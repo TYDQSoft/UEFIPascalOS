@@ -2460,9 +2460,9 @@ begin
  for i:=1 to original_parameter_number do
   begin
    size:=(original_parameter_items+i-1)^.item_size;
+   ReallocMem(res.param_content,totalsize+size);
+   Move((res.param_content+totalsize)^,(original_parameter_items+i-1)^.item_content^,size);
    totalsize:=totalsize+size;
-   ReallocMem(res.param_content,totalsize);
-   for j:=1 to size do (res.param_content+totalsize-size+j-1)^:=((original_parameter_items+i-1)^.item_content+j-1)^;
    (res.param_size+i-1)^:=size;
   end;
  sys_parameter_construct:=res;
