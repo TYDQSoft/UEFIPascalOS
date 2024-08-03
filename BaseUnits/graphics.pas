@@ -275,8 +275,8 @@ begin
  height:=graphicsheap.graphics_sections[index].draw_height; 
  if(relativex>width) or (relativex=0) then exit;
  if(relativey>height) or (relativey=0) then exit;
- if(relativex+blockwidth>width) then correctwidth:=width-relativex+1;
- if(relativey+blockheight>height) then correctheight:=height-relativey+1;
+ if(relativex+blockwidth>width) then correctwidth:=width-relativex+1 else correctwidth:=blockwidth;
+ if(relativey+blockheight>height) then correctheight:=height-relativey+1 else correctheight:=blockheight;
  pstart:=(graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_start-Natuint(@graphicsheap.graphics_content)+1) shr 2;
  for i:=1 to correctheight do
   for j:=1 to correctwidth do
