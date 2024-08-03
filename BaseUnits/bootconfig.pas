@@ -7,7 +7,6 @@ type screen_config=packed record
                    screen_address:qword;
                    screen_width:qword;
                    screen_height:qword;
-                   screen_scanline:qword;
                    end;
      Pscreen_config=^screen_config;
      
