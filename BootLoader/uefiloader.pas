@@ -48,6 +48,7 @@ begin
  efi_console_initialize(systemtable,efi_bck_black,efi_lightgrey,500);
  edl:=efi_disk_tydq_get_fs_list(systemtable);
  fsi:=tydq_fs_systeminfo_read(edl);
+ freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
  efsl:=efi_list_all_file_system(systemtable,0);
  i:=1; count:=efsl.file_system_count;
  gpl:=efi_graphics_initialize(systemtable);
@@ -56,11 +57,6 @@ begin
  screenconfig.screen_address:=(gpl.graphics_item^)^.Mode^.FrameBufferBase;
  screenconfig.screen_width:=(gpl.graphics_item^)^.Mode^.Info^.HorizontalResolution;
  screenconfig.screen_height:=(gpl.graphics_item^)^.Mode^.Info^.VerticalResolution;
- screenconfig.screen_scanline:=(gpl.graphics_item^)^.Mode^.Info^.PixelsPerScanLine;
- initparam:=allocmem(sizeof(sys_parameter_item)*1);
- initparam^.item_content:=@screenconfig;
- initparam^.item_size:=sizeof(screen_config);
- param:=sys_parameter_construct(initparam,1);
  while(i<=count) do
   begin
    sfsp:=(efsl.file_system_content+i-1)^;
@@ -78,6 +74,8 @@ begin
    efi_console_output_string(systemtable,'Boot failed,the kernel does not exist.'#10);
    while(True) do;
   end;
+ freemem(gpl.graphics_item); gpl.graphics_count:=0;
+ freemem(efsl.file_system_content); efsl.file_system_count:=0;
  bool[1]:=Pelf64_header(@proccontent)^.elf64_identify[1]=Byte(#$7F);
  bool[2]:=Pelf64_header(@proccontent)^.elf64_identify[2]=Byte('E');
  bool[3]:=Pelf64_header(@proccontent)^.elf64_identify[3]=Byte('L');
@@ -126,18 +124,24 @@ begin
     begin
      SourceStart:=Pointer(@proccontent+(program_headers+i-1)^.program_offset);
      DestStart:=Pointer((program_headers+i-1)^.program_virtual_address+RelocateOffset);
-     SystemTable^.BootServices^.CopyMem(DestStart,SourceStart,(program_headers+i-1)^.program_file_size);
+     Move(DestStart^,SourceStart^,(program_headers+i-1)^.program_file_size);
     end;
   end;
  KernelEntry:=Pointer(header.elf64_entry+RelocateOffset);
  {Load ended}
+ initparam:=allocmem(sizeof(sys_parameter_item));
+ initparam^.item_content:=@screenconfig;
+ initparam^.item_size:=sizeof(screen_config);
+ param:=sys_parameter_construct(initparam,1);
  funcaddr:=sys_function(KernelEntry);
  func.func:=funcaddr;
  funcandparam:=sys_parameter_and_function_construct(param,func,sizeof(qword));
  res:=sys_parameter_function_execute(funcandparam);
+ sys_parameter_and_function_free(funcandparam);
  partstr:=UintToPWChar(Pqword(res)^);
  efi_console_output_string(systemtable,partstr);
  Wstrfree(partstr);
+ SystemTable^.BootServices^.FreePages(KernelRelocateBase,PageCount);
  while True do;
  efi_main:=efi_success;
 end;
