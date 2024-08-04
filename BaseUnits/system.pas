@@ -2452,7 +2452,7 @@ begin
  PWCharGetWildCard:=res;
 end; 
 function sys_parameter_construct(original_parameter_items:Psys_parameter_item;original_parameter_number:natuint):sys_parameter;[public,alias:'sys_parameter_construct'];
-var i,j,size,totalsize:natuint;
+var i,size,totalsize:natuint;
     res:sys_parameter;
 begin
  res.param_size:=allocmem(sizeof(natuint)*original_parameter_number);
