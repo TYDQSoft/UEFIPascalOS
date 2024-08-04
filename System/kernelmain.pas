@@ -13,7 +13,7 @@ begin
  graphics_draw_block(ptr,1,1,screenconfig.screen_width,screenconfig.screen_height,$FF,$FF,$FF,$FF);
  graphics_heap_output_to_screen(screenconfig.screen_address,screenconfig.screen_width,screenconfig.screen_height);
  res:=allocmem(sizeof(qword));
- res^:=120;
+ res^:=screenconfig.screen_width;
  kernel_main:=res;
 end;
 
