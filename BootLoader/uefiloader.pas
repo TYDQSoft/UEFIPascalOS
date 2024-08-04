@@ -53,10 +53,6 @@ begin
  i:=1; count:=efsl.file_system_count;
  gpl:=efi_graphics_initialize(systemtable);
  efi_graphics_get_maxwidth_maxheight_and_maxdepth(gpl,1);
- screenconfig.screen_is_graphics:=fsi.header.tydqgraphics;
- screenconfig.screen_address:=(gpl.graphics_item^)^.Mode^.FrameBufferBase;
- screenconfig.screen_width:=(gpl.graphics_item^)^.Mode^.Info^.HorizontalResolution;
- screenconfig.screen_height:=(gpl.graphics_item^)^.Mode^.Info^.VerticalResolution;
  while(i<=count) do
   begin
    sfsp:=(efsl.file_system_content+i-1)^;
@@ -74,6 +70,10 @@ begin
    efi_console_output_string(systemtable,'Boot failed,the kernel does not exist.'#10);
    while(True) do;
   end;
+ screenconfig.screen_is_graphics:=fsi.header.tydqgraphics;
+ screenconfig.screen_address:=(gpl.graphics_item^)^.Mode^.FrameBufferBase;
+ screenconfig.screen_width:=(gpl.graphics_item^)^.Mode^.Info^.HorizontalResolution;
+ screenconfig.screen_height:=(gpl.graphics_item^)^.Mode^.Info^.VerticalResolution;
  freemem(gpl.graphics_item); gpl.graphics_count:=0;
  freemem(efsl.file_system_content); efsl.file_system_count:=0;
  bool[1]:=Pelf64_header(@proccontent)^.elf64_identify[1]=Byte(#$7F);
@@ -134,14 +134,23 @@ begin
  initparam^.item_size:=sizeof(screen_config);
  param:=sys_parameter_construct(initparam,1);
  funcaddr:=sys_function(KernelEntry);
+ efi_console_output_String(systemtable,'S1'#10);
  func.func:=funcaddr;
+ efi_console_output_String(systemtable,'S2'#10);
  funcandparam:=sys_parameter_and_function_construct(param,func,sizeof(qword));
+ efi_console_output_String(systemtable,'S3'#10);
  res:=sys_parameter_function_execute(funcandparam);
- sys_parameter_and_function_free(funcandparam);
+ efi_console_output_String(systemtable,'S4'#10);
  partstr:=UintToPWChar(Pqword(res)^);
  efi_console_output_string(systemtable,partstr);
  Wstrfree(partstr);
- SystemTable^.BootServices^.FreePages(KernelRelocateBase,PageCount);
+ efi_console_output_String(systemtable,'S5'#10);
+ freemem(res);
+ efi_console_output_String(systemtable,'S6'#10);
+ sys_parameter_and_function_free(funcandparam);
+ efi_console_output_String(systemtable,'S7'#10);
+ freemem(initparam);
+ efi_console_output_String(systemtable,'S8'#10);
  while True do;
  efi_main:=efi_success;
 end;
