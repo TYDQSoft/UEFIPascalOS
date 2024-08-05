@@ -6,14 +6,14 @@ interface
 {$IFDEF CPU32}
 const compilermaxheap=1048576;
       compilermaxsection=16384;
-      maxheap=16777216*4;
+      maxheap=16777216*2;
       maxsection=16384*64;
       maxnatint=$7FFFFFFF;
       maxnatuint=$FFFFFFFF;
 {$ELSE CPU32}
 const compilermaxheap=4194304;
       compilermaxsection=65536;
-      maxheap=67108864*4;
+      maxheap=67108864*2;
       maxsection=65536*64;
       maxnatint=$7FFFFFFFFFFFFFFF;
       maxnatuint=$FFFFFFFFFFFFFFFF;
@@ -129,7 +129,7 @@ type
 	       heapcount,heaprest:natuint;
                end;
   systemheap=packed record
-	     heapcontent:array[1..maxheap] of word;
+	     heapcontent:array[1..maxheap] of dword;
 	     heapsection:array[1..maxsection,1..2] of natuint;
 	     heapcount,heaprest:natuint;
              end;
@@ -154,7 +154,7 @@ type
                 param_content:PByte;
                 param_size:^natuint;
                 param_count:natuint;
-                end;                         
+                end;
   sys_function=function (parameter:sys_parameter):PByte;
   sys_procedure=procedure (parameter:sys_parameter);
   sys_parameter_function=packed record
@@ -460,7 +460,7 @@ begin
 end;
 procedure sysheap_initialize;[public,alias:'sysheap_initialize'];
 begin
- sysheap.heapcount:=0; sysheap.heaprest:=maxheap*sizeof(word);
+ sysheap.heapcount:=0; sysheap.heaprest:=maxheap*sizeof(dword);
 end;
 procedure sysheap_delete_item(ptr:Pointer);[public,alias:'sysheap_delete_item'];
 var procptr1,procptr2:PByte;
@@ -2457,6 +2457,7 @@ var i,size,totalsize:natuint;
 begin
  res.param_size:=allocmem(sizeof(natuint)*original_parameter_number);
  res.param_count:=original_parameter_number; size:=0; totalsize:=0;
+ res.param_content:=nil;
  for i:=1 to original_parameter_number do
   begin
    size:=(original_parameter_items+i-1)^.item_size;
@@ -2469,10 +2470,9 @@ begin
 end;
 function sys_parameter_and_function_construct(parameter:sys_parameter;func:sys_parameter_function;result_size:natuint):sys_parameter_function_and_parameter;[public,alias:'sys_parameter_and_function_construct'];
 var res:sys_parameter_function_and_parameter;
-    size:natuint;
 begin
- res.parameter_parameter:=parameter;
  res.parameter_function:=func;
+ res.parameter_parameter:=parameter;
  res.parameter_result_size:=result_size;
  res.parameter_disposed:=false;
  sys_parameter_and_function_construct:=res;

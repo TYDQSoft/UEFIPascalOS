@@ -4,7 +4,7 @@ interface
 
 
 const graphics_heap_max=1 shl 28;
-      graphics_section_max=1 shl 16;
+      graphics_section_max=1 shl 20;
     
 type graphics_item=packed record
                    Red:byte;
@@ -250,7 +250,6 @@ begin
  height:=graphicsheap.graphics_sections[index].draw_height; 
  if(relativex>width) or (relativex=0) then exit;
  if(relativey>height) or (relativey=0) then exit;
- width:=graphicsheap.graphics_sections[index].draw_width; height:=graphicsheap.graphics_sections[index].draw_height;
  pos:=(relativey-1)*width+relativex;
  pstart:=(graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_start-Natuint(@graphicsheap.graphics_content)+1) shr 2;
  graphicsheap.graphics_content[pstart+pos-1].Red:=Red;
