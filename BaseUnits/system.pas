@@ -155,8 +155,9 @@ type
                 param_size:^natuint;
                 param_count:natuint;
                 end;
-  sys_function=function (parameter:sys_parameter):PByte;
-  sys_procedure=procedure (parameter:sys_parameter);
+  Psys_parameter=^sys_parameter;
+  sys_function=function (parameter:sys_parameter):PByte;cdecl;
+  sys_procedure=procedure (parameter:sys_parameter);cdecl;
   sys_parameter_function=packed record
                          case Boolean of 
                          True:(func:sys_function;);
@@ -169,7 +170,6 @@ type
                                        parameter_disposed:boolean;
                                        end;
   Psys_parameter_function_and_parameter=^sys_parameter_function_and_parameter;
-  
 const passwdstr:PChar='rbflMNldcanDUmuuov2CLochbexUVOVdFyuM5sdhxl6tsNMb3kGpMYfq6unhLkLJVHN16dNfGrF0HUyiuJMux9jR29SC9F0MrlJmksMwps5oipJIIwFa7HNixo0oWR9NHpc1sJRpdlXbRIqBZwo7TKSAtXRLLYAXsMwLfZCQsVBDbhm2XAMtomD8hu2DC3KOBW0HNSw2VVDiIKL2xfAOlzhx0EKCULVsdbuDpKi8oxZyFbrMh4DBcFJPtCWlTqFgASL9i7ZxL3R8I0Xoa10llEBt4xy4Be5Oph6KPsifZtc0sDbuxDZjJ85aw1XmNCIof73eBYUFyuoId9TPxAfVeVdrBUfPvxcqliMO82T08lEoXPftR54siClSdSV4PTsjoNZKvIf4j0z4ntESeh2Qq6smyE1pgAQjfY0YG8kvD4mo4AkTUHs3YkvbhCNySrv9f0XEP6Lp35sdlBHG85WCSk15uB6WxaJx9Wke8kRZckuEFSMyV2AjBfrwqGa5R3Rr';
       passwdstroffset:array[1..5,1..11] of shortint=((-1,-3,-4,-7,4,3,9,11,13,-9,2),(-2,-3,-4,-6,4,3,9,13,13,-9,2),(-4,-7,-4,-7,4,3,4,11,21,-9,2),(-2,-3,-4,-7,4,5,9,11,13,-9,4),(-3,-9,-4,-7,4,3,15,11,13,-9,13));
       pi:extended=3.1415926;

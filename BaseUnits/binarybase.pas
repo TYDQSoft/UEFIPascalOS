@@ -684,7 +684,7 @@ type elf32_header=packed record
                          SizeOfImage:dword;
                          SizeOfHeader:dword;
                          Checksum:dword;
-                         Subsytem:word;
+                         Subsystem:word;
                          DllCharacteristics:word;
                          SizeOfStackReserve:dword;
                          SizeOfStackCommit:dword;
@@ -714,7 +714,7 @@ type elf32_header=packed record
                          SizeOfImage:dword;
                          SizeOfHeader:dword;
                          Checksum:dword;
-                         Subsytem:word;
+                         Subsystem:word;
                          DllCharacteristics:word;
                          SizeOfStackReserve:dword;
                          SizeOfStackCommit:dword;

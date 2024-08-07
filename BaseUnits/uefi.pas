@@ -2896,7 +2896,6 @@ procedure efi_reset_system_cold(systemtable:Pefi_system_table);
 procedure efi_system_shutdown(systemtable:Pefi_system_table);
 function efi_graphics_initialize(systemtable:Pefi_system_table):efi_graphics_list;
 procedure efi_graphics_get_maxwidth_maxheight_and_maxdepth(egl:efi_graphics_list;eglindex:natuint);
-procedure efi_graphics_draw_screen(egl:efi_graphics_list;eglindex:natuint;screendata:Pointer;screensize:natuint);
 function efi_pointer_initialize(systemtable:Pefi_system_table):efi_pointer_list;
 procedure efi_mouse_initialize(epl:efi_pointer_list;eplindex:natuint);
 procedure efi_pointer_refresh_cursor(Event:efi_event;Context:Pointer);cdecl;
@@ -4068,13 +4067,6 @@ begin
     end;
   end;
  ptr^.SetMode(ptr,graphicsindex);
-end;
-procedure efi_graphics_draw_screen(egl:efi_graphics_list;eglindex:natuint;screendata:Pointer;screensize:natuint);[public,alias:'EFI_GRAPHICS_DRAW_SCREEN'];
-var ptr:Pefi_graphics_output_protocol;
-begin
- if(eglindex>egl.graphics_count) then exit;
- ptr:=(egl.graphics_item+eglindex-1)^;
- ptr^.Blt(ptr,screendata,EfiBltBufferToVideo,0,0,0,0,maxscreenwidth,maxscreenheight,sizeof(dword));
 end;
 procedure efi_graphics_free(var egl:efi_graphics_list);[public,alias:'EFI_GRAPICS_FREE'];
 begin
