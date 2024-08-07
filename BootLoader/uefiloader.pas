@@ -1,4 +1,4 @@
-library uefiloader;
+program uefiloader;
 
 {$MODE FPC}
 
@@ -7,8 +7,9 @@ uses uefi,tydqfs,binarybase,bootconfig;
 var proccontent:array[1..67108864] of byte;
     procsize:dword;
     
-function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;cdecl;[public,alias:'_DLLMainCRTStartup'];
-var fsi:tydqfs_system_info;
+function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;[public,alias:'_mainCRTStartup'];
+var {For checking elf file}
+    fsi:tydqfs_system_info;
     edl:efi_disk_list;
     sfsp:Pefi_simple_file_system_protocol;
     fp:Pefi_file_protocol;
@@ -21,9 +22,6 @@ var fsi:tydqfs_system_info;
     partstr:PWideChar;
     gpl:efi_graphics_list;
     isgraphics:boolean;
-    framebufferbase:qword;
-    framebufferwidth:dword;
-    framebufferheight:dword;
     loaderscreenconfig:screen_config;
     {For elf structure}
     header:elf64_header;
@@ -42,9 +40,11 @@ var fsi:tydqfs_system_info;
     func:sys_parameter_function;
     funcandparam:sys_parameter_function_and_parameter;
     res:Pointer;
-begin 
+begin  
+ {Initialize the uefi loader}
  compheap_initialize; sysheap_initialize;
  efi_console_initialize(systemtable,efi_bck_black,efi_lightgrey,500);
+ efi_console_enable_mouse_blink(systemtable,false,0);
  edl:=efi_disk_tydq_get_fs_list(systemtable);
  fsi:=tydq_fs_systeminfo_read(edl);
  freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
@@ -52,6 +52,7 @@ begin
  i:=1; count:=efsl.file_system_count;
  gpl:=efi_graphics_initialize(systemtable);
  efi_graphics_get_maxwidth_maxheight_and_maxdepth(gpl,1);
+ {Detect the kernel file}
  while(i<=count) do
   begin
    sfsp:=(efsl.file_system_content+i-1)^;
@@ -69,10 +70,12 @@ begin
    efi_console_output_string(systemtable,'Boot failed,the kernel does not exist.'#10);
    while(True) do;
   end;
+ {Initialize the kernel parameter}
  loaderscreenconfig.screen_is_graphics:=fsi.header.tydqgraphics;
  loaderscreenconfig.screen_address:=(gpl.graphics_item^)^.Mode^.FrameBufferBase;
  loaderscreenconfig.screen_width:=(gpl.graphics_item^)^.Mode^.Info^.HorizontalResolution;
  loaderscreenconfig.screen_height:=(gpl.graphics_item^)^.Mode^.Info^.VerticalResolution;
+ {Free the system heap}
  freemem(gpl.graphics_item); gpl.graphics_count:=0;
  freemem(efsl.file_system_content); efsl.file_system_count:=0;
  {Check the elf kernel}
@@ -127,10 +130,7 @@ begin
     end;
   end;
  KernelEntry:=Pointer(header.elf64_entry+RelocateOffset);
- partstr:=UintToWhex(Qword(KernelEntry));
- efi_console_output_string(systemtable,partstr);
- efi_console_output_string(systemtable,#10);
- Wstrfree(partstr);
+ efi_console_enable_mouse_blink(systemtable,false,0);
  {Set the parameter for kernel}
  initparam:=allocmem(sizeof(sys_parameter_item));
  initparam^.item_content:=@loaderscreenconfig;
@@ -139,37 +139,17 @@ begin
  {Execute the elf file}
  func.func:=sys_function(KernelEntry);
  funcandparam:=sys_parameter_and_function_construct(param,func,sizeof(return_config));
- partstr:=UintToWhex(Qword(funcandparam.parameter_function.func));
+ partstr:=UintToWhex(Qword(@funcandparam.parameter_parameter));
  efi_console_output_string(systemtable,partstr);
  efi_console_output_string(systemtable,#10);
  Wstrfree(partstr);
  res:=sys_parameter_function_execute(funcandparam);
- partstr:=UintToPWChar(Qword(funcandparam.parameter_parameter.param_content));
- efi_console_output_string(systemtable,partstr);
- efi_console_output_string(systemtable,#10);
- Wstrfree(partstr);
- partstr:=UintToPWChar(Qword(funcandparam.parameter_parameter.param_size^));
- efi_console_output_string(systemtable,partstr);
- efi_console_output_string(systemtable,#10);
- Wstrfree(partstr);
- partstr:=UintToPWChar(Qword(funcandparam.parameter_parameter.param_count));
- efi_console_output_string(systemtable,partstr);
- efi_console_output_string(systemtable,#10);
- Wstrfree(partstr);
- partstr:=UintToPWChar(Preturn_config(res)^.content);
- efi_console_output_string(systemtable,partstr);
- efi_console_output_string(systemtable,#10);
- Wstrfree(partstr);
- partstr:=UintToPWChar(Preturn_config(res)^.size);
- efi_console_output_string(systemtable,partstr);
- efi_console_output_string(systemtable,#10);
- Wstrfree(partstr);
- partstr:=UintToPWChar(Preturn_config(res)^.count);
- efi_console_output_string(systemtable,partstr);
- efi_console_output_string(systemtable,#10);
- Wstrfree(partstr);
+ {Free the memory}
+ sys_parameter_and_function_free(funcandparam);
+ SystemTable^.BootServices^.FreePages(KernelRelocateBase,PageCount);
  while True do;
  efi_main:=efi_success;
 end;
 
+begin
 end.
