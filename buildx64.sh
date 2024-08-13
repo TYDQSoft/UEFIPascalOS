@@ -5,11 +5,6 @@
 	/home/tydq/source/compiler/ppcx64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Twin64 -Cg BaseUnits/fpintres.pas
 	/home/tydq/source/compiler/ppcx64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Twin64 -Cg BaseUnits/sysinit.pas
 	/home/tydq/source/compiler/ppcx64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Twin64 -Cg -dCPUX86_64 -dcpux86_64 -FuBaseUnits -FEBinaries/BootLoader BootLoader/uefiloader.pas
-	/home/tydq/source/compiler/ppcx64 -n -O4 -Si -Sc -Sg -Xd -Ur -Us -CX -Xs -Cg BaseUnits/system.pas
-	/home/tydq/source/compiler/ppcx64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -Xs -Cg BaseUnits/fpintres.pas
-	/home/tydq/source/compiler/ppcx64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -Xs -Cg BaseUnits/sysinit.pas
-	/home/tydq/source/compiler/ppcx64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -Xs -Cg BaseUnits/si_prc.pas
-	/home/tydq/source/compiler/ppcx64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -Xs -Xi -al -Cg -dCPUX86_64 -dcpux86_64 -FuBaseUnits -FEBinaries/BootLoader BootLoader/uefiloaderx64.pas
 	objcopy -I pei-x86-64 -O efi-app-x86-64 Binaries/BootLoader/uefiloader.exe Binaries/BootLoader/bootx64.efi
 	rm -rf BaseUnits/*.ppu BaseUnits/*.o Installer/*.o Installer/*.ppu BootLoader/*.o BootLoader/*.ppu
 	/home/tydq/source/compiler/ppcx64 -n -O4 -Si -Sc -Sg -Xd -Ur -Us -CX -XXs -Cg BaseUnits/system.pas
