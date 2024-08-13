@@ -1,10 +1,6 @@
 unit graphics;
 
 interface
-
-
-const graphics_heap_max=1 shl 28;
-      graphics_section_max=1 shl 20;
     
 type graphics_item=packed record
                    Red:byte;
@@ -12,330 +8,378 @@ type graphics_item=packed record
                    Blue:byte;
                    Alpha:byte;
                    end;
+     graphics_color=packed record
+                    Red:byte;
+                    Green:byte;
+                    Blue:byte;
+                    Alpha:byte;
+                    end;
      Pgraphics_item=^graphics_item;
-     graphics_section=packed record
-                      pointer_start,pointer_end:natuint;
-                      draw_x,draw_y,draw_width,draw_height:dword;
+     graphics_segment=packed record
+                      start:natuint;
+                      left,top,width,height:dword;
                       visible:boolean;
                       end;
-     graphics_screen=array[1..33554432] of graphics_item;
      graphics_output_blt_pixel=packed record
                                Blue:byte;
                                Green:byte;
                                Red:byte;
                                Reserved:byte;
                                end;
-     graphics_output_screen=array[1..33554432] of graphics_output_blt_pixel;
+     Pgraphics_output_blt_pixel=^graphics_output_blt_pixel;
      graphics_heap=packed record
-                   graphics_content:array[1..graphics_heap_max] of graphics_item;
-                   graphics_sections:array[1..graphics_section_max] of graphics_section;
-                   graphics_count,graphics_rest:natuint;
+                   content:^graphics_item;
+                   contentused:natuint;
+                   contentmax:natuint;
+                   segment:^graphics_segment;
+                   segmentcount:natuint;
+                   segmentcountmax:natuint;
+                   screenwidth:dword;
+                   screenheight:dword;
+                   initscreen:^graphics_item;
+                   framebufferbase:^graphics_output_blt_pixel;
                    end;
+     Pgraphics_heap=^graphics_heap;
 
-procedure graphics_heap_initialize;     
-function graphics_heap_getmem(startx,starty,width,height:natuint):Pgraphics_item;
-function graphics_heap_getmemsize(ptr:Pgraphics_item):natuint;
-function graphics_heap_allocmem(startx,starty,width,height:natuint):Pgraphics_item;
-procedure graphics_heap_freemem(var ptr:Pgraphics_item);
-procedure graphics_heap_changeposition(var ptr:Pgraphics_item;startx,starty:natuint);
-procedure graphics_heap_changevisible(var ptr:Pgraphics_item;visible:boolean);
-procedure graphics_heap_reallocmem(var ptr:Pgraphics_item;startx,starty,width,height:natuint);
-procedure graphics_heap_move(dest,source:Pgraphics_item;size:natuint);
-procedure graphics_draw_pixel(ptr:Pgraphics_item;relativex,relativey:dword;Red,Green,Blue,Alpha:byte);
-procedure graphics_draw_block(ptr:Pgraphics_item;relativex,relativey,blockwidth,blockheight:dword;Red,Blue,Green,Alpha:byte);
-procedure graphics_heap_output_to_screen(framebufferbase:qword;screenwidth,screenheight:dword);
+const graphics_zero:graphics_item=(Red:0;Green:0;Blue:0;Alpha:0);
+      graphics_red:graphics_color=(Red:$FF;Green:0;Blue:0;Alpha:$FF);
+      graphics_green:graphics_color=(Red:0;Green:$FF;Blue:0;Alpha:$FF);
+      graphics_blue:graphics_color=(Red:0;Green:0;Blue:$FF;Alpha:$FF);
+      graphics_white:graphics_color=(Red:$FF;Green:$FF;Blue:$FF;Alpha:$FF);
+      graphics_black:graphics_color=(Red:0;Green:0;Blue:0;Alpha:$FF);
 
-var graphicsheap:graphics_heap;
-    graphicsscreen:graphics_screen;
-    graphicsoutputscreen:graphics_output_screen;
+function dword_to_graphics_color(number:dword):graphics_color;
+procedure graphics_heap_initialize(MemoryStart:Pointer;ContentCount:natuint;SegmentCount:natuint;screenwidth:natuint;screenheight:natuint;framebufferbase:Pgraphics_output_blt_pixel);
+function graphics_getmem(startx,starty,width,height:dword):Pgraphics_item;
+function graphics_allocmem(startx,starty,width,height:dword):Pgraphics_item;
+function graphics_getmemsize(ptr:Pgraphics_item):natuint;
+function graphics_freemem(var ptr:Pgraphics_item):natuint;
+procedure graphics_move(Source:Pgraphics_item;var Dest:Pgraphics_item;Count:natuint);
+procedure graphics_changeposition(ptr:Pgraphics_item;newstartx,newstarty:dword);
+procedure graphics_changevisible(ptr:Pgraphics_item;visible:boolean);
+procedure graphics_reallocmem(var ptr:Pgraphics_item;newstartx,newstarty,newwidth,newheight:dword);
+procedure graphics_draw_pixel(ptr:Pgraphics_item;relativex,relativey:dword;color:graphics_color);
+procedure graphics_draw_block(ptr:Pgraphics_item;relativex,relativey,blockwidth,blockheight:dword;color:graphics_color);
+procedure graphics_draw_circle(ptr:Pgraphics_item;relativex,relativey:dword;radius:dword;color:graphics_color);
+procedure graphics_output_to_screen;
+
+var graphheap:graphics_heap;
 
 implementation
 
-procedure graphics_heap_initialize;[public,alias:'graphics_heap_initialize'];
+function dword_to_graphics_color(number:dword):graphics_color;[public,alias:'dword_to_graphics_color'];
+var res:graphics_color;
 begin
- graphicsheap.graphics_count:=0; graphicsheap.graphics_rest:=graphics_heap_max;
+ res.Red:=number div 16777216;
+ res.Green:=number div 65536 mod 256;
+ res.Blue:=number div 256 mod 256;
+ res.Alpha:=number mod 256;
+ dword_to_graphics_color:=res;
+end;
+procedure graphics_heap_initialize(MemoryStart:Pointer;ContentCount:natuint;SegmentCount:natuint;screenwidth:natuint;screenheight:natuint;framebufferbase:Pgraphics_output_blt_pixel);[public,alias:'graphics_heap_initialize'];
+begin
+ graphheap.content:=MemoryStart;
+ graphheap.contentused:=0;
+ graphheap.contentmax:=ContentCount;
+ graphheap.segment:=MemoryStart+ContentCount*sizeof(graphics_item);
+ graphheap.segmentcount:=0;
+ graphheap.segmentcountmax:=SegmentCount;
+ graphheap.screenwidth:=screenwidth;
+ graphheap.screenheight:=screenheight;
+ graphheap.initscreen:=MemoryStart+ContentCount*sizeof(graphics_item)+sizeof(graphics_segment)*SegmentCount;
+ graphheap.framebufferbase:=framebufferbase;
 end;
 procedure graphics_heap_delete_item(ptr:Pgraphics_item);[public,alias:'graphics_heap_delete_item'];
-var i,j,k,size:natuint;
-    zero:graphics_item;
+var index,size,i,j:natuint;
+    procptr1,procptr2:Pgraphics_item;
 begin
- i:=1;
- zero.Red:=0; zero.Green:=0; zero.Blue:=0; zero.Alpha:=0;
- while(i<=graphicsheap.graphics_count) do
+ index:=1; size:=0;
+ while(index<=graphheap.segmentcount) do
   begin
-   if(Natuint(ptr)>=graphicsheap.graphics_sections[i].pointer_start) and (Natuint(ptr)<=graphicsheap.graphics_sections[i].pointer_end) then break;
-   inc(i,1);
+   size:=(graphheap.segment+index-1)^.width*(graphheap.segment+index-1)^.height*
+   sizeof(graphics_item);
+   if(Natuint(ptr)>=(graphheap.segment+index-1)^.start) and (Natuint(ptr)<=(graphheap.segment+index-1)^.start+size-1) then break;
+   inc(index);
   end;
- if(i>graphicsheap.graphics_count) then exit;
- size:=graphicsheap.graphics_sections[i].pointer_end-graphicsheap.graphics_sections[i].pointer_start+1;
- for j:=i+1 to graphicsheap.graphics_count do
+ if(index>graphheap.segmentcount) then exit;
+ for i:=index+1 to graphheap.segmentcount do
   begin
-   k:=graphicsheap.graphics_sections[j].pointer_start;
-   while(k<=graphicsheap.graphics_sections[j].pointer_end) do
+   for j:=1 to (graphheap.segment+i-1)^.width*(graphheap.segment+i-1)^.height do
     begin
-     graphicsheap.graphics_content[(k-size-Qword(@graphicsheap.graphics_content)+1) shr 2]:=
-     graphicsheap.graphics_content[(k-Qword(@graphicsheap.graphics_content)+1) shr 2];
-     graphicsheap.graphics_content[(k-Qword(@graphicsheap.graphics_content)+1) shr 2]:=zero;
-     inc(k,1 shl 2);
+     procptr1:=Pgraphics_item((graphheap.segment+i-1)^.start+(j-1)*sizeof(graphics_item));
+     procptr2:=Pgraphics_item((graphheap.segment+i-1)^.start+(j-1)*sizeof(graphics_item)-size);
+     procptr2^:=procptr1^;
     end;
-   graphicsheap.graphics_sections[j-1].pointer_start:=graphicsheap.graphics_sections[j].pointer_start-size;
-   graphicsheap.graphics_sections[j-1].pointer_end:=graphicsheap.graphics_sections[j].pointer_end-size;
-   graphicsheap.graphics_sections[j-1].draw_x:=graphicsheap.graphics_sections[j].draw_x;
-   graphicsheap.graphics_sections[j-1].draw_y:=graphicsheap.graphics_sections[j].draw_y;
-   graphicsheap.graphics_sections[j-1].draw_width:=graphicsheap.graphics_sections[j].draw_width;
-   graphicsheap.graphics_sections[j-1].draw_height:=graphicsheap.graphics_sections[j].draw_height;
+   (graphheap.segment+i-2)^.start:=(graphheap.segment+i-1)^.start-size;
   end;
- dec(graphicsheap.graphics_count);
- inc(graphicsheap.graphics_rest,size shr 2);
+ dec(graphheap.contentused,size shr 2);
+ dec(graphheap.segmentcount);
 end;
-function graphics_heap_getmem(startx,starty,width,height:natuint):Pgraphics_item;[public,alias:'graphics_heap_getmem'];
-var i,size:natuint;
-    pstart,pend:natuint;
+function graphics_getmem(startx,starty,width,height:dword):Pgraphics_item;[public,alias:'graphics_getmem'];
+var i:natuint;
+    procptr:Pgraphics_item;
 begin
- size:=width*height;
- if(graphicsheap.graphics_rest<size shl 2) then exit(nil);
- if(graphicsheap.graphics_count>=graphics_section_max) then exit(nil);
- if(size=0) then exit(nil);
- inc(graphicsheap.graphics_count);
- if(graphicsheap.graphics_count=1) then graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_start:=Natuint(@graphicsheap.graphics_content)
- else graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_start:=graphicsheap.graphics_sections[graphicsheap.graphics_count-1].pointer_end+1;
- graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_end:=graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_start+size shl 2-1;
- pstart:=(graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_start-Natuint(@graphicsheap.graphics_content)+1) shr 2;
- pend:=(graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_end-Natuint(@graphicsheap.graphics_content)+1) shr 2;
- graphicsheap.graphics_sections[graphicsheap.graphics_count].draw_x:=startx;
- graphicsheap.graphics_sections[graphicsheap.graphics_count].draw_y:=starty;
- graphicsheap.graphics_sections[graphicsheap.graphics_count].draw_width:=width;
- graphicsheap.graphics_sections[graphicsheap.graphics_count].draw_height:=height;
- graphicsheap.graphics_sections[graphicsheap.graphics_count].visible:=true;
- for i:=1 to size do
+ //if(graphheap.contentused+width*height>graphheap.contentmax) then exit(nil);
+ //if(graphheap.segmentcount>=graphheap.segmentcountmax) then exit(nil);
+ inc(graphheap.segmentcount);
+ if(graphheap.segmentcount=1) then
   begin
-   graphicsheap.graphics_content[pstart+i-1].Red:=0;
-   graphicsheap.graphics_content[pstart+i-1].Green:=0;
-   graphicsheap.graphics_content[pstart+i-1].Blue:=0;
-   graphicsheap.graphics_content[pstart+i-1].Alpha:=0;
+   (graphheap.segment+graphheap.segmentcount-1)^.start:=Natuint(graphheap.content);
+  end
+ else if(graphheap.segmentcount>1) then
+  begin
+   (graphheap.segment+graphheap.segmentcount-1)^.start:=Natuint(graphheap.content+graphheap.contentused);
   end;
- dec(graphicsheap.graphics_rest,size);
- graphics_heap_getmem:=Pointer(graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_start);
+ (graphheap.segment+graphheap.segmentcount-1)^.left:=startx;
+ (graphheap.segment+graphheap.segmentcount-1)^.top:=starty;
+ (graphheap.segment+graphheap.segmentcount-1)^.width:=width;
+ (graphheap.segment+graphheap.segmentcount-1)^.height:=height;
+ (graphheap.segment+graphheap.segmentcount-1)^.visible:=true;
+ for i:=1 to width*height do
+  begin
+   procptr:=Pointer((graphheap.segment+graphheap.segmentcount-1)^.start+(i-1)*4); procptr^:=graphics_zero;
+  end;
+ inc(graphheap.contentused,width*height);
+ graphics_getmem:=Pointer((graphheap.segment+graphheap.segmentcount-1)^.start);
 end;
-function graphics_heap_getmemsize(ptr:Pgraphics_item):natuint;[public,alias:'graphics_heap_getmemsize'];
-var i,size:natuint;
+function graphics_allocmem(startx,starty,width,height:dword):Pgraphics_item;[public,alias:'graphics_allocmem'];
+var i:natuint;
+    procptr:Pgraphics_item;
 begin
- i:=1;
- while(i<=graphicsheap.graphics_count) do
+ if(graphheap.contentused+width*height>graphheap.contentmax) then exit(nil);
+ if(graphheap.segmentcount>=graphheap.segmentcountmax) then exit(nil);
+ inc(graphheap.segmentcount);
+ if(graphheap.segmentcount=1) then
   begin
-   if(Natuint(ptr)>=graphicsheap.graphics_sections[i].pointer_start) and (Natuint(ptr)<=graphicsheap.graphics_sections[i].pointer_end) then break;
-   inc(i,1);
+   (graphheap.segment+graphheap.segmentcount-1)^.start:=Natuint(graphheap.content);
+  end
+ else if(graphheap.segmentcount>1) then
+  begin
+   (graphheap.segment+graphheap.segmentcount-1)^.start:=Natuint(graphheap.content+graphheap.contentused);
   end;
- if(i>graphicsheap.graphics_count) then graphics_heap_getmemsize:=0 
- else graphics_heap_getmemsize:=(graphicsheap.graphics_sections[i].pointer_end-graphicsheap.graphics_sections[i].pointer_start+1) shr 2;
+ (graphheap.segment+graphheap.segmentcount-1)^.left:=startx;
+ (graphheap.segment+graphheap.segmentcount-1)^.top:=starty;
+ (graphheap.segment+graphheap.segmentcount-1)^.width:=width;
+ (graphheap.segment+graphheap.segmentcount-1)^.height:=height;
+ (graphheap.segment+graphheap.segmentcount-1)^.visible:=true;
+ for i:=1 to width*height do
+  begin
+   procptr:=Pointer((graphheap.segment+graphheap.segmentcount-1)^.start+(i-1)*4); procptr^:=graphics_zero;
+  end;
+ inc(graphheap.contentused,width*height);
+ graphics_allocmem:=Pointer((graphheap.segment+graphheap.segmentcount-1)^.start);
 end;
-function graphics_heap_allocmem(startx,starty,width,height:natuint):Pgraphics_item;[public,alias:'graphics_heap_allocmem'];
-var i,size:natuint;
-    pstart,pend:natuint;
+function graphics_getmemsize(ptr:Pgraphics_item):natuint;[public,alias:'graphics_getmemsize'];
+var index,size:natuint;
 begin
- size:=width*height;
- if(graphicsheap.graphics_rest<size shl 2) then exit(nil);
- if(graphicsheap.graphics_count>=graphics_section_max) then exit(nil);
- if(size=0) then exit(nil);
- inc(graphicsheap.graphics_count);
- if(graphicsheap.graphics_count=1) then graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_start:=Natuint(@graphicsheap.graphics_content)
- else graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_start:=graphicsheap.graphics_sections[graphicsheap.graphics_count-1].pointer_end+1;
- graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_end:=graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_start+size shl 2-1;
- pstart:=(graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_start-Natuint(@graphicsheap.graphics_content)+1) shr 2;
- pend:=(graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_end-Natuint(@graphicsheap.graphics_content)+1) shr 2;
- graphicsheap.graphics_sections[graphicsheap.graphics_count].draw_x:=startx;
- graphicsheap.graphics_sections[graphicsheap.graphics_count].draw_y:=starty;
- graphicsheap.graphics_sections[graphicsheap.graphics_count].draw_width:=width;
- graphicsheap.graphics_sections[graphicsheap.graphics_count].draw_height:=height;
- graphicsheap.graphics_sections[graphicsheap.graphics_count].visible:=true;
- for i:=1 to size do
+ index:=1;
+ while(index<=graphheap.segmentcount) do
   begin
-   graphicsheap.graphics_content[pstart+i-1].Red:=0;
-   graphicsheap.graphics_content[pstart+i-1].Green:=0;
-   graphicsheap.graphics_content[pstart+i-1].Blue:=0;
-   graphicsheap.graphics_content[pstart+i-1].Alpha:=0;
+   size:=(graphheap.segment+index-1)^.width*(graphheap.segment+index-1)^.height*
+   sizeof(graphics_item);
+   if(Natuint(ptr)>=(graphheap.segment+index-1)^.start) and
+   (Natuint(ptr)>=(graphheap.segment+index-1)^.start+size-1) then break;
+   inc(index);
   end;
- dec(graphicsheap.graphics_rest,size);
- graphics_heap_allocmem:=Pointer(graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_start);
+ if(index>graphheap.segmentcount) then graphics_getmemsize:=0
+ else graphics_getmemsize:=size div sizeof(graphics_item);
 end;
-procedure graphics_heap_freemem(var ptr:Pgraphics_item);[public,alias:'graphics_heap_freemem'];
+function graphics_freemem(var ptr:Pgraphics_item):natuint;[public,alias:'graphics_freemem'];
 begin
  if(ptr<>nil) then
   begin
    graphics_heap_delete_item(ptr); ptr:=nil;
   end;
 end;
-procedure graphics_heap_changeposition(var ptr:Pgraphics_item;startx,starty:natuint);[public,alias:'graphics_heap_changeposition'];
-var i,size:natuint;
-begin
- i:=1;
- while(i<=graphicsheap.graphics_count) do
-  begin
-   if(Natuint(ptr)>=graphicsheap.graphics_sections[i].pointer_start) and (Natuint(ptr)<=graphicsheap.graphics_sections[i].pointer_end) then break;
-   inc(i,1);
-  end;
- if(i>graphicsheap.graphics_count) then exit
- else
-  begin
-   graphicsheap.graphics_sections[i].draw_x:=startx; graphicsheap.graphics_sections[i].draw_y:=starty;
-  end;
-end;
-procedure graphics_heap_changevisible(var ptr:Pgraphics_item;visible:boolean);[public,alias:'graphics_heap_changevisible'];
-var i,size:natuint;
-begin
- i:=1;
- while(i<=graphicsheap.graphics_count) do
-  begin
-   if(Natuint(ptr)>=graphicsheap.graphics_sections[i].pointer_start) and (Natuint(ptr)<=graphicsheap.graphics_sections[i].pointer_end) then break;
-   inc(i,1);
-  end;
- if(i>graphicsheap.graphics_count) then exit
- else
-  begin
-   graphicsheap.graphics_sections[i].visible:=visible;
-  end;
-end;
-procedure graphics_heap_reallocmem(var ptr:Pgraphics_item;startx,starty,width,height:natuint);[public,alias:'graphics_heap_reallocmem'];
-var oldptr,newptr:Pgraphics_item;
-    i,index,offset:natuint;
-    orgsize,newsize:natuint;
-begin
- index:=1;
- while(index<=graphicsheap.graphics_count) do
-  begin
-   if(Natuint(ptr)>=graphicsheap.graphics_sections[index].pointer_start) and (Natuint(ptr)<=graphicsheap.graphics_sections[index].pointer_end) then break;
-   inc(index,1);
-  end;
- if(index>graphicsheap.graphics_count) then 
-  begin
-   ptr:=nil; exit;
-  end;
- oldptr:=Pointer(graphicsheap.graphics_sections[index].pointer_start);
- offset:=Natuint(Ptr)-Natuint(oldptr);
- newptr:=graphics_heap_allocmem(startx,starty,width,height);
- if(newptr=nil) then exit;
- orgsize:=graphics_heap_getmemsize(ptr); newsize:=width*height;
- if(orgsize>newsize) then
-  begin
-   for i:=1 to newsize do (newptr+i-1)^:=(oldptr+i-1)^;
-  end
- else if(orgsize<=newsize) then
-  begin
-   for i:=1 to orgsize do (newptr+i-1)^:=(oldptr+i-1)^;
-  end;
- freemem(oldptr); 
- ptr:=newptr+offset-orgsize;
-end;
-procedure graphics_heap_move(dest,source:Pgraphics_item;size:natuint);[public,alias:'graphics_heap_move'];
+procedure graphics_move(Source:Pgraphics_item;var Dest:Pgraphics_item;Count:natuint);[public,alias:'graphics_move'];
 var i:natuint;
 begin
- for i:=1 to size do
-  begin
-   (dest+i-1)^:=(source+i-1)^;
-  end;
+ for i:=1 to Count do (Dest+i-1)^:=(Source+i-1)^;
 end;
-procedure graphics_draw_pixel(ptr:Pgraphics_item;relativex,relativey:dword;Red,Green,Blue,Alpha:byte);[public,alias:'graphics_draw_pixel'];
-var index:natuint;
-    width,height,pos:dword;
-    pstart:dword;
+procedure graphics_changeposition(ptr:Pgraphics_item;newstartx,newstarty:dword);[public,alias:'graphics_changeposition'];
+var index,size:natuint;
 begin
  index:=1;
- while(index<=graphicsheap.graphics_count) do
+ while(index<=graphheap.segmentcount) do
   begin
-   if(Natuint(ptr)>=graphicsheap.graphics_sections[index].pointer_start) and (Natuint(ptr)<=graphicsheap.graphics_sections[index].pointer_end) then break;
-   inc(index,1);
+   size:=(graphheap.segment+index-1)^.width*(graphheap.segment+index-1)^.height*
+   sizeof(graphics_item);
+   if(Natuint(ptr)>=(graphheap.segment+index-1)^.start) and
+   (Natuint(ptr)>=(graphheap.segment+index-1)^.start+size-1) then break;
+   inc(index);
   end;
- if(index>graphicsheap.graphics_count) then exit;
- width:=graphicsheap.graphics_sections[index].draw_width;
- height:=graphicsheap.graphics_sections[index].draw_height; 
- if(relativex>width) or (relativex=0) then exit;
- if(relativey>height) or (relativey=0) then exit;
- pos:=(relativey-1)*width+relativex;
- pstart:=(graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_start-Natuint(@graphicsheap.graphics_content)+1) shr 2;
- graphicsheap.graphics_content[pstart+pos-1].Red:=Red;
- graphicsheap.graphics_content[pstart+pos-1].Green:=Green;
- graphicsheap.graphics_content[pstart+pos-1].Blue:=Blue;
- graphicsheap.graphics_content[pstart+pos-1].Alpha:=Alpha;
+ if(index>graphheap.segmentcount) then exit
+ else
+  begin
+   (graphheap.segment+index-1)^.left:=newstartx;
+   (graphheap.segment+index-1)^.top:=newstarty;
+  end;
 end;
-procedure graphics_draw_block(ptr:Pgraphics_item;relativex,relativey,blockwidth,blockheight:dword;Red,Blue,Green,Alpha:byte);[public,alias:'graphics_draw_block'];
-var index,i,j:natuint;
-    width,height,pos:dword;
-    pstart:dword;
-    correctwidth,correctheight:dword;
+procedure graphics_changevisible(ptr:Pgraphics_item;visible:boolean);[public,alias:'graphics_changevisible'];
+var index,size:natuint;
 begin
  index:=1;
- while(index<=graphicsheap.graphics_count) do
+ while(index<=graphheap.segmentcount) do
   begin
-   if(Natuint(ptr)>=graphicsheap.graphics_sections[index].pointer_start) and (Natuint(ptr)<=graphicsheap.graphics_sections[index].pointer_end) then break;
-   inc(index,1);
+   size:=(graphheap.segment+index-1)^.width*(graphheap.segment+index-1)^.height*
+   sizeof(graphics_item);
+   if(Natuint(ptr)>=(graphheap.segment+index-1)^.start) and
+   (Natuint(ptr)>=(graphheap.segment+index-1)^.start+size-1) then break;
+   inc(index);
   end;
- if(index>graphicsheap.graphics_count) then exit;
- width:=graphicsheap.graphics_sections[index].draw_width;
- height:=graphicsheap.graphics_sections[index].draw_height; 
- if(relativex>width) or (relativex=0) then exit;
- if(relativey>height) or (relativey=0) then exit;
- if(relativex+blockwidth>width) then correctwidth:=width-relativex+1 else correctwidth:=blockwidth;
- if(relativey+blockheight>height) then correctheight:=height-relativey+1 else correctheight:=blockheight;
- pstart:=(graphicsheap.graphics_sections[graphicsheap.graphics_count].pointer_start-Natuint(@graphicsheap.graphics_content)+1) shr 2;
- for i:=1 to correctheight do
-  for j:=1 to correctwidth do
+ if(index>graphheap.segmentcount) then exit else (graphheap.segment+index-1)^.visible:=visible;
+end;
+procedure graphics_reallocmem(var ptr:Pgraphics_item;newstartx,newstarty,newwidth,newheight:dword);[public,alias:'graphics_reallocmem'];
+var oldptr,newptr:Pgraphics_item;
+    oldsize,newsize,offset,i,j,index,size:natuint;
+begin
+ newptr:=graphics_getmem(newstartx,newstarty,newwidth,newheight);
+ if(newptr=nil) then exit;
+ if(ptr=nil) then
+  begin
+   ptr:=newptr; exit;
+  end;
+ index:=1;
+ while(index<=graphheap.segmentcount) do
+  begin
+   size:=(graphheap.segment+index-1)^.width*(graphheap.segment+index-1)^.height*
+   sizeof(graphics_item);
+   if(Natuint(ptr)>=(graphheap.segment+index-1)^.start) and
+   (Natuint(ptr)>=(graphheap.segment+index-1)^.start+size-1) then break;
+   inc(index);
+  end;
+ if(index>graphheap.segmentcount-1) then
+  begin
+   ptr:=newptr; exit;
+  end;
+ oldptr:=Pgraphics_item((graphheap.segment+index-1)^.start);
+ offset:=ptr-oldptr;
+ oldsize:=graphics_getmemsize(oldptr);
+ newsize:=newwidth*newheight;
+ if(oldsize>newsize) then graphics_move(oldptr,newptr,newsize) else graphics_move(oldptr,newptr,oldsize);
+ graphics_heap_delete_item(oldptr);
+ ptr:=newptr+offset-oldsize;
+end;
+procedure graphics_draw_pixel(ptr:Pgraphics_item;relativex,relativey:dword;color:graphics_color);[public,alias:'graphics_draw_pixel'];
+var index,size:natuint;
+    myptr:Pgraphics_item;
+begin
+ index:=1;
+ while(index<=graphheap.segmentcount) do
+  begin
+   size:=(graphheap.segment+index-1)^.width*(graphheap.segment+index-1)^.height*sizeof(graphics_item);
+   if(Natuint(ptr)>=(graphheap.segment+index-1)^.start) and (Natuint(ptr)<=(graphheap.segment+index-1)^.start+size-1) then break;
+   inc(index);
+  end;
+ if(index>graphheap.segmentcount) then exit;
+ if(relativex=0) and (relativex>(graphheap.segment+index-1)^.width) then exit;
+ if(relativey=0) and (relativey>(graphheap.segment+index-1)^.height) then exit;
+ myptr:=Pointer((graphheap.segment+index-1)^.start+((relativey-1)*(graphheap.segment+index-1)^.width+relativex-1)*sizeof(graphics_item));
+ myptr^.Red:=color.Red; myptr^.Blue:=color.Blue; myptr^.Green:=color.Green; myptr^.Alpha:=color.Alpha;
+end;
+procedure graphics_draw_block(ptr:Pgraphics_item;relativex,relativey,blockwidth,blockheight:dword;color:graphics_color);[public,alias:'graphics_draw_block'];
+var index,size,trimwidth,trimheight,i,j:natuint;
+    myptr:Pgraphics_item;
+begin
+ index:=1;
+ while(index<=graphheap.segmentcount) do
+  begin
+   size:=(graphheap.segment+index-1)^.width*(graphheap.segment+index-1)^.height*sizeof(graphics_item);
+   if(Natuint(ptr)>=(graphheap.segment+index-1)^.start) and (Natuint(ptr)<=(graphheap.segment+index-1)^.start+size-1) then break;
+   inc(index);
+  end;
+ if(index>graphheap.segmentcount) then exit;
+ if(relativex=0) and (relativex>(graphheap.segment+index-1)^.width) then exit;
+ if(relativey=0) and (relativey>(graphheap.segment+index-1)^.height) then exit;
+ if(relativex+blockwidth-1>(graphheap.segment+index-1)^.width) then
+ trimwidth:=(graphheap.segment+index-1)^.width-relativex+1 else trimwidth:=blockwidth;
+ if(relativey+blockheight-1>(graphheap.segment+index-1)^.height) then
+ trimheight:=(graphheap.segment+index-1)^.height-relativey+1 else trimheight:=blockheight;
+ for i:=relativex to relativex+trimwidth-1 do
+  for j:=relativey to relativey+trimheight-1 do
    begin
-    pos:=(relativey+i-2)*width+relativex+j-1;
-    graphicsheap.graphics_content[pstart+pos-1].Red:=Red;
-    graphicsheap.graphics_content[pstart+pos-1].Green:=Green;
-    graphicsheap.graphics_content[pstart+pos-1].Blue:=Blue;
-    graphicsheap.graphics_content[pstart+pos-1].Alpha:=Alpha;
+    myptr:=Pointer((graphheap.segment+index-1)^.start+((j-1)*(graphheap.segment+index-1)^.width+i-1)*sizeof(graphics_item));
+    myptr^.Red:=color.Red; myptr^.Blue:=color.Blue;
+    myptr^.Green:=color.Green; myptr^.Alpha:=color.Alpha;
    end;
 end;
-procedure graphics_heap_output_to_screen(framebufferbase:qword;screenwidth,screenheight:dword);[public,alias:'graphics_heap_output_to_screen'];
+procedure graphics_draw_circle(ptr:Pgraphics_item;relativex,relativey:dword;radius:dword;color:graphics_color);[public,alias:'graphics_draw_circle'];
+var index,size:natuint;
+    myptr:Pgraphics_item;
+    startx,starty,endx,endy,i,j:natuint;
+begin
+ index:=1;
+ while(index<=graphheap.segmentcount) do
+  begin
+   size:=(graphheap.segment+index-1)^.width*(graphheap.segment+index-1)^.height*
+   sizeof(graphics_item);
+   if(Natuint(ptr)>=(graphheap.segment+index-1)^.start) and (Natuint(ptr)<=(graphheap.segment+index-1)^.start+size-1) then break;
+   inc(index);
+  end;
+ if(index>graphheap.segmentcount) then exit;
+ if(relativex-radius<0) then startx:=0 else startx:=relativex-radius+1;
+ if(relativex+radius>(graphheap.segment+index-1)^.width+1)
+ then endx:=(graphheap.segment+index-1)^.width else endx:=relativex+radius-1;
+ if(relativey-radius<0) then starty:=0 else starty:=relativey-radius+1;
+ if(relativey+radius>(graphheap.segment+index-1)^.height+1)
+ then endy:=(graphheap.segment+index-1)^.height else endy:=relativey+radius-1;
+ for i:=startx to endx do
+  for j:=starty to endy do
+   begin
+    if(sqr(relativex-startx+1)+sqr(relativey-starty+1)<=sqr(radius+1)) then
+     begin
+      myptr:=Pointer((graphheap.segment+index-1)^.start+((j-1)*(graphheap.segment+index-1)^.width+(i-1)*sizeof(graphics_item)));
+      myptr^.Red:=color.Red; myptr^.Blue:=color.Blue;
+      myptr^.Green:=color.Green; myptr^.alpha:=color.alpha;
+     end;
+   end;
+end;
+procedure graphics_output_to_screen;[public,alias:'graphics_heap_output_to_screen'];
 var i,j,k,m:natuint;
     dx,dy,dpos:natuint;
     index:natuint;
-    fbufferbase:^graphics_output_blt_pixel;
     oldalpha,oldred,oldgreen,oldblue:byte;
     newalpha,newred,newgreen,newblue:byte;
 begin
- fbufferbase:=Pointer(framebufferbase);
- for i:=1 to screenwidth*screenheight do
+ for i:=1 to graphheap.screenwidth*graphheap.screenheight do
   begin
-   graphicsscreen[i].Red:=0;
-   graphicsscreen[i].Green:=0;
-   graphicsscreen[i].Blue:=0;
-   graphicsscreen[i].Alpha:=255;
+   (graphheap.initscreen+i-1)^.Red:=0;
+   (graphheap.initscreen+i-1)^.Green:=0;
+   (graphheap.initscreen+i-1)^.Blue:=0;
+   (graphheap.initscreen+i-1)^.Alpha:=$FF;
   end;
- for i:=1 to graphicsheap.graphics_count do
+ for i:=1 to graphheap.segmentcount do
   begin
-   m:=graphicsheap.graphics_sections[i].pointer_start;
-   if(graphicsheap.graphics_sections[i].visible=false) then continue;
-   for j:=1 to graphicsheap.graphics_sections[i].draw_height do
-    for k:=1 to graphicsheap.graphics_sections[i].draw_width do
+   m:=(graphheap.segment+i-1)^.start;
+   if((graphheap.segment+i-1)^.visible=false) then continue;
+   for j:=1 to (graphheap.segment+i-1)^.height do
+    for k:=1 to (graphheap.segment+i-1)^.width do
      begin
-      dx:=graphicsheap.graphics_sections[i].draw_x+k-1;
-      dy:=graphicsheap.graphics_sections[i].draw_y+j-1;
-      dpos:=(dy-1)*screenwidth+dx;
-      index:=(m-Qword(@graphicsheap.graphics_content)) shr 2+1;
-      oldalpha:=graphicsheap.graphics_content[index].Alpha;
-      oldred:=graphicsheap.graphics_content[index].Red;
-      oldgreen:=graphicsheap.graphics_content[index].Green;
-      oldblue:=graphicsheap.graphics_content[index].Blue;
-      newalpha:=255-(255-oldalpha)*(255-graphicsscreen[dpos].alpha) div 255;
-      newred:=optimize_integer_divide((oldred*oldalpha+graphicsscreen[dpos].Red*graphicsscreen[dpos].alpha*(255-oldalpha) div 255),newalpha);
-      newgreen:=optimize_integer_divide((oldgreen*oldalpha+graphicsscreen[dpos].Green*graphicsscreen[dpos].alpha*(255-oldalpha) div 255),newalpha);
-      newblue:=optimize_integer_divide((oldblue*oldalpha+graphicsscreen[dpos].Blue*graphicsscreen[dpos].alpha*(255-oldalpha) div 255),newalpha);
-      graphicsscreen[dpos].Alpha:=newalpha;
-      graphicsscreen[dpos].Red:=newred;
-      graphicsscreen[dpos].Green:=newgreen;
-      graphicsscreen[dpos].Blue:=newblue;
-      inc(m,4);
+      dx:=(graphheap.segment+i-1)^.left+k-1;
+      dy:=(graphheap.segment+i-1)^.top+j-1;
+      dpos:=(dy-1)*graphheap.screenwidth+dx;
+      index:=(m-Natuint(graphheap.content)) shr 2+1;
+      oldalpha:=(graphheap.content+index-1)^.Alpha;
+      oldred:=(graphheap.content+index-1)^.Red;
+      oldgreen:=(graphheap.content+index-1)^.Green;
+      oldblue:=(graphheap.content+index-1)^.Blue;
+      newalpha:=255-(255-oldalpha)*(255-(graphheap.initscreen+dpos-1)^.alpha) div 255;
+      newred:=optimize_integer_divide(oldred*oldalpha+(graphheap.initscreen+dpos-1)^.Red*(graphheap.initscreen+dpos-1)^.alpha*(255-oldalpha) div 255,newalpha);
+      newgreen:=optimize_integer_divide(oldgreen*oldalpha+(graphheap.initscreen+dpos-1)^.Green*(graphheap.initscreen+dpos-1)^.alpha*(255-oldalpha) div 255,newalpha);
+      newblue:=optimize_integer_divide(oldblue*oldalpha+(graphheap.initscreen+dpos-1)^.Blue*(graphheap.initscreen+dpos-1)^.alpha*(255-oldalpha) div 255,newalpha);
+      (graphheap.initscreen+dpos-1)^.Alpha:=newalpha;
+      (graphheap.initscreen+dpos-1)^.Red:=newred;
+      (graphheap.initscreen+dpos-1)^.Green:=newgreen;
+      (graphheap.initscreen+dpos-1)^.Blue:=newblue;
+      inc(m,sizeof(graphics_item));
      end;
   end;
- for i:=1 to screenwidth*screenheight do
+ for i:=1 to graphheap.screenwidth*graphheap.screenheight do
   begin
-   graphicsoutputscreen[i].Blue:=graphicsscreen[i].Blue;
-   graphicsoutputscreen[i].Green:=graphicsscreen[i].Green;
-   graphicsoutputscreen[i].Red:=graphicsscreen[i].Red;
-   graphicsoutputscreen[i].Reserved:=$00;
-   (fbufferbase+i-1)^:=graphicsoutputscreen[i];
+   (graphheap.framebufferbase+i-1)^.Green:=(graphheap.initscreen+i-1)^.Green;
+   (graphheap.framebufferbase+i-1)^.Blue:=(graphheap.initscreen+i-1)^.Blue;
+   (graphheap.framebufferbase+i-1)^.Red:=(graphheap.initscreen+i-1)^.Red;
+   (graphheap.framebufferbase+i-1)^.Reserved:=$00;
   end;
 end;
 

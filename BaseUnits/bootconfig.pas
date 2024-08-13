@@ -10,9 +10,7 @@ type screen_config=packed record
                    end;
      Pscreen_config=^screen_config;
      return_config=packed record
-                   content:natuint;
-                   size:natuint;
-                   count:natuint;
+                   m1,m2,m3,m4,m5,m6:natuint;
                    end;
      Preturn_config=^return_config;
      
