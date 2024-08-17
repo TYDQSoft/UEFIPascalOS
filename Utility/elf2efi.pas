@@ -631,7 +631,7 @@ begin
    optionalheader64.SizeOfInitializedData:=peRelocationOffset-peDataOffset;
    optionalheader64.AddressOfEntryPoint:=PeCoffEntry;
    optionalheader64.BaseOfCode:=PeTextOffset;
-   optionalheader64.ImageBase:=$00400000;
+   optionalheader64.ImageBase:=$00000000;
    optionalheader64.SectionAlignment:=elfmaxalignment;
    optionalheader64.FileAlignment:=elfmaxalignment;
    optionalheader64.SizeOfImage:=
@@ -663,7 +663,7 @@ begin
    optionalheader32.BaseOfData:=peRoDataOffset
    else
    optionalheader32.BaseOfData:=peDataOffset;
-   optionalheader32.ImageBase:=$00400000;
+   optionalheader32.ImageBase:=$00000000;
    optionalheader32.SectionAlignment:=elfmaxalignment;
    optionalheader32.FileAlignment:=elfmaxalignment;
    optionalheader32.SizeOfImage:=
