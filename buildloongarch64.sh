@@ -9,7 +9,7 @@
 	rm -rf Utility/elf2efi
 	/home/tydq/source/compiler/ppcloongarch64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Fu/home/tydq/source/compiler/loongarch64/units/loongarch64-linux -Fu/home/tydq/source/rtl/units/loongarch64-linux -Cg Utility/elf2efi.pas
 	rm -rf Utility/*.o Utility/*.ppu
-	./Utility/elf2efi "Binaries/BootLoader/uefiloader" Custom "Binaries/BootLoader/bootriscv64.efi"
+	./Utility/elf2efi "Binaries/BootLoader/uefiloader" Custom "Binaries/BootLoader/bootloongarch64.efi"
 	rm -rf BaseUnits/*.ppu BaseUnits/*.o Installer/*.o Installer/*.ppu BootLoader/*.o BootLoader/*.ppu
 	/home/tydq/source/compiler/ppcloongarch64 -n -O4 -Si -Sc -Sg -Xd -Ur -Us -CX -XXs -Cg BaseUnits/system.pas
 	/home/tydq/source/compiler/ppcloongarch64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Cg BaseUnits/fpintres.pas
