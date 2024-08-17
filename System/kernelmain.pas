@@ -2,7 +2,7 @@ program kernelmain;
 
 {$MODE FPC}
 
-uses bootconfig,graphics;
+uses bootconfig,graphics{$ifdef cpuaarch64},prt0{$endif cpuaarch64}{$ifdef cpuarm},prt0{$endif cpuarm};
 
 function kernel_main(param:Psys_parameter):Pointer;[public,alias:'_start'];
 var readoffset:natuint;
@@ -10,6 +10,12 @@ var readoffset:natuint;
     res:Preturn_config;
     i:natuint;
 begin
+ {$ifdef cpuaarch64}
+ ExitCode:=0;
+ {$endif cpuaarch64}
+ {$ifdef cpuarm}
+ ExitCode:=0;
+ {$endif cpuarm}
  readoffset:=0;
  compheap:=Pheap_record(param^.param_content+readoffset)^;
  readoffset:=readoffset+sizeof(heap_record);
