@@ -366,7 +366,7 @@ const elf_file_identify:array[1..4] of char=(#$7F,'E','L','F');
       pe_image_file_machine_alpha=$184;
       pe_image_file_machine_alpha64=$284;
       pe_image_file_machine_am33=$1D3;
-      pe_image_file_machine_amd64=$8864;
+      pe_image_file_machine_amd64=$8664;
       pe_image_file_machine_arm=$1C0;
       pe_image_file_machine_arm64=$AA64;
       pe_image_file_machine_armnt=$1C4;
@@ -447,9 +447,9 @@ const elf_file_identify:array[1..4] of char=(#$7F,'E','L','F');
       pe_image_directory_entry_iat=12;
       pe_image_directory_entry_delay_import=13;
       pe_image_directory_entry_com_descriptor=14;
-      pe32_image_magic=$10B;
-      pe32plus_image_magic=$20B;
-      perom_image_magic=$107;
+      pe_image_pe32_image_magic=$10B;
+      pe_image_pe32plus_image_magic=$20B;
+      pe_image_perom_image_magic=$107;
       pe_image_scn_type_no_pad=$00000008;
       pe_image_scn_cnt_code=$00000020;
       pe_image_scn_cnt_initialized_data=$00000040;
@@ -485,6 +485,10 @@ const elf_file_identify:array[1..4] of char=(#$7F,'E','L','F');
       pe_image_mem_execute=$20000000;
       pe_image_mem_read=$40000000;
       pe_image_mem_write=$80000000;
+      pe_image_rel_base_absolute=0;
+      pe_image_rel_base_high=1;
+      pe_image_rel_base_low=2;
+      pe_image_rel_base_highlow=3;
       
 type elf32_header=packed record 
                   elf32_identify:array[1..16] of byte;
@@ -678,11 +682,13 @@ type elf32_header=packed record
                          FileAlignment:dword;
                          MajorOperatingSystemVersion:word;
                          MinorOperatingSystemVersion:word;
+                         MajorImageVersion:word;
+                         MinorImageVersion:word;
                          MajorSubsystemVersion:word;
                          MinorSubsystemVersion:word;
                          Win32VersionValue:dword;
                          SizeOfImage:dword;
-                         SizeOfHeader:dword;
+                         SizeOfHeaders:dword;
                          Checksum:dword;
                          Subsystem:word;
                          DllCharacteristics:word;
@@ -708,18 +714,20 @@ type elf32_header=packed record
                          FileAlignment:dword;
                          MajorOperatingSystemVersion:word;
                          MinorOperatingSystemVersion:word;
+                         MajorImageVersion:word;
+                         MinorImageVersion:word;
                          MajorSubsystemVersion:word;
                          MinorSubsystemVersion:word;
                          Win32VersionValue:dword;
                          SizeOfImage:dword;
-                         SizeOfHeader:dword;
+                         SizeOfHeaders:dword;
                          Checksum:dword;
                          Subsystem:word;
                          DllCharacteristics:word;
-                         SizeOfStackReserve:dword;
-                         SizeOfStackCommit:dword;
-                         SizeOfHeapReserve:dword;
-                         SizeOfHeapCommit:dword;
+                         SizeOfStackReserve:qword;
+                         SizeOfStackCommit:qword;
+                         SizeOfHeapReserve:qword;
+                         SizeOfHeapCommit:qword;
                          LoaderFlags:dword;
                          NumberOfRvaandSizes:dword;
                          DataDirectory:array[1..16] of pe_image_data_directory;
@@ -745,6 +753,7 @@ type elf32_header=packed record
                              PointerToRelocation:dword;
                              PointerToLineNumbers:dword;
                              NumberOfRelocations:word;
+                             NumberOfLineNumbers:word;
                              Characteristics:dword;
                              end;
      pe_dummy_union_name=packed record
@@ -768,7 +777,11 @@ type elf32_header=packed record
                              hint:word;
                              name:dword;
                              end;
-     pe_image_base_relocation=packed record
+     pe_image_type_offset=bitpacked record
+                         Offset:0..4095;
+                         peType:0..15;
+                         end;
+     pe_image_base_relocation=record
                               VirtualAddress:dword;
                               SizeOfBlock:dword;
                               end;
@@ -824,4 +837,4 @@ begin
  elf64_relocation_info:=s shl 32+t and $FFFFFFFF;
 end;
 
-end.
+end. 

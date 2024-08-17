@@ -25,7 +25,12 @@ const efi_usb_max_bulk_buffer_num=10;
       efi_bluetooth_config_remote_device_state_connected=$1;
       efi_bluetooth_config_remote_device_state_paired=$2;
       bluetooth_hci_link_key_size=16;
-      
+{$ifdef cpux86_64}
+ {$PACKRECORDS 8}
+{$endif cpux86_64}
+{$ifdef cpui386}
+ {$PACKRECORDS 4}
+{$endif cpui386}
 type efi_lba=qword;
      fat32_header=packed record
                   JumpOrder:array[1..3] of byte;
@@ -219,7 +224,7 @@ type efi_lba=qword;
      efi_text_set_attribute=function (This:Pefi_simple_text_output_protocol;eattribute:NatUint):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_text_clear_screen=function (This:Pefi_simple_text_output_protocol):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_text_set_cursor_position=function (This:Pefi_simple_text_output_protocol;column,row:Natuint):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-     efi_text_enable_cursor=function (This:Pefi_simple_text_output_protocol;visible:boolean):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+     efi_text_enable_cursor=function (This:Pefi_simple_text_output_protocol;visible:boolean):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}    
      efi_simple_text_output_protocol=record
                                      Reset:efi_text_reset;
                                      Outputstring:efi_text_output_string;
@@ -278,7 +283,7 @@ type efi_lba=qword;
                         	  case Boolean of 
                        		  True:(DataBlock:efi_physical_address);
                         	  False:(ContinuationPointer:efi_physical_address);
-                      		  end;
+                      		  end;     
      efi_capsule_header=record
                         CapsuleGuid:efi_guid;
                         headersize:dword;
@@ -293,7 +298,7 @@ type efi_lba=qword;
      PPefi_capsule_header=^Pefi_capsule_header;
      efi_update_capsule=function (CapsuleHeaderArray:PPefi_capsule_header;CapsuleCount:NatUint;ScatterGatherList:efi_physical_address):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_query_capsule_capabilities=function (CapsuleHeaderArray:PPefi_capsule_header;CapsuleCount:NatUint;var MaximumCapsuleSize:qword;var ResetType:efi_reset_type):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-     efi_query_variable_info=function (attributes:dword;MaximumVariableStorageSize,RemainingVariableStorageSize,MaximumVariableSize:Pqword):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}                
+     efi_query_variable_info=function (attributes:dword;MaximumVariableStorageSize,RemainingVariableStorageSize,MaximumVariableSize:Pqword):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}       
      efi_runtime_services=record
                           hdr:efi_table_header;
                           Gettime:efi_get_time;
@@ -314,14 +319,13 @@ type efi_lba=qword;
      efi_tpl=NatUint;
      efi_raise_tpl=function (NewTpl:efi_tpl):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_restore_tpl=function (OldTpl:efi_tpl):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-     efi_allocate_type=(AllocateAnyPages,AllocateMaxAddress,AllocateAddress,MaxAllocateType);
-       	efi_memory_type=(EfiReservedMemoryType,EfiLoaderCode,EfiLoaderData,EfiBootServicesCode,EfiBootServicesData,EfiRuntimeServicesCode,EfiRuntimeServicesData,EfiConventionalMemory,EfiUnusableMemory,EfiACPIReclaimMemory,EfiACPIMemoryNVS,EfiMemoryMappedIO,EfiMemoryMappedIOPortSpace,EfiPalCode,EfiPersistentMemory,EfiUnacceptedMemoryType,EfiMaxMemoryType);
+     efi_allocate_type=(AllocateAnyPages,AllocateMaxAddress,AllocateAddress,MaxAllocateType);     	efi_memory_type=(EfiReservedMemoryType,EfiLoaderCode,EfiLoaderData,EfiBootServicesCode,EfiBootServicesData,EfiRuntimeServicesCode,EfiRuntimeServicesData,EfiConventionalMemory,EfiUnusableMemory,EfiACPIReclaimMemory,EfiACPIMemoryNVS,EfiMemoryMappedIO,EfiMemoryMappedIOPortSpace,EfiPalCode,EfiPersistentMemory,EfiUnacceptedMemoryType,EfiMaxMemoryType);
      efi_allocate_pages=function (efitype:efi_allocate_type;MemoryType:efi_memory_type;Pages:NatUint;var Memory:qword):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_free_pages=function (Memory:qword;Pages:NatUint):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_get_memory_map=function (var MemoryMapSize:Natuint;Memory_map:Pefi_memory_descriptor;var MapKey:natuint;var DescriptorSize:NatUint;var DescriptorVersion:dword):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_allocate_pool=function (PoolType:efi_memory_type;Size:NatUint;var Buffer:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_free_pool=function (Buffer:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-     efi_event_notify=procedure (Event:efi_event;Context:Pointer);
+     efi_event_notify=procedure (Event:efi_event;Context:Pointer);{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_create_event=function (efitype:dword;NotifyTpl:efi_tpl;NotifyFunction:efi_event_notify;NotifyContext:Pointer;var Event:efi_event):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_create_event_ex=function (efitype:dword;NotifyTpl:efi_tpl;NotifyFunction:efi_event_notify;const NotifyContext:Pointer;const EventGroup:Pefi_guid;var Event:efi_event):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_timer_delay=(TimerCancel,TimerPeriodic,TimerRelative);
@@ -360,6 +364,7 @@ type efi_lba=qword;
      efi_disconnect_controller=function (ControllerHandle,DriverImageHandle,ChildHandle:efi_handle):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_open_protocol=function (Handle:efi_handle;Protocol:Pefi_guid;var efiinterface:Pointer;AgentHandle:efi_handle;ControllerHandle:efi_handle;Attributes:dword):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_close_protocol=function (Handle:efi_handle;Protocol:Pefi_guid;AgentHandle:efi_handle;ControllerHandle:efi_handle):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+     
      efi_open_protocol_information_entry=record
      					 AgentHandle,ControllerHandle:efi_handle;
      					 Attributes,OpenCount:dword;
@@ -374,7 +379,7 @@ type efi_lba=qword;
      efi_uninstall_multiple_protocol_interfaces=function (var Handle:efi_handle;argument:PPointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_calculate_crc32=function (Data:Pointer;DataSize:NatUint;var Crc32:dword):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_copy_mem=procedure (Destination,Source:Pointer;efilength:NatUint);
-     efi_set_mem=procedure (Buffer:Pointer;size:NatUint;efivalue:byte);
+     efi_set_mem=procedure (Buffer:Pointer;size:NatUint;efivalue:byte);   
      efi_boot_services=record
                        hdr:efi_table_header;
                        RaiseTPL:efi_raise_tpl;
@@ -442,7 +447,7 @@ type efi_lba=qword;
                       configuration_table:^efi_configuration_table;
                       end;
      Pefi_system_table=^efi_system_table;
-     Pefi_loaded_image_protocol=^efi_loaded_image_protocol;
+     Pefi_loaded_image_protocol=^efi_loaded_image_protocol;    
      efi_loaded_image_protocol=record
                                Revision:dword;
                                ParentHandle:efi_handle;
@@ -465,7 +470,7 @@ type efi_lba=qword;
      efi_device_path_utils_append_instance=function (const DevicePath,DeviceInstance:Pefi_device_path_protocol):Pefi_device_path_protocol;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_device_path_utils_get_next_instance=function (var DevicePathInstance:PPefi_device_path_protocol;var DevicePathInstanceSize:Natuint):Pefi_device_path_protocol;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_device_path_utils_is_multi_instance=function (const DevicePath:Pefi_device_path_protocol):Pefi_device_path_protocol;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-     efi_device_path_utils_create_node=function (NodeType:byte;NodeSubType:byte;NodeLength:word):Pefi_device_path_protocol;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+     efi_device_path_utils_create_node=function (NodeType:byte;NodeSubType:byte;NodeLength:word):Pefi_device_path_protocol;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}     
      efi_device_path_utilities_protocol=record
      					GetDevicePathSize:efi_device_path_utils_get_device_path_size;
      					DuplicateDevicePath:efi_device_path_utils_dup_device_path;
@@ -491,7 +496,7 @@ type efi_lba=qword;
      Pefi_driver_binding_protocol=^efi_driver_binding_protocol;
      efi_driver_binding_protocol_supported=function (This:Pefi_driver_binding_protocol;ControllerHandle:efi_handle;RemainingDevicePath:Pefi_device_path_protocol):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_driver_binding_protocol_start=function (This:Pefi_driver_binding_protocol;ControllerHandle:efi_handle;RemainingDevicePath:Pefi_device_path_protocol):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-     efi_driver_binding_protocol_stop=function (This:Pefi_driver_binding_protocol;ControllerHandle:efi_handle;NumberOfChildren:natuint;ChildHandleBuffer:efi_handle):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+     efi_driver_binding_protocol_stop=function (This:Pefi_driver_binding_protocol;ControllerHandle:efi_handle;NumberOfChildren:natuint;ChildHandleBuffer:efi_handle):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}  
      efi_driver_binding_protocol=record
                                  Supported:efi_driver_binding_protocol_supported;
                                  Start:efi_driver_binding_protocol_start;
@@ -538,8 +543,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
      			 	  DestroyChild:efi_service_binding_destroy_child;
                                   end;
      Pefi_platform_to_driver_configuration_protocol=^efi_platform_to_driver_configuration_protocol;
-     efi_platform_to_driver_configuration_query=function (This:Pefi_platform_to_driver_configuration_protocol;ControllerHandle,ChildHandle:efi_handle;Instance:PNatuint;var ParameterTypeGuid:Pefi_guid;var ParameterBlock:Pointer;var ParameterBlockSize:Natuint):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-     	efi_platform_configuration_action=(efiplatformconfigurationactionnone=0,efiplatformconfigurationactionstopcontroller=1,efiplatformconfigurationactionrestartcontroller=2,efiplatformconfigurationactionrestartplatform=3,efiplatformconfigurationactionnvramfailed=4,efiplatformconfigurationactionunsupportedguid=5,efiplatformconfigurationactionmaximum);
+     efi_platform_to_driver_configuration_query=function (This:Pefi_platform_to_driver_configuration_protocol;ControllerHandle,ChildHandle:efi_handle;Instance:PNatuint;var ParameterTypeGuid:Pefi_guid;var ParameterBlock:Pointer;var ParameterBlockSize:Natuint):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}	efi_platform_configuration_action=(efiplatformconfigurationactionnone=0,efiplatformconfigurationactionstopcontroller=1,efiplatformconfigurationactionrestartcontroller=2,efiplatformconfigurationactionrestartplatform=3,efiplatformconfigurationactionnvramfailed=4,efiplatformconfigurationactionunsupportedguid=5,efiplatformconfigurationactionmaximum);
      efi_platform_to_driver_configuration_response=function (This:Pefi_platform_to_driver_configuration_protocol;ControllerHandle,ChildHandle:efi_handle;Instance:PNatUint;ParameterTypeGuid:Pefi_guid;ParameterBlock:Pointer;ParameterBlockSize:Natuint;ConfigurationAction:efi_platform_configuration_action):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_platform_to_driver_configuration_protocol=record
      						   Query:efi_platform_to_driver_configuration_query;
@@ -554,8 +558,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
      efi_driver_family_override_protocol=record
                                          GetVersion:efi_driver_family_override_get_version;
                                          end;
-     Pefi_driver_health_protocol=^efi_driver_health_protocol;
-     efi_driver_health_status=(efidriverstatushealthy,efidriverstatusrepairrequired,efidriverstatusconfigurationrequired,efidriverstatusfailed,efidriverstatusreconnectrequired,efidriverstatusrebootrequired);
+     Pefi_driver_health_protocol=^efi_driver_health_protocol; efi_driver_health_status=(efidriverstatushealthy,efidriverstatusrepairrequired,efidriverstatusconfigurationrequired,efidriverstatusfailed,efidriverstatusreconnectrequired,efidriverstatusrebootrequired);
      efi_string_id=natuint;
      efi_driver_health_hii_message=record
      				   HiiHandle:efi_hii_handle;
@@ -622,6 +625,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
      efi_key_notify_function=function (KeyData:Pefi_key_data):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_register_keystroke_notify=function (This:Pefi_simple_text_input_ex_protocol;KeyData:Pefi_key_data;KeyNotificationFunction:efi_key_notify_function;var NotifyHandle:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_unregister_keystroke_notify=function (This:Pefi_simple_text_input_ex_protocol;NotificationHandle:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+     
      efi_simple_text_input_ex_protocol=record
                                        Reset:efi_input_reset_ex;
                                        ReadKeyStrokeEx:efi_input_read_key_ex;
@@ -641,6 +645,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                               LeftButton,RightButton:boolean;
                               end;
      efi_simple_pointer_get_state=function (This:Pefi_simple_pointer_protocol;var State:efi_simple_pointer_state):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+     
      efi_simple_pointer_protocol=record
                                  Reset:efi_simple_pointer_reset;
                                  GetState:efi_simple_pointer_get_state;
@@ -658,12 +663,14 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                                 ActiveButtons:dword;
                                 end;
      efi_absolute_pointer_get_state=function (This:Pefi_absolute_pointer_protocol;var state:efi_absolute_pointer_state):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+     
      efi_absolute_pointer_protocol=record
                                    Reset:efi_absolute_pointer_reset;
                                    GetState:efi_absolute_pointer_get_state;
                                    WaitForInput:efi_event;
                                    Mode:^efi_absolute_pointer_mode;
                                    end;
+     
      serial_io_mode=record
                     ControlMask:dword;
                     TimeOut:dword;
@@ -682,6 +689,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
      efi_serial_get_control_bits=function (This:Pefi_serial_io_protocol;var Control:dword):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_serial_write=function (This:Pefi_serial_io_protocol;BufferSize:PNatuint;Buffer:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_serial_read=function (This:Pefi_serial_io_protocol;var BufferSize:Natuint;var Buffer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+     
      efi_serial_io_protocol=record
                             revision:longword;
                             Reset:efi_serial_reset;
@@ -707,6 +715,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                                           PixelsPerScanLine:dword;
                                           end;
      Pefi_graphics_output_mode_information=^efi_graphics_output_mode_information;
+     
      efi_graphics_output_protocol_mode=record
                                        MaxMode:dword;
                                        Mode:dword;
@@ -761,7 +770,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
      efi_file_open_ex=function (This:Pefi_file_protocol;var NewHandle:Pefi_file_protocol;FileName:PWideChar;OpenMode,Attributes:qword;var Token:efi_file_io_token):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_file_read_ex=function (This:Pefi_file_protocol;var Token:efi_file_io_token):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_file_write_ex=function (This:Pefi_file_protocol;var Token:efi_file_io_token):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-     efi_file_flush_ex=function (This:Pefi_file_protocol;var Token:efi_file_io_token):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+     efi_file_flush_ex=function (This:Pefi_file_protocol;var Token:efi_file_io_token):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386} 
      efi_file_protocol=record
                        Revision:qword;
                        Open:efi_file_open;
@@ -876,7 +885,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                          end;
      efi_block_read_ex=function (This:Pefi_block_io2_protocol;MediaId:dword;lba:efi_lba;var Token:efi_block_io2_token;BufferSize:Natuint;var Buffer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
      efi_block_write_ex=function (This:Pefi_block_io2_protocol;MediaId:dword;lba:efi_lba;var Token:efi_block_io2_token;BufferSize:Natuint;Buffer:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-     efi_block_flush_ex=function (This:Pefi_block_io2_protocol;var Token:efi_block_io2_token):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+     efi_block_flush_ex=function (This:Pefi_block_io2_protocol;var Token:efi_block_io2_token):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}   
      efi_block_io2_protocol=record
                             Media:^efi_block_io_media;
                             Reset:efi_block_reset_ex;
@@ -900,19 +909,19 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
      efi_block_io_crypto_iv_input_aes_cbc_microsoft_bitlocker=record
                                                               Header:efi_block_io_crypto_iv_input;
                                                               CryptoBlockNumber,CryptoBlockByteSize:qword;
-                                                              end;
+                                                              end; 
      efi_block_io_crypto_capabilities=record
                                       supported:boolean;
                                       KeyCount:qword;
                                       CapabilityCount:qword;
                                       Capabilities:array[1..1] of efi_block_io_crypto_capability;
-                                      end;
+                                      end;                         
      efi_block_io_crypto_configuration_table_entry=record
                                                    Index:qword;
                                                    KeyOwnerGuid:efi_guid;
                                                    Capability:efi_block_io_crypto_capability;
                                                    CryptoKey:Pointer;
-                                                   end;
+                                                   end;  
      efi_block_io_crypto_response_configuration_entry=record 
                                                       Index:qword;
                                                       KeyOwnerGuid:efi_guid;
@@ -1075,8 +1084,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
     efi_sd_mmc_status_block=record
                             Resp0,Resp1,Resp2,Resp3:dword;
                             end;
-    efi_sd_mmc_command_type=(SdMmcCommandTypeBc,SdMmcCommandTypeBcr,SdMmcCommandTypeAc,SdMmcCommandTypeAdtc);
-    efi_sd_mmc_response_type=(SdMmcResponceTypeR1,SdMmcResponceTypeR1b,SdMmcResponceTypeR2,SdMmcResponceTypeR3,SdMmcResponceTypeR4,SdMmcResponceTypeR5,SdMmcResponceTypeR5b,SdMmcResponceTypeR6,SdMmcResponceTypeR7);
+    efi_sd_mmc_command_type=(SdMmcCommandTypeBc,SdMmcCommandTypeBcr,SdMmcCommandTypeAc,SdMmcCommandTypeAdtc); efi_sd_mmc_response_type=(SdMmcResponceTypeR1,SdMmcResponceTypeR1b,SdMmcResponceTypeR2,SdMmcResponceTypeR3,SdMmcResponceTypeR4,SdMmcResponceTypeR5,SdMmcResponceTypeR5b,SdMmcResponceTypeR6,SdMmcResponceTypeR7); 
     efi_sd_mmc_pass_thru_command_packet=record
                                         SdMmcCmdBlk:^efi_sd_mmc_command_block;
                                         SdMmcStatusBlk:^efi_sd_mmc_status_block;
@@ -1133,15 +1141,13 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                                    RwUfsFlag:efi_ufs_device_rw_flag;
                                    RwUfsAttribute:efi_ufs_device_rw_attribute;
                                    end;
-    Pefi_pci_root_bridge_io_protocol=^efi_pci_root_bridge_io_protocol;
-                                   efi_pci_root_bridge_io_protocol_width=(efiPciWidthUint8,efiPciWidthUint16,efiPciWidthUint32,efiPciWidthUint64,efiPciWidthFifoUint8,efiPciWidthFifoUint16,efiPciWidthFifoUint32,efiPciWidthFifouint64,efiPciWidthFilluint8,efiPciWidthFilluint16,efiPciWidthFilluint32,efiPciWidthFilluint64,efiPciWidthMaximum);
+    Pefi_pci_root_bridge_io_protocol=^efi_pci_root_bridge_io_protocol;                      efi_pci_root_bridge_io_protocol_width=(efiPciWidthUint8,efiPciWidthUint16,efiPciWidthUint32,efiPciWidthUint64,efiPciWidthFifoUint8,efiPciWidthFifoUint16,efiPciWidthFifoUint32,efiPciWidthFifouint64,efiPciWidthFilluint8,efiPciWidthFilluint16,efiPciWidthFilluint32,efiPciWidthFilluint64,efiPciWidthMaximum);
     efi_pci_root_bridge_io_protocol_poll_io_mem=function (This:Pefi_pci_root_bridge_io_protocol;Width:efi_pci_root_bridge_io_protocol_width;Address,Mask,fvalue,Delay:qword;var fResult:qword):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_pci_root_bridge_io_protocol_io_mem=function (This:Pefi_pci_root_bridge_io_protocol;Width:efi_pci_root_bridge_io_protocol_width;Address:qword;Count:natuint;var Buffer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_pci_root_bridge_io_protocol_access=record 
                                            efiRead:efi_pci_root_bridge_io_protocol_io_mem;
                                            efiWrite:efi_pci_root_bridge_io_protocol_io_mem;
-                                           end;
-    efi_pci_root_bridge_io_protocol_operation=(efiPciOperationBusMasterRead,efiPciOperationBusMasterWrite,efiPciOperationBusMasterCommonBuffer,efiPciOperationBusMasterRead64,efiPciOperationBusMasterwrite64,efiPciOperationBusMasterCommonBuffer64,efiPciOperationMaxiumum);
+                                           end; efi_pci_root_bridge_io_protocol_operation=(efiPciOperationBusMasterRead,efiPciOperationBusMasterWrite,efiPciOperationBusMasterCommonBuffer,efiPciOperationBusMasterRead64,efiPciOperationBusMasterwrite64,efiPciOperationBusMasterCommonBuffer64,efiPciOperationMaxiumum);
     efi_pci_root_bridge_io_protocol_copy_mem=function (This:Pefi_pci_root_bridge_io_protocol;Width:efi_pci_root_bridge_io_protocol_width;DestAddress,SrcAddress:qword;Count:natuint):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_pci_root_bridge_io_protocol_map=function (This:Pefi_pci_root_bridge_io_protocol;Operation:efi_pci_root_bridge_io_protocol_operation;HostAddress:Pointer;var NumberOfBytes:natuint;DeviceAddress:efi_physical_address;var Mapping:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_pci_root_bridge_io_protocol_unmap=function (This:Pefi_pci_root_bridge_io_protocol;Mapping:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
@@ -1169,8 +1175,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                                     Configuration:efi_pci_root_bridge_io_protocol_configuration;
                                     SegmentNumber:dword;
                                     end;
-    Pefi_pci_io_protocol=^efi_pci_io_protocol;
-    efi_pci_io_protocol_width=(efiPciIoWidthUint8,efiPciIoWidthUint16,efiPciIoWidthUint32,efiPciIoWidthUint64,efiPciIoWidthFifoUint8,efiPciIoWidthFifoUint16,efiPciIoWidthFifoUint32,efiPciIoWidthFifoUint64,efiPciIoWidthFillUint8,efiPciIoWidthFillUint16,efiPciIoWidthFillUint32,efiPciIoWidthFillUint64,efiPciIoWidthMaximum);
+    Pefi_pci_io_protocol=^efi_pci_io_protocol; efi_pci_io_protocol_width=(efiPciIoWidthUint8,efiPciIoWidthUint16,efiPciIoWidthUint32,efiPciIoWidthUint64,efiPciIoWidthFifoUint8,efiPciIoWidthFifoUint16,efiPciIoWidthFifoUint32,efiPciIoWidthFifoUint64,efiPciIoWidthFillUint8,efiPciIoWidthFillUint16,efiPciIoWidthFillUint32,efiPciIoWidthFillUint64,efiPciIoWidthMaximum);
     efi_pci_io_protocol_poll_io_mem=function (This:Pefi_pci_io_protocol;Width:efi_pci_io_protocol_width;Barindex:byte;Offset,Mask,fValue,Delay:qword;var fResult:qword):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_pci_io_protocol_io_mem=function (This:Pefi_pci_io_protocol;Width:efi_pci_io_protocol_width;Barindex:byte;Offset:qword;Count:natuint;var Buffer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_pci_io_protocol_access=record
@@ -1189,8 +1194,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
     efi_pci_io_protocol_allocate_buffer=function (This:Pefi_pci_io_protocol;fType:efi_allocate_type;MemoryType:efi_memory_type;Pages:natuint;var HostAddress:Pointer;Attributes:qword):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_pci_io_protocol_free_buffer=function (This:Pefi_pci_io_protocol;Pages:natuint;HostAddress:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_pci_io_protocol_flush=function (This:Pefi_pci_io_protocol):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-    efi_pci_io_protocol_get_location=function (This:Pefi_pci_io_protocol;var SegmentNumber,BusNumber,DeviceNumber,FunctionNumber:natuint):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-    efi_pci_io_protocol_attribute_operation=(efiPciIoAttributeOperationGet,efiPciIoAttributeOperationSet,efiPciIoAttributeOperationEnable,efiPciIoAttributeOperationDisable,efiPciIoAttributeOperationSupported,efiPciIoAttributeOperationMaximum);
+    efi_pci_io_protocol_get_location=function (This:Pefi_pci_io_protocol;var SegmentNumber,BusNumber,DeviceNumber,FunctionNumber:natuint):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386} efi_pci_io_protocol_attribute_operation=(efiPciIoAttributeOperationGet,efiPciIoAttributeOperationSet,efiPciIoAttributeOperationEnable,efiPciIoAttributeOperationDisable,efiPciIoAttributeOperationSupported,efiPciIoAttributeOperationMaximum);
     efi_pci_io_protocol_attributes=function (This:Pefi_pci_io_protocol;Operation:efi_pci_io_protocol_attribute_operation;Attributes:qword;var fResult:qword):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_pci_io_protocol_get_bar_attributes=function (This:Pefi_pci_io_protocol;Barindex:byte;var Supports:qword;var Resources:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_pci_io_protocol_set_bar_attributes=function (This:Pefi_pci_io_protocol;Attributes:qword;BarIndex:byte;var Offset,Length:qword):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
@@ -1301,7 +1305,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                               end;
     efi_usb_io_get_config_descriptor=function (This:Pefi_usb_io_protocol;var ConfigurationDescriptor:efi_usb_config_descriptor):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_usb_interface_descriptor=record
-                            Length,DescriptorType,InterfaceNumber,AlternateSetting,NumEndPoints,InterfaceClass,InterfaceSubClass,InterfaceProtocol,efiInterface:byte;
+    Length,DescriptorType,InterfaceNumber,AlternateSetting,NumEndPoints,InterfaceClass,InterfaceSubClass,InterfaceProtocol,efiInterface:byte;
                                  end;
     efi_usb_io_get_interface_descriptor=function (This:Pefi_usb_io_protocol;var InterfaceDescriptor:efi_usb_interface_descriptor):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_usb_endpoint_descriptor=record
@@ -1349,8 +1353,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
     efi_usb2_hc_protocol_async_isochronous_transfer=function (This:Pefi_usb2_hc_protocol;DeviceAddress,EndPointAddress,DeviceSpeed:byte;MaximumPacketLength:natuint;DataBuffersNumber:byte;Data:efi_usb_max_iso_buffer_array;DataLength:natuint;Translator:Pefi_usb2_hc_transaction_translator;IsochronousCallBack:efi_async_usb_transfer_callback;Context:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_usb_port_status=record
                         PortStatus,PortChangeStatus:word;
-                        end;
-    efi_usb_port_feature=(efiUsbPortEnable=1,efiUsbPortSuspend=2,efiUsbPortReset=4,efiUsbPortPower=8,efiUsbPortOwner=13,efiUsbPortConnectChange=16,efiUsbPortEnableChange=17,efiUsbPortSuspendChange=18,efiUsbPortOverCurrentChange=19,efiUsbPortResetChange=20);
+                        end; efi_usb_port_feature=(efiUsbPortEnable=1,efiUsbPortSuspend=2,efiUsbPortReset=4,efiUsbPortPower=8,efiUsbPortOwner=13,efiUsbPortConnectChange=16,efiUsbPortEnableChange=17,efiUsbPortSuspendChange=18,efiUsbPortOverCurrentChange=19,efiUsbPortResetChange=20);
     efi_usb2_hc_protocol_get_roothub_port_status=function (This:Pefi_usb2_hc_protocol;PortNumber:byte;var PortStatus:efi_usb_port_status):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_usb2_hc_protocol_set_roothub_port_feature=function (This:Pefi_usb2_hc_protocol;PortNumber:byte;PortFeature:efi_usb_port_feature):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_usb2_hc_protocol_clear_roothub_port_feature=function (This:Pefi_usb2_hc_protocol;PortNumber:byte;PortFeature:efi_usb_port_feature):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
@@ -1371,8 +1374,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                          MajorRevision:word;
                          MinorRevision:word;
                          end;
-    Pefi_usbfn_io_protocol=^efi_usbfn_io_protocol;
-    efi_usbfn_port_type=(efiUsbUnknownPort=0,efiUsbStandardDownStreamPort,efiUsbChargingDownStreamPort,efiUsbDedicatedChargingPort,efiUsbInvaildDedicatedChargingPort);
+    Pefi_usbfn_io_protocol=^efi_usbfn_io_protocol; efi_usbfn_port_type=(efiUsbUnknownPort=0,efiUsbStandardDownStreamPort,efiUsbChargingDownStreamPort,efiUsbDedicatedChargingPort,efiUsbInvaildDedicatedChargingPort);
     efi_usbfn_io_detect_port=function (This:Pefi_usbfn_io_protocol;var PortType:efi_usbfn_port_type):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     Pefi_usb_endpoint_descriptor=^efi_usb_endpoint_descriptor;
     efi_usb_interface_info=record
@@ -1396,12 +1398,10 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
     efi_usbfn_io_get_endpoint_maxpacket_size=function (This:Pefi_usbfn_io_protocol;EndPointType:efi_usb_endpoint_type;BusSpeed:efi_usb_bus_speed;var MaxPacketSize:word):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_usbfn_device_info_id=(efiUsbDeviceInfoUnknown=0,efiUsbDeviceInfoSerialNumber,efiUsbDeviceInfoManufacturerName,efiUsbDeviceInfoProductName);
     efi_usbfn_io_get_device_info=function (This:Pefi_usbfn_io_protocol;Id:efi_usbfn_device_info_id;var BufferSize:natuint;var Buffer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-    efi_usbfn_io_get_vendor_id_product_id=function (This:Pefi_usbfn_io_protocol;var Vid,Pid:word):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-    efi_usbfn_endpoint_direction=(efiUsbEndPointDirectionHostOut=0,efiUsbEndPointDirectionHostIn,efiUsbEndPointDirectionDeviceTx=efiUsbEndPointDirectionHostIn,efiUsbEndPointDirectionDeviceRx=efiUsbEndPointDirectionHostOut);
+    efi_usbfn_io_get_vendor_id_product_id=function (This:Pefi_usbfn_io_protocol;var Vid,Pid:word):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386} efi_usbfn_endpoint_direction=(efiUsbEndPointDirectionHostOut=0,efiUsbEndPointDirectionHostIn,efiUsbEndPointDirectionDeviceTx=efiUsbEndPointDirectionHostIn,efiUsbEndPointDirectionDeviceRx=efiUsbEndPointDirectionHostOut);
     efi_usbfn_io_abort_transfer=function (This:Pefi_usbfn_io_protocol;EndPointIndex:byte;Direction:efi_usbfn_endpoint_direction):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_usbfn_io_get_endpoint_stall_state=function (This:Pefi_usbfn_io_protocol;EndPointIndex:byte;Direction:efi_usbfn_endpoint_direction;var State:boolean):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-    efi_usbfn_io_set_endpoint_stall_state=function (This:Pefi_usbfn_io_protocol;EndPointIndex:byte;Direction:efi_usbfn_endpoint_direction;State:boolean):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-    efi_usbfn_message=(efiUsbMsgNone=0,efiUsbMsgSetupPacket,efiUsbMsgEndPointStatusChangedRx,efiUsbMsgEndPointStatusChangedTx,efiUsbMsgBusEventDetach,efiUsbMsgBusEventAttach,efiUsbMsgBusEventReset,efiUsbMsgBusEventResume,efiUsbMsgBusEventSpeed);
+    efi_usbfn_io_set_endpoint_stall_state=function (This:Pefi_usbfn_io_protocol;EndPointIndex:byte;Direction:efi_usbfn_endpoint_direction;State:boolean):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386} efi_usbfn_message=(efiUsbMsgNone=0,efiUsbMsgSetupPacket,efiUsbMsgEndPointStatusChangedRx,efiUsbMsgEndPointStatusChangedTx,efiUsbMsgBusEventDetach,efiUsbMsgBusEventAttach,efiUsbMsgBusEventReset,efiUsbMsgBusEventResume,efiUsbMsgBusEventSpeed);
     efi_usbfn_transfer_status=(UsbTransferStatusUnknown=0,UsbTransferStatusComplete,UsbTransferStatusAborted,UsbTransferStatusActive,UsbTransferStatusNone);
     efi_usbfn_transfer_result=record
                               BytesTransferred:natuint;
@@ -1445,8 +1445,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                           SetEndPointPolicy:efi_usbfn_io_set_endpoint_policy;
                           GetEndPointPolicy:efi_usbfn_io_get_endpoint_policy;
                           end;
-    Pefi_debug_support_protocol=^efi_debug_support_protocol;
-    efi_instruction_set_architecture=(IsaIa32=$014C,IsaX64=$8664,IsaIpf=$0200,IsaEbc=$0EBC,IsaArm=$01C2,IsaAArch64=$AA64,Isariscv32=$5032,Isariscv64=$5064,Isariscv128=$5128,Isaloongarch32=$6232,Isaloongarch64=$6264);
+    Pefi_debug_support_protocol=^efi_debug_support_protocol; efi_instruction_set_architecture=(IsaIa32=$014C,IsaX64=$8664,IsaIpf=$0200,IsaEbc=$0EBC,IsaArm=$01C2,IsaAArch64=$AA64,Isariscv32=$5032,Isariscv64=$5064,Isariscv128=$5128,Isaloongarch32=$6232,Isaloongarch64=$6264);
     efi_get_maximum_processor_index=function (This:Pefi_debug_support_protocol;var MaxProcessorIndex:natuint):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_system_context_ebc=record
                            R0,R1,R2,R3,R4,R5,R6,R7:qword;
@@ -1741,8 +1740,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                                  end;
     Pefi_simple_network_protocol=^efi_simple_network_protocol;
     efi_simple_network_state=(efiSimpleNetworkStopped,efiSimpleNetworkStarted,efiSimpleNetworkInitialized,efiSimpleNetworkMaxState);
-    efi_simple_network_mode=record
-                            State,HwAddressSize,MediaHeaderSize,MaxPacketSize,NvRamSize,NvRamAccessSize,ReceiveFilterMask,ReceiveFilterSetting,MaxMCastFilterCount,MCastFilterCount:dword;
+    efi_simple_network_mode=record                   State,HwAddressSize,MediaHeaderSize,MaxPacketSize,NvRamSize,NvRamAccessSize,ReceiveFilterMask,ReceiveFilterSetting,MaxMCastFilterCount,MCastFilterCount:dword;
                             MCastFilter:array[1..max_mcast_filter_cnt] of efi_mac_address;
                             CurrentAddress,BroadCastAddress,PermanentAddress:efi_mac_address;
                             Iftype:byte;
@@ -1905,8 +1903,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                                     SrvList:array[1..65535] of efi_pxe_base_code_srvlist;
                                     end;
     Pefi_pxe_base_code_discover_info=^efi_pxe_base_code_discover_info;
-    efi_pxe_base_code_discover=function (This:Pefi_pxe_base_code_protocol;ftype:word;Layer:Pword;UseBis:boolean;Info:Pefi_pxe_base_code_discover_info):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-    efi_pxe_base_code_tftp_opcode=(efi_pxe_base_code_tftp_first,efi_pxe_base_code_tftp_get_file_size,efi_pxe_base_code_tftp_read_file,efi_pxe_base_code_tftp_write_file,efi_pxe_base_code_tftp_read_directory,efi_pxe_base_code_mtftp_get_file_size,efi_pxe_base_code_mtftp_read_file,efi_pxe_base_codemtftp_read_directory,efi_pxe_base_code_mtftp_last);
+    efi_pxe_base_code_discover=function (This:Pefi_pxe_base_code_protocol;ftype:word;Layer:Pword;UseBis:boolean;Info:Pefi_pxe_base_code_discover_info):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386} efi_pxe_base_code_tftp_opcode=(efi_pxe_base_code_tftp_first,efi_pxe_base_code_tftp_get_file_size,efi_pxe_base_code_tftp_read_file,efi_pxe_base_code_tftp_write_file,efi_pxe_base_code_tftp_read_directory,efi_pxe_base_code_mtftp_get_file_size,efi_pxe_base_code_mtftp_read_file,efi_pxe_base_codemtftp_read_directory,efi_pxe_base_code_mtftp_last);
     efi_pxe_base_code_mtftp_info=record
                                  MCastIp:efi_ip_address;
                                  CPort,SPort:efi_pxe_base_code_udp_port;
@@ -1937,9 +1934,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                                SetPackets:efi_pxe_base_code_set_packets;
                                Mode:^efi_pxe_base_code_mode;
                                end; 
-    Pefi_pxe_base_code_callback_protocol=^efi_pxe_base_code_callback_protocol;
-    efi_pxe_base_code_callback_status=(efi_pxe_base_code_callback_status_first,efi_pxe_base_code_callback_status_continue,efi_pxe_base_code_callback_status_abort,efi_pxe_base_code_callback_status_last);
-    efi_pxe_base_code_function=(efi_pxe_base_code_function_first,efi_pxe_base_code_function_dhcp,efi_pxe_base_code_function_discover,efi_pxe_base_code_function_mtftp,efi_pxe_base_code_function_udp_write,efi_pxe_base_code_function_udp_read,efi_pxe_base_code_function_arp,efi_pxe_base_code_function_igmp,efi_pxe_base_code_pxe_function_last);
+    Pefi_pxe_base_code_callback_protocol=^efi_pxe_base_code_callback_protocol; efi_pxe_base_code_callback_status=(efi_pxe_base_code_callback_status_first,efi_pxe_base_code_callback_status_continue,efi_pxe_base_code_callback_status_abort,efi_pxe_base_code_callback_status_last); efi_pxe_base_code_function=(efi_pxe_base_code_function_first,efi_pxe_base_code_function_dhcp,efi_pxe_base_code_function_discover,efi_pxe_base_code_function_mtftp,efi_pxe_base_code_function_udp_write,efi_pxe_base_code_function_udp_read,efi_pxe_base_code_function_arp,efi_pxe_base_code_function_igmp,efi_pxe_base_code_pxe_function_last);
     efi_pxe_callback=function (This:Pefi_pxe_base_code_callback_protocol;ffunction:efi_pxe_base_code_function;Received:boolean;Packetlen:dword;Packet:Pefi_pxe_base_code_packet):efi_pxe_base_code_callback_status;
     efi_pxe_base_code_callback_protocol=record
                                         Revision:qword;
@@ -2130,6 +2125,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                               end;
     Pefi_bluetooth_config_protocol=^efi_bluetooth_config_protocol;
     efi_bluetooth_config_init=function (This:Pefi_bluetooth_config_protocol):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+    
     efi_bluetooth_scan_callback_information=record
                                             BDAddr:bluetooth_address;
                                             RemoteDeviceState:byte;
@@ -2140,8 +2136,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
     efi_bluetooth_config_scan_callback_function=function (This:Pefi_bluetooth_config_protocol;Context:Pointer;CallBackInfo:Pefi_bluetooth_scan_callback_information):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_bluetooth_config_scan=function (This:Pefi_bluetooth_config_protocol;ReScan:boolean;ScanType:byte;CallBack:efi_bluetooth_config_scan_callback_function;Context:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_bluetooth_config_connect=function (This:Pefi_bluetooth_config_protocol;bd_addr:bluetooth_address):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-    efi_bluetooth_config_disconnect=function (This:Pefi_bluetooth_config_protocol;bd_addr:bluetooth_address;Reason:Pbyte):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-    efi_bluetooth_config_data_type=(EfiBlueToothConfigDataTypeDeviceName,EfiBlueToothConfigDataTypeClassOfDevice,EfiBlueToothConfigDataRemoteDeviceState,EfiBlueToothConfigDataTypeSdpInfo,EfiBlueToothConfigDataTypeBDADDR,EfiBlueToothConfigDataTypeDiscoverable,EfiBlueToothConfigDataTypeControllerStoredPairedDeviceList,EfiBlueToothConfigDataTypeAvailableDeviceList,EfiBlueToothConfigDataTypeRandomAddress,EfiBlueToothConfigDataTypeRSSI,EfiBlueToothConfigDataTypeAdvertisementData,EfiBlueToothConfigDataTypeIoCapability,EfiBlueToothConfigDataTypeOOBDataFlag,EfiBlueToothConfigDataTypeKeySize,EfiBlueToothConfigDataTypeEncKeySize,EfiBlueToothConfigDataTypeMax);
+    efi_bluetooth_config_disconnect=function (This:Pefi_bluetooth_config_protocol;bd_addr:bluetooth_address;Reason:Pbyte):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386} efi_bluetooth_config_data_type=(EfiBlueToothConfigDataTypeDeviceName,EfiBlueToothConfigDataTypeClassOfDevice,EfiBlueToothConfigDataRemoteDeviceState,EfiBlueToothConfigDataTypeSdpInfo,EfiBlueToothConfigDataTypeBDADDR,EfiBlueToothConfigDataTypeDiscoverable,EfiBlueToothConfigDataTypeControllerStoredPairedDeviceList,EfiBlueToothConfigDataTypeAvailableDeviceList,EfiBlueToothConfigDataTypeRandomAddress,EfiBlueToothConfigDataTypeRSSI,EfiBlueToothConfigDataTypeAdvertisementData,EfiBlueToothConfigDataTypeIoCapability,EfiBlueToothConfigDataTypeOOBDataFlag,EfiBlueToothConfigDataTypeKeySize,EfiBlueToothConfigDataTypeEncKeySize,EfiBlueToothConfigDataTypeMax);
     efi_bluetooth_config_remote_device_state_type=dword;
     efi_bluetooth_config_get_data=function (This:Pefi_bluetooth_config_protocol;DataType:efi_bluetooth_config_data_type;var DataSize:natuint;var Data):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_bluetooth_config_set_data=function (This:Pefi_bluetooth_config_protocol;DataType:efi_bluetooth_config_data_type;DataSize:natuint;Data:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
@@ -2153,8 +2148,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
     efi_bluetooth_config_register_get_link_key_callback_function=function (This:Pefi_bluetooth_config_protocol;Context:Pointer;BDAddr:Pbluetooth_address;var Linkkey:efi_bluetooth_hci_link_key_array):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_bluetooth_config_register_get_link_key_callback=function (This:Pefi_bluetooth_config_protocol;CallBack:efi_bluetooth_config_register_get_link_key_callback_function;Context:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_bluetooth_config_register_set_link_key_callback_function=function (This:Pefi_bluetooth_config_protocol;Context:Pointer;BDAddr:Pbluetooth_address;Linkkey:efi_bluetooth_hci_link_key_array):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-    efi_bluetooth_config_register_set_link_key_callback=function (This:Pefi_bluetooth_config_protocol;Callback:efi_bluetooth_config_register_set_link_key_callback_function;Context:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
-    efi_bluetooth_connect_complete_callback_type=(EfiBluetoothConnCallbackTypeDisconnected,EfiBluetoothConnCallbackTypeConnected,EfiBluetoothConnCallbackTypeAuthenticated,EfiBluetoothConnCallbackTypeEncrypted);
+    efi_bluetooth_config_register_set_link_key_callback=function (This:Pefi_bluetooth_config_protocol;Callback:efi_bluetooth_config_register_set_link_key_callback_function;Context:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386} efi_bluetooth_connect_complete_callback_type=(EfiBluetoothConnCallbackTypeDisconnected,EfiBluetoothConnCallbackTypeConnected,EfiBluetoothConnCallbackTypeAuthenticated,EfiBluetoothConnCallbackTypeEncrypted);
     efi_bluetooth_config_register_connect_complete_callback_function=function (This:Pefi_bluetooth_config_protocol;Context:Pointer;CallBackType:efi_bluetooth_connect_complete_callback_type;BDAddr:Pbluetooth_address;InputBuffer:Pointer;InputBufferSize:natuint):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_bluetooth_config_register_connect_complete_callback=function (This:Pefi_bluetooth_config_protocol;Callback:efi_bluetooth_config_register_connect_complete_callback_function;Context:Pointer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_bluetooth_config_protocol=record
@@ -2170,7 +2164,6 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                                   RegisterSetLinkKeyCallBack:efi_bluetooth_config_register_set_link_key_callback;
                                   RegisterLinkConnectCompleteCallBack:efi_bluetooth_config_register_connect_complete_callback;
                                   end;
-    
     Pefi_mp_services_protocol=^efi_mp_services_protocol;
     efi_mp_services_get_number_of_processors=function (This:Pefi_mp_services_protocol;var NumberOfProcessors:natuint;var NumberOfEnabledProcessors:natuint):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
     efi_cpu_physical_location=record
@@ -2824,8 +2817,7 @@ const efi_system_table_signature:qword=$5453595320494249;
       processor_health_status_bit=$00000004;
       
 function bis_get_siginfo_count(bisdataPtr:Pefi_bis_data):dword;
-function bis_get_siginfo_array(bisdataPtr:Pefi_bis_data):Pefi_bis_signature_info;  
-procedure efi_get_systemtable_and_imagehandle;
+function bis_get_siginfo_array(bisdataPtr:Pefi_bis_data):Pefi_bis_signature_info; 
 procedure efi_initialize(ImageHandle:efi_handle;SystemTable:Pefi_system_table);
 function efi_allocmem(size:natuint):Pointer;
 procedure efi_move(Source:Pointer;Dest:Pointer;Size:natuint);
@@ -2847,8 +2839,6 @@ procedure efi_console_get_cursor_position(var column,row:natuint);
 procedure efi_console_get_max_row_and_max_column;
 procedure efi_console_output_string_with_colour(Outputstring:PWideChar;backgroundcolour:byte;textcolour:byte);
 procedure efi_console_read_string_with_colour(var ReadString:PWideChar;backgroundcolour:byte;textcolour:byte);
-procedure efi_console_timer_mouse_blink(Event:efi_event;Context:Pointer);
-procedure efi_console_enable_mouse_blink(enableblink:boolean;blinkmilliseconds:qword);
 function efi_list_all_file_system(isreadonly:byte):efi_file_system_list;
 function efi_list_all_file_system_ext:efi_file_system_list_ext;
 procedure efi_console_initialize(bck_colour,text_colour:byte;blinkmiliseconds:qword);
@@ -2879,9 +2869,6 @@ end;
 function bis_get_siginfo_array(bisdataPtr:Pefi_bis_data):Pefi_bis_signature_info;[public,alias:'BIS_GET_SIGINFO_ARRAY'];
 begin
  bis_get_siginfo_array:=Pefi_bis_signature_info(bisdataPtr^.Data);
-end;
-procedure efi_get_systemtable_and_imagehandle;[public,alias:'EFI_GET_SYSTEMTABLE_AND_IMAGEHANDLE'];
-begin
 end;
 procedure efi_initialize(ImageHandle:efi_handle;SystemTable:Pefi_system_table);[public,alias:'EFI_INITIALIZE'];
 begin
@@ -2973,32 +2960,32 @@ function efi_get_platform:byte;[public,alias:'EFI_GET_PLATFORM'];
 begin
  {$IFDEF CPUX86_64}
  efi_get_platform:=0;
- {$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+ {$endif}
  {$IFDEF CPUAARCH64}
  efi_get_platform:=1;
- {$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+ {$endif}
  {$IFDEF CPULOONGARCH}
  efi_get_platform:=2;
- {$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+ {$endif}
  {$IFDEF CPURISCV64}
  efi_get_platform:=3;
- {$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+ {$endif}
  {$IFDEF CPURISCV128}
  efi_get_platform:=4;
- {$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+ {$endif}
  {$IFDEF CPUI386}
  efi_get_platform:=5;
- {$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+ {$endif}
  {$IFDEF CPUARM}
  efi_get_platform:=6;
- {$endif}{$ifdef cpui386}cdecl;{$endif cpui386}
+ {$endif}
 end;
 procedure efi_console_output_string(outputstring:PWideChar);[public,alias:'EFI_CONSOLE_OUTPUT_STRING'];
 var mychar:array[1..2] of WideChar;
     i,currentcolumn,currentrow,len:natuint;
 begin
- GlobalSystemTable^.ConOut^.SetAttribute(GlobalSystemTable^.ConOut,consolebck shl 4+consoletex);
- i:=1; len:=wstrlen(outputstring);
+ i:=1; len:=0;
+ while((outputstring+len)^<>#0) do inc(len);
  while(i<=len) do
   begin
    if(i<=len-1) then
@@ -3045,10 +3032,6 @@ begin
     begin
      currentcolumn:=0; inc(currentrow,1); 
     end;
-   if(currentrow>=maxrow) then 
-    begin
-     efi_console_clear_screen;
-    end;
   end;
  efi_console_set_cursor_position(currentcolumn,currentrow);
 end;
@@ -3057,7 +3040,8 @@ var mychar:array[1..2] of WideChar;
     i,len:Natuint;
 begin
  GlobalSystemTable^.ConOut^.SetAttribute(GlobalSystemTable^.ConOut,backgroundcolour shl 4+textcolour);
- i:=1; len:=wstrlen(outputstring);
+ i:=1; len:=0;
+ while((outputstring+len)^<>#0) do inc(len);
  while(i<=len) do
   begin
    if(i<=len-1) then
@@ -3104,12 +3088,9 @@ begin
     begin
      currentcolumn:=0; inc(currentrow,1); 
     end;
-   if(currentrow>=maxrow) then 
-    begin
-     efi_console_clear_screen;
-    end;
   end;
  efi_console_set_cursor_position(currentcolumn,currentrow);
+ GlobalSystemTable^.ConOut^.SetAttribute(GlobalSystemTable^.ConOut,consolebck shl 4+consoletex);
 end;
 procedure efi_set_watchdog_timer_to_null;[public,alias:'EFI_SET_WATCHDOG_TIMER_TO_NULL'];
 begin
@@ -3120,7 +3101,6 @@ var key:efi_input_key;
     waitidx,i,j:natuint;
     procstring:PWideChar;
 begin
- GlobalSystemTable^.ConOut^.SetAttribute(GlobalSystemTable^.ConOut,consolebck shl 4+consoletex);
  if(ReadString<>nil) then efi_freemem(ReadString);
  Readstring:=efi_allocmem(sizeof(WideChar)); i:=0;
  while (True) do
@@ -3163,7 +3143,7 @@ begin
      inc(currentcolumn);
      if(currentcolumn>=maxcolumn) then
       begin
-       currentcolumn:=0; inc(currentrow); GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,#13#10);
+       currentcolumn:=0; inc(currentrow);
       end;
      if(currentrow>=maxrow) then efi_console_clear_screen;
      GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,@(ReadString+i-1)^);
@@ -3263,7 +3243,7 @@ begin
      inc(currentcolumn);
      if(currentcolumn>=maxcolumn) then
       begin
-       currentcolumn:=0; inc(currentrow); GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,#13#10);
+       currentcolumn:=0; inc(currentrow);
       end;
      if(currentrow>=maxrow) then efi_console_clear_screen;
      GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,@(ReadString+i-1)^);
@@ -3271,21 +3251,23 @@ begin
    else dec(i);
    efi_console_set_cursor_position(currentcolumn,currentrow);
   end;
+ GlobalSystemTable^.ConOut^.SetAttribute(GlobalSystemTable^.ConOut,consolebck shl 4+consoletex);
 end;
 procedure efi_console_output_number(number:natint);[public,alias:'EFI_CONSOLE_OUTPUT_NUMBER'];
 const numchar:PWideChar='0123456789';
-var num,procnum,index1,index2:natuint;
+var charstr:array[1..32] of WideChar=(#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0);
+    num,procnum,index1,index2:natuint;
     negative:boolean;
     numstr:PWideChar;
 begin
  if(number<0) then negative:=true else negative:=false;
  num:=abs(number); procnum:=1; index1:=1;
- while(procnum*10<num) do 
+ while(procnum*10<=num) do 
   begin
    inc(index1);
    procnum:=procnum*10;
   end;
- numstr:=efi_allocmem((index1+1)*sizeof(WideChar));
+ numstr:=@charstr;
  index2:=1;
  while(procnum>=1) do
   begin
@@ -3297,20 +3279,20 @@ begin
  (numstr+index2-1)^:=#0;
  if(negative) then efi_console_output_string('-');
  efi_console_output_string(numstr);
- efi_freemem(numstr);
 end;
 procedure efi_console_output_hex(hex:natuint);[public,alias:'EFI_CONSOLE_OUTPUT_HEX'];
 const numchar:PWideChar='0123456789ABCDEF';
-var num,procnum,index1,index2:natuint;
+var charstr:array[1..20] of WideChar=(#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0);
+    num,procnum,index1,index2:natuint;
     numstr:PWideChar;
 begin
  num:=hex; procnum:=1; index1:=1;
- while(procnum shl 4<num) do 
+ while(procnum shl 4<=num) do 
   begin
    inc(index1);
    procnum:=procnum shl 4;
   end;
- numstr:=efi_allocmem((index1+1)*sizeof(WideChar));
+ numstr:=@charstr;
  index2:=1;
  while(procnum>=1) do
   begin
@@ -3321,7 +3303,6 @@ begin
   end;
  (numstr+index2-1)^:=#0;
  efi_console_output_string(numstr);
- efi_freemem(numstr);
 end;
 procedure efi_console_enable_mouse;[public,alias:'EFI_CONSOLE_ENABLE_MOUSE'];
 begin
@@ -3347,26 +3328,22 @@ var maxc,maxr:Natuint;
     status:natint;
     i:byte;
 begin
- i:=0; status:=efi_success; maxcharsize:=0; maxcharindex:=0;
+ i:=0; status:=efi_success; maxcharsize:=2000; maxcharindex:=1; rescolumn:=80; resrow:=25;
  GlobalSystemTable^.ConOut^.SetMode(GlobalSystemTable^.ConOut,0);
- while(True) do
+ while(i<GlobalSystemTable^.ConOut^.Mode^.MaxMode) do
   begin
    inc(i);
-   GlobalSystemTable^.ConOut^.QueryMode(GlobalSystemTable^.ConOut,i-1,maxc,maxr);
-   status:=GlobalSystemTable^.ConOut^.SetMode(GlobalSystemTable^.ConOut,maxcharindex-1);
-   if(maxc*maxr>maxcharsize) and (status=efi_success) then
+   status:=GlobalSystemTable^.ConOut^.QueryMode(GlobalSystemTable^.ConOut,i-1,maxc,maxr);
+   if(status<>efi_success) then continue;
+   if(maxc*maxr>maxcharsize) then
     begin
      maxcharsize:=maxc*maxr; rescolumn:=maxc; resrow:=maxr; maxcharindex:=i;
     end;
-   if(i>=GlobalSystemTable^.ConOut^.Mode^.MaxMode) then 
-    begin
-     GlobalSystemTable^.ConOut^.SetMode(GlobalSystemTable^.ConOut,maxcharindex-1);
-     maxcolumn:=rescolumn; maxrow:=resrow; 
-     break;
-    end;
   end;
+ GlobalSystemTable^.ConOut^.SetMode(GlobalSystemTable^.ConOut,maxcharindex-1);
+ maxcolumn:=rescolumn; maxrow:=resrow; 
 end;
-procedure efi_console_timer_mouse_blink(Event:efi_event;Context:Pointer);[public,alias:'EFI_CONSOLE_TIMER_MOUSE_BLINK'];
+procedure efi_console_timer_mouse_blink(Event:efi_event;Context:Pointer);{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}[public,alias:'EFI_CONSOLE_TIMER_MOUSE_BLINK'];
 begin
  if(CursorBlinkVisible=true) then 
   begin 
@@ -3407,7 +3384,7 @@ begin
  for i:=1 to totalnum do
   begin
    GlobalSystemTable^.BootServices^.HandleProtocol((totalbuf+i-1)^,@efi_simple_file_system_protocol_guid,sfspp);
-   Pefi_simple_file_system_protocol(sfspp)^.OpenVolume(Pefi_simple_file_system_protocol(sfspp),fp);
+   sfspp^.OpenVolume(sfspp,fp);
    realsize:=sizeof(efi_file_system_info);
    fp^.GetInfo(fp,@efi_file_system_info_id,realsize,fsinfo);
    if(isreadonly=1) and (fsinfo.ReadOnly=true) then
@@ -3479,7 +3456,7 @@ begin
  efi_console_clear_screen;
  efi_console_get_max_row_and_max_column;
  efi_console_enable_mouse;
- efi_console_enable_mouse_blink(true,blinkmiliseconds);
+ if(blinkmiliseconds>0) then efi_console_enable_mouse_blink(true,blinkmiliseconds) else efi_console_enable_mouse_blink(false,0);
  efi_set_watchdog_timer_to_null;
 end;
 function efi_graphics_initialize:efi_graphics_list;[public,alias:'EFI_GRAPHICS_INITITALIZE'];
@@ -3511,7 +3488,7 @@ procedure efi_graphics_free(var egl:efi_graphics_list);[public,alias:'EFI_GRAPIC
 begin
  efi_freemem(egl.graphics_item); egl.graphics_count:=0;
 end;
-function efi_loader_get_memory_map:efi_memory_map;[public,alias:'EFI_GET_MEMORY_MAP'];
+function efi_loader_get_memory_map:efi_memory_map;[public,alias:'EFI_LOADER_GET_MEMORY_MAP'];
 var ptr:Pointer;
     endptr:^efi_memory_descriptor;
     size:natuint;
@@ -3538,7 +3515,7 @@ begin
  efi_freemem(ptr);
  efi_loader_get_memory_map:=res;
 end;
-function efi_loader_get_memory_available(memorymap:efi_memory_map):efi_memory_result;[public,alias:'EFI_GET_MEMORY_AVAILABLE'];
+function efi_loader_get_memory_available(memorymap:efi_memory_map):efi_memory_result;[public,alias:'EFI_LOADER_GET_MEMORY_AVAILABLE'];
 var memoryaddress,index,maxsize:natuint;
     res:efi_memory_result;
 begin
@@ -3556,7 +3533,7 @@ begin
  res.memory_size:=maxsize;
  efi_loader_get_memory_available:=res;
 end;
-procedure efi_loader_exit_boot_services(memorymap:efi_memory_map);[public,alias:'EFI_EXIT_BOOT_SERVICES'];
+procedure efi_loader_exit_boot_services(memorymap:efi_memory_map);[public,alias:'EFI_LOADER_EXIT_BOOT_SERVICES'];
 begin
  GlobalSystemTable^.BootServices^.ExitBootServices(ParentImageHandle,memorymap.memory_key);
 end;

@@ -848,6 +848,7 @@ end;
 function optimize_integer_divide(a,b:natuint):natuint;[public,alias:'optimize_integer_divide'];
 var procnum1,procnum2,degree,res:natuint;
 begin
+ if(a=0) then exit(0);
  if(a<b) then exit(0);
  if(a=b) then exit(1);
  if(b=1) or (b=0) then exit(a);
@@ -872,8 +873,9 @@ end;
 function optimize_integer_modulo(a,b:natuint):natuint;[public,alias:'optimize_integer_modulo'];
 var res,procnum:natuint;
 begin
+ if(a=0) then exit(0);
  if(a<b) then exit(a);
- if(a=b) then exit(1);
+ if(a=b) then exit(0);
  if(b=1) or (b=0) then exit(0);
  res:=a; procnum:=b;
  while(procnum<=res shr 1) do
