@@ -53,7 +53,7 @@ begin
  {Initialize the uefi loader}
  efi_initialize(ImageHandle,systemtable);
  efi_console_initialize(efi_bck_black,efi_lightgrey,0);
- efsl:=efi_list_all_file_system(1);
+ efsl:=efi_list_all_file_system(2);
  i:=0; count:=efsl.file_system_count;
  efi_console_output_string('Welcome to TYDQ bootloader!'#10);
  {Detect the kernel file}
