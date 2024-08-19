@@ -1,13 +1,10 @@
-program uefiloaderx64;
+program uefiloader;
 
 {$MODE FPC}
 
-uses uefi,binarybase,bootconfig,graphics{$ifdef cpuaarch64},prt0{$endif cpuaarch64}{$ifdef cpuarm},prt0{$endif cpuarm};
-
-var proccontent:Pointer;
-    procsize:dword;
+uses uefi,binarybase,bootconfig,graphics;
     
-function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif cpui386}[public,alias:'_start'];
+function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif}[public,alias:'_start'];
 var {For checking elf file}
     sfsp:Pefi_simple_file_system_protocol;
     fp:Pefi_file_protocol;
@@ -16,6 +13,7 @@ var {For checking elf file}
     status:efi_status;
     finfo:efi_file_info;
     finfosize:natuint;
+    proccontent:Pointer;
     procsize:natuint;
     partstr:PWideChar;
     gpl:efi_graphics_list;
@@ -44,12 +42,6 @@ var {For checking elf file}
     addressoffset:natuint;
     allocaddress:natuint;
 begin  
- {$ifdef cpuaarch64}
- ExitCode:=0;
- {$endif cpuaarch64}
- {$ifdef cpuarm}
- ExitCode:=0;
- {$endif cpuarm}
  {Initialize the uefi loader}
  efi_initialize(ImageHandle,systemtable);
  efi_console_initialize(efi_bck_black,efi_lightgrey,0);
