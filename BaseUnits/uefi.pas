@@ -796,7 +796,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                    LastAccessTime:efi_time;
                    ModificationTime:efi_time;
                    Attributes:qword;
-                   FileName:array[1..256] of WideChar;
+                   FileName:array[1..261] of WideChar;
                    end;
      Pefi_file_info=^efi_file_info;
      efi_file_system_info=record
@@ -805,11 +805,11 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                           VolumeSize:qword;
                           FreeSpace:qword;
                           BlockSize:dword;
-                          VolumeLabel:array[1..256] of WideChar;
+                          VolumeLabel:array[1..261] of WideChar;
                           end;
      Pefi_file_system_info=^efi_file_system_info;
      efi_file_system_volume_label=record
-                                  VolumeLabel:array[1..256] of WideChar;
+                                  VolumeLabel:array[1..261] of WideChar;
                                   end;
      Pefi_tape_io_protocol=^efi_tape_io_protocol;
      efi_tape_read=function (This:Pefi_tape_io_protocol;var BufferSize:natuint;var Buffer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif}
@@ -2857,7 +2857,7 @@ var maxcolumn:Natuint=80;
     Cursorblinkevent:efi_event=nil;
     CursorblinkVisible:boolean=false;
     ParentImageHandle:efi_handle=nil;
-    GlobalSystemTable:^efi_system_table=nil;
+    GlobalSystemTable:Pefi_system_table=nil;
     graphicsindex:natuint=0;
     
 implementation
@@ -3157,7 +3157,6 @@ var key:efi_input_key;
     waitidx,i,j:natuint;
     procstring:PWideChar;
 begin
- GlobalSystemTable^.ConOut^.SetAttribute(GlobalSystemTable^.ConOut,consolebck shl 4+consoletex);
  if(ReadString<>nil) then efi_freemem(ReadString);
  Readstring:=efi_allocmem(sizeof(WideChar)); i:=0;
  while (True) do
@@ -3255,8 +3254,7 @@ begin
 end;
 procedure efi_console_output_number(number:natint);[public,alias:'EFI_CONSOLE_OUTPUT_NUMBER'];
 const numchar:PWideChar='0123456789';
-var charstr:array[1..32] of WideChar=(#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0);
-    num,procnum,index1,index2:natuint;
+var num,procnum,index1,index2:natuint;
     negative:boolean;
     numstr:PWideChar;
 begin
@@ -3267,7 +3265,7 @@ begin
    inc(index1);
    procnum:=procnum*10;
   end;
- numstr:=@charstr;
+ numstr:=efi_allocmem((index1+1)*sizeof(WideChar));
  index2:=1;
  while(procnum>=1) do
   begin
@@ -3282,8 +3280,7 @@ begin
 end;
 procedure efi_console_output_hex(hex:natuint);[public,alias:'EFI_CONSOLE_OUTPUT_HEX'];
 const numchar:PWideChar='0123456789ABCDEF';
-var charstr:array[1..20] of WideChar=(#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0,#0);
-    num,procnum,index1,index2:natuint;
+var num,procnum,index1,index2:natuint;
     numstr:PWideChar;
 begin
  num:=hex; procnum:=1; index1:=1;
@@ -3292,7 +3289,7 @@ begin
    inc(index1);
    procnum:=procnum shl 4;
   end;
- numstr:=@charstr;
+ numstr:=efi_allocmem((index1+1)*sizeof(WideChar));
  index2:=1;
  while(procnum>=1) do
   begin
@@ -3373,7 +3370,7 @@ end;
 function efi_list_all_file_system(isreadonly:byte):efi_file_system_list;[public,alias:'EFI_LIST_ALL_FILE_SYSTEM'];
 var totalnum,i:natuint;
     totalbuf:Pefi_handle;
-    sfspp:Pefi_simple_file_system_protocol;
+    sfsp:Pefi_simple_file_system_protocol;
     fsinfo:efi_file_system_info;
     fp:Pefi_file_protocol;
     data:efi_file_system_list;
@@ -3383,24 +3380,24 @@ begin
  data.file_system_content:=efi_allocmem(totalnum*sizeof(Pointer)); data.file_system_count:=0;
  for i:=1 to totalnum do
   begin
-   GlobalSystemTable^.BootServices^.HandleProtocol((totalbuf+i-1)^,@efi_simple_file_system_protocol_guid,sfspp);
-   sfspp^.OpenVolume(sfspp,fp);
+   GlobalSystemTable^.BootServices^.HandleProtocol((totalbuf+i-1)^,@efi_simple_file_system_protocol_guid,sfsp);
+   sfsp^.OpenVolume(sfsp,fp);
    realsize:=sizeof(efi_file_system_info);
    fp^.GetInfo(fp,@efi_file_system_info_id,realsize,fsinfo);
    if(isreadonly=1) and (fsinfo.ReadOnly=true) then
     begin
      inc(data.file_system_count);
-     (data.file_system_content+data.file_system_count-1)^:=sfspp;
+     (data.file_system_content+data.file_system_count-1)^:=sfsp;
     end
    else if(isreadonly=0) and (fsinfo.ReadOnly=false) then
     begin
      inc(data.file_system_count);
-     (data.file_system_content+data.file_system_count-1)^:=sfspp;
+     (data.file_system_content+data.file_system_count-1)^:=sfsp;
     end
-   else if(isreadonly=2) then
+   else if(isreadonly>=2) then
     begin
      inc(data.file_system_count);
-     (data.file_system_content+data.file_system_count-1)^:=sfspp;
+     (data.file_system_content+data.file_system_count-1)^:=sfsp;
     end;
   end;
  efi_list_all_file_system:=data;
@@ -3458,7 +3455,7 @@ begin
  if(blinkmiliseconds>0) then 
   begin
    efi_console_enable_mouse;
-   efi_console_enable_mouse_blink(true,blinkmiliseconds) 
+   efi_console_enable_mouse_blink(true,blinkmiliseconds);
   end
  else 
   begin
@@ -3480,15 +3477,21 @@ begin
 end;
 procedure efi_graphics_get_maxwidth_maxheight_and_maxdepth(egl:efi_graphics_list;eglindex:natuint);[public,alias:'EFI_GRAPHICS_GET_MAXWIDTH_MAXHEIGHT_AND_MAXDEPTH'];
 var ptr:Pefi_graphics_output_protocol;
-    maxmode,i,status:natuint;
+    maxmode,i:natuint;
+    screensize:natuint;
+    status:efi_status;
 begin
  if(eglindex>egl.graphics_count) then exit;
  ptr:=(egl.graphics_item+eglindex-1)^;
- maxmode:=ptr^.Mode^.MaxMode;
+ maxmode:=ptr^.Mode^.MaxMode; screensize:=0;
  for i:=0 to maxmode-1 do
   begin
-   ptr^.SetMode(ptr,i);
-   if(ptr^.Mode^.Info^.PixelFormat=PixelBlueGreenRedReserved8BitPerColor) then graphicsindex:=i;
+   status:=ptr^.SetMode(ptr,i);
+   if((ptr^.Mode^.Info^.PixelFormat=PixelBlueGreenRedReserved8BitPerColor) or 
+   (ptr^.Mode^.Info^.PixelFormat=PixelRedGreenBlueReserved8BitPerColor)) and (ptr^.Mode^.FrameBufferSize>screensize) and (status=efi_success) then 
+    begin
+     graphicsindex:=i; screensize:=ptr^.Mode^.FrameBufferSize;
+    end;
   end;
  ptr^.SetMode(ptr,graphicsindex);
 end;

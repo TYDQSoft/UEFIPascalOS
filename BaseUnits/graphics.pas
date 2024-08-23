@@ -38,6 +38,7 @@ type graphics_item=packed record
                    screenheight:dword;
                    initscreen:^graphics_item;
                    framebufferbase:^graphics_output_blt_pixel;
+                   screentype:byte;
                    end;
      Pgraphics_heap=^graphics_heap;
 
@@ -49,7 +50,7 @@ const graphics_zero:graphics_item=(Red:0;Green:0;Blue:0;Alpha:0);
       graphics_black:graphics_color=(Red:0;Green:0;Blue:0;Alpha:$FF);
 
 function dword_to_graphics_color(number:dword):graphics_color;
-procedure graphics_heap_initialize(MemoryStart:Pointer;ContentCount:natuint;SegmentCount:natuint;screenwidth:natuint;screenheight:natuint;framebufferbase:Pgraphics_output_blt_pixel);
+procedure graphics_heap_initialize(MemoryStart:Pointer;ContentCount:natuint;SegmentCount:natuint;screenwidth:natuint;screenheight:natuint;framebufferbase:Pgraphics_output_blt_pixel;screentype:byte);
 function graphics_getmem(startx,starty,width,height:dword):Pgraphics_item;
 function graphics_allocmem(startx,starty,width,height:dword):Pgraphics_item;
 function graphics_getmemsize(ptr:Pgraphics_item):natuint;
@@ -76,7 +77,7 @@ begin
  res.Alpha:=number mod 256;
  dword_to_graphics_color:=res;
 end;
-procedure graphics_heap_initialize(MemoryStart:Pointer;ContentCount:natuint;SegmentCount:natuint;screenwidth:natuint;screenheight:natuint;framebufferbase:Pgraphics_output_blt_pixel);[public,alias:'graphics_heap_initialize'];
+procedure graphics_heap_initialize(MemoryStart:Pointer;ContentCount:natuint;SegmentCount:natuint;screenwidth:natuint;screenheight:natuint;framebufferbase:Pgraphics_output_blt_pixel;screentype:byte);[public,alias:'graphics_heap_initialize'];
 begin
  graphheap.content:=MemoryStart;
  graphheap.contentused:=0;
@@ -88,6 +89,7 @@ begin
  graphheap.screenheight:=screenheight;
  graphheap.initscreen:=MemoryStart+ContentCount*sizeof(graphics_item)+sizeof(graphics_segment)*SegmentCount;
  graphheap.framebufferbase:=framebufferbase;
+ graphheap.screentype:=screentype;
 end;
 procedure graphics_heap_delete_item(ptr:Pgraphics_item);[public,alias:'graphics_heap_delete_item'];
 var index,size,i,j:natuint;
@@ -119,8 +121,8 @@ function graphics_getmem(startx,starty,width,height:dword):Pgraphics_item;[publi
 var i:natuint;
     procptr:Pgraphics_item;
 begin
- //if(graphheap.contentused+width*height>graphheap.contentmax) then exit(nil);
- //if(graphheap.segmentcount>=graphheap.segmentcountmax) then exit(nil);
+ if(graphheap.contentused+width*height>graphheap.contentmax) then exit(nil);
+ if(graphheap.segmentcount>=graphheap.segmentcountmax) then exit(nil);
  inc(graphheap.segmentcount);
  if(graphheap.segmentcount=1) then
   begin
@@ -376,10 +378,20 @@ begin
   end;
  for i:=1 to graphheap.screenwidth*graphheap.screenheight do
   begin
-   (graphheap.framebufferbase+i-1)^.Green:=(graphheap.initscreen+i-1)^.Green;
-   (graphheap.framebufferbase+i-1)^.Blue:=(graphheap.initscreen+i-1)^.Blue;
-   (graphheap.framebufferbase+i-1)^.Red:=(graphheap.initscreen+i-1)^.Red;
-   (graphheap.framebufferbase+i-1)^.Reserved:=$00;
+   if(graphheap.screentype=0) then
+    begin
+     (graphheap.framebufferbase+i-1)^.Green:=(graphheap.initscreen+i-1)^.Green;
+     (graphheap.framebufferbase+i-1)^.Blue:=(graphheap.initscreen+i-1)^.Blue;
+     (graphheap.framebufferbase+i-1)^.Red:=(graphheap.initscreen+i-1)^.Red;
+     (graphheap.framebufferbase+i-1)^.Reserved:=$00;
+    end
+   else if(graphheap.screentype=1) then
+    begin
+     (graphheap.framebufferbase+i-1)^.Green:=(graphheap.initscreen+i-1)^.Green;
+     (graphheap.framebufferbase+i-1)^.Blue:=(graphheap.initscreen+i-1)^.Red;
+     (graphheap.framebufferbase+i-1)^.Red:=(graphheap.initscreen+i-1)^.Blue;
+     (graphheap.framebufferbase+i-1)^.Reserved:=$00;
+    end;
   end;
 end;
 
