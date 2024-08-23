@@ -42,8 +42,9 @@ var {For checking elf file}
     addressoffset:natuint;
     allocaddress:natuint;
 begin  
- {Initialize the uefi loader}
+ {Initialize uefi environment}
  efi_initialize(ImageHandle,systemtable);
+ {Initialize the uefi loader}
  efi_console_initialize(efi_bck_black,efi_lightgrey,0);
  efsl:=efi_list_all_file_system(2);
  i:=0; count:=efsl.file_system_count;
@@ -55,18 +56,19 @@ begin
    if(i>count) then break;
    sfsp:=(efsl.file_system_content+i-1)^;
    sfsp^.OpenVolume(sfsp,fp);
-   status:=fp^.Open(fp,fp,'\EFI\SYSTEM\kernelmain.elf',efi_file_mode_read,efi_file_system);
+   status:=fp^.Open(fp,fp,'\EFI\SYSTEM\kernelmain.elf',efi_file_mode_read,0);
    if(status<>efi_success) then continue;
-   fp^.SetPosition(fp,0);
    finfosize:=sizeof(efi_file_info);
-   fp^.GetInfo(fp,@efi_file_info_id,finfosize,finfo);
-   procsize:=finfo.filesize;
+   fp^.GetInfo(fp,@efi_file_info_id,finfosize,finfo); 
+   procsize:=finfo.FileSize;
+   fp^.SetPosition(fp,0);
    proccontent:=efi_allocmem(procsize);
    for j:=1 to procsize do 
     begin
      procindex:=1;
      fp^.efiRead(fp,procindex,(proccontent+j-1)^);
     end;
+   fp^.Close(fp);
    if(status=efi_success) then break;
   end;
  if(i>count) then
@@ -76,11 +78,25 @@ begin
   end;
  {Initialize the kernel parameter}
  gpl:=efi_graphics_initialize;
+ if(gpl.graphics_count=0) then
+  begin
+   efi_console_output_string('Boot failed,Graphics screen does not exist.'#10);
+   while(True) do;
+  end;
  efi_graphics_get_maxwidth_maxheight_and_maxdepth(gpl,1);
  loaderscreenconfig.screen_is_graphics:=false;
  loaderscreenconfig.screen_address:=(gpl.graphics_item^)^.Mode^.FrameBufferBase;
  loaderscreenconfig.screen_width:=(gpl.graphics_item^)^.Mode^.Info^.HorizontalResolution;
  loaderscreenconfig.screen_height:=(gpl.graphics_item^)^.Mode^.Info^.VerticalResolution;
+ if((gpl.graphics_item^)^.Mode^.Info^.PixelFormat=PixelBlueGreenRedReserved8BitPerColor) then 
+ loaderscreenconfig.screen_type:=0
+ else if((gpl.graphics_item^)^.Mode^.Info^.PixelFormat=PixelBlueGreenRedReserved8BitPerColor) then 
+ loaderscreenconfig.screen_type:=1;
+ if(loaderscreenconfig.screen_address=0) then
+  begin
+   efi_console_output_string('Boot failed,FrameBuffer does not exist.'#10);
+   while(True) do;
+  end;
  {Free the system heap}
  efi_freemem(gpl.graphics_item); gpl.graphics_count:=0;
  efi_freemem(efsl.file_system_content); efsl.file_system_count:=0;
@@ -146,7 +162,7 @@ begin
   end;
  compheap_initialize(Pointer(memoryavailable.memory_address),1 shl 20,1 shl 12);
  addressoffset:=1 shl 20+(1 shl 12)*sizeof(heap_segment);
- graphics_heap_initialize(Pointer(memoryavailable.memory_address+addressoffset),1 shl 28,1 shl 18,loaderscreenconfig.screen_width,loaderscreenconfig.screen_height,Pointer(loaderscreenconfig.screen_address));
+ graphics_heap_initialize(Pointer(memoryavailable.memory_address+addressoffset),1 shl 28,1 shl 18,loaderscreenconfig.screen_width,loaderscreenconfig.screen_height,Pointer(loaderscreenconfig.screen_address),loaderscreenconfig.screen_type);
  addressoffset:=addressoffset+(1 shl 28)*sizeof(graphics_item)+(1 shl 18)*sizeof(graphics_segment)+loaderscreenconfig.screen_width*loaderscreenconfig.screen_height*sizeof(graphics_color);
  if(addressoffset+4 shl 30<memoryavailable.memory_size) then
   begin
@@ -180,12 +196,12 @@ begin
  {Execute the elf file}
  efi_console_output_string('Entering the kernel......'#10);
  func.func:=sys_function(KernelEntry);
- funcandparam:=sys_parameter_and_function_construct(param,func,sizeof(return_config));
- res:=sys_parameter_function_execute(funcandparam);
- freemem(res);
+ funcandparam:=sys_parameter_and_function_construct(param,func,sizeof(natuint));
+ sys_parameter_function_execute(funcandparam);
  {Free the memory}
- sys_parameter_and_function_free(funcandparam);
- freemem(initparam);
+ sysheap.contentused:=0; sysheap.segmentcount:=0;
+ graphheap.contentused:=0; graphheap.segmentcount:=0;
+ compheap.contentused:=0; compheap.segmentcount:=0;
  efi_console_output_string('Kernel successfully loaded!'#10);
  while True do;
  efi_main:=efi_success;
