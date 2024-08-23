@@ -3,7 +3,7 @@ uses binarybase,sysutils,classes;
 type natuint=qword;
      natint=int64;
      relocarray=array[1..2] of pe_image_type_offset;
-const pecoff_max_alignment=$2000;
+const pecoff_max_alignment=$10000;
 function optimize_integer_divide(a,b:natuint):natuint;[public,alias:'optimize_integer_divide'];
 var procnum1,procnum2,degree,res:natuint;
 begin
@@ -46,26 +46,6 @@ begin
   end;
  optimize_integer_modulo:=res;
 end;
-function strlen(str:Pchar):natuint;[public,alias:'strlen'];
-var res:natuint;
-begin
- res:=0;
- if(str=nil) then exit(0);
- while((str+res)^<>#0) do inc(res);
- strlen:=res;
-end;
-function strcmpL(str1,str2:Pchar):natint;[public,alias:'strcmpL'];
-var i,len1,len2:natint;
-begin
- i:=0; len1:=strlen(str1); len2:=strlen(str2);
- if(str1=nil) and (str2=nil) then exit(0);
- if(len1>len2) then exit(1) else if(len1<len2) then exit(-1);
- if(str1=nil) then exit(-1) else if(str2=nil) then exit(1);
- while((str1+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0) do inc(i);
- if((str1+i)^>(str2+i)^) then strcmpL:=1
- else if((str1+i)^<(str2+i)^) then strcmpL:=-1
- else strcmpL:=0;
-end;
 function CalcCheckSum(Data:Pointer;DataSize:SizeUint):dword;
 var Ptr:Pword;
     sum,checksum:dword;
@@ -90,33 +70,17 @@ var i,j:qword;
     elfmachine:word;
     myplatform:byte=0;
     elfheader32:elf32_header;
-    elfsectionheader32:^elf32_section_header;
+    elfprogramheader32:^elf32_program_header;
     elfheader64:elf64_header;
-    elfsectionheader64:^elf64_section_header;
+    elfprogramheader64:^elf64_program_header;
     elfcodeblock:^Pointer;
-    elfstrtab:word;
-    {For parsing elf file}
-    elfmaxalignment:dword;
-    elffoundsection:boolean=false;
-    {$ifdef cpu32}
-    elflowaddr:dword;
-    {$endif cpu32}
-    {$ifdef cpu64}
-    elflowaddr:qword;
-    {$endif cpu64}
-    elfshname:PChar;
-    {For elf .got section}
-    gotitem:^SizeUint;
-    gotsize:SizeUint;
+    elfloadcount:byte;
+    elfloadindex:array[1..4] of byte;
+    elflowaddress:SizeUint;
+    elfmaxalign:dword;
     {For efi files output}
-    pehaverdata:boolean;
     pebaseaddr:dword;
     pecoffindex:word;
-    pecalindex:word;
-    pecalsize:dword;
-    pecoffoffsetarray:array[1..256] of dword;
-    pecoffindexarray:array[1..256] of word;
-    pecoffoffsetcount:array[1..3] of dword;
     pecoffoffset:dword;
     sectionoffset:word;
     peTextOffset:dword;
@@ -124,7 +88,7 @@ var i,j:qword;
     peDataOffset:dword;
     peRelocationOffset:dword;
     pecoffentry:dword;
-    memzero:array[1..8192] of byte;
+    memzero:array[1..65535] of byte;
     outputfile:TFileStream;
     outputpath:string;
     dosheader:pe_image_dos_header;
@@ -255,390 +219,155 @@ begin
    goto label1;
   end;
  writeln('Detecting elf file......');
- {$ifdef cpu32}elflowaddr:=$7FFFFFFF;{$endif cpu32}
- {$ifdef cpu64}elflowaddr:=$7FFFFFFFFFFFFFFF;{$endif cpu64}
- pehaverdata:=false;
+ {$ifdef cpu32}elflowaddress:=$7FFFFFFF;{$endif cpu32}
+ {$ifdef cpu64}elflowaddress:=$7FFFFFFFFFFFFFFF;{$endif cpu64}
+ elfloadcount:=0; elfmaxalign:=0;
  if(is64bit) then
   begin
-   elfstrtab:=elfheader64.elf64_section_header_string_table_index+1;
    if(elfheader64.elf64_type<>elf_type_executable) and (elfheader64.elf64_type<>elf_type_dynamic) then
     begin
      writeln('Input elf file is not be executable or shared library,cannot be converted.');
      inputfile.Free;
      goto label1;
     end;
-   inputfile.Seek(elfheader64.elf64_section_header_offset,0);
-   elfsectionheader64:=AllocMem(sizeof(elf64_section_header)*elfheader64.elf64_section_header_number);
-   for i:=1 to elfheader64.elf64_section_header_number do
+   elfprogramheader64:=AllocMem(sizeof(elf64_program_header)*elfheader64.elf64_program_header_number);
+   inputfile.Seek(elfheader64.elf64_program_header_offset,0);
+   for i:=1 to elfheader64.elf64_program_header_number do
     begin
-     inputfile.Read((elfsectionheader64+i-1)^,sizeof(elf64_section_header));
-     if(((elfsectionheader64+i-1)^.section_header_type=elf_section_header_progbits) or
-     ((elfsectionheader64+i-1)^.section_header_type=elf_section_header_nobits))
-     and ((elfsectionheader64+i-1)^.section_header_address<elflowaddr) then
+     inputfile.Read((elfprogramheader64+i-1)^,sizeof(elf64_program_header));
+     if((elfprogramheader64+i-1)^.program_type=elf_program_table_load) and
+     ((elfprogramheader64+i-1)^.program_file_size>0) then
       begin
-       elflowaddr:=(elfsectionheader64+i-1)^.section_header_address;
+       inc(elfloadcount);
+       elfloadindex[elfloadcount]:=i;
+       if((elfprogramheader64+i-1)^.program_virtual_address<elflowaddress) then
+       elflowaddress:=(elfprogramheader64+i-1)^.program_virtual_address;
+       if((elfprogramheader64+i-1)^.program_align>elfmaxalign) then
+       elfmaxalign:=(elfprogramheader64+i-1)^.program_align;
       end;
     end;
-   elfcodeblock:=allocmem(sizeof(Pointer)*elfheader64.elf64_section_header_number);
-   for i:=1 to elfheader64.elf64_section_header_number do
+   elfcodeblock:=AllocMem(sizeof(elf64_program_header)*sizeof(Pointer));
+   for i:=1 to elfheader64.elf64_program_header_number do
     begin
-     inputfile.Seek((elfsectionheader64+i-1)^.section_header_offset,0);
-     (elfcodeblock+i-1)^:=allocmem((elfsectionheader64+i-1)^.section_header_size);
-     if((elfsectionheader64+i-1)^.section_header_type=elf_section_header_progbits) or
-     ((elfsectionheader64+i-1)^.section_header_type=elf_section_header_strtab) then
-      begin
-       for j:=1 to (elfsectionheader64+i-1)^.section_header_size do
-       inputfile.Read(((elfcodeblock+i-1)^+j-1)^,1);
-       if((elfsectionheader64+i-1)^.section_header_flags and
-       (elf_section_header_flag_write or elf_section_header_flag_alloc or
-       elf_section_header_flag_exec_instr)=elf_section_header_flag_alloc) then
-       pehaverdata:=true;
-      end;
+     if((elfprogramheader64+i-1)^.program_type<>elf_program_table_load) then continue;
+     if((elfprogramheader64+i-1)^.program_file_size=0) then continue;
+     inputfile.Seek((elfprogramheader64+i-1)^.program_offset,0);
+     (elfcodeblock+i-1)^:=AllocMem((elfprogramheader64+i-1)^.program_memory_size);
+     for j:=1 to (elfprogramheader64+i-1)^.program_file_size do inputfile.Read(((elfcodeblock+i-1)^+j-1)^,1);
     end;
   end
  else
   begin
-   elfstrtab:=elfheader32.elf32_section_header_string_table_index+1;
    if(elfheader32.elf32_type<>elf_type_executable) and (elfheader32.elf32_type<>elf_type_dynamic) then
     begin
      writeln('Input elf file is not be executable or shared library,cannot be converted.');
      inputfile.Free;
      goto label1;
     end;
-   inputfile.Seek(elfheader32.elf32_section_header_offset,0);
-   elfsectionheader32:=AllocMem(sizeof(elf32_section_header)*elfheader32.elf32_section_header_number);
-   for i:=1 to elfheader32.elf32_section_header_number do
+   elfprogramheader32:=AllocMem(sizeof(elf32_program_header)*elfheader32.elf32_program_header_number);
+   inputfile.Seek(elfheader32.elf32_program_header_offset,0);
+   for i:=1 to elfheader32.elf32_program_header_number do
     begin
-     inputfile.Read((elfsectionheader32+i-1)^,sizeof(elf32_section_header));
-     if(((elfsectionheader32+i-1)^.section_header_type=elf_section_header_progbits) or
-     ((elfsectionheader32+i-1)^.section_header_type=elf_section_header_nobits))
-     and ((elfsectionheader32+i-1)^.section_header_address<elflowaddr) then
+     inputfile.Read((elfprogramheader32+i-1)^,sizeof(elf32_program_header));
+     if((elfprogramheader32+i-1)^.program_type=elf_program_table_load) and
+     ((elfprogramheader32+i-1)^.program_file_size>0) then
       begin
-       elflowaddr:=(elfsectionheader32+i-1)^.section_header_address;
+       inc(elfloadcount);
+       elfloadindex[elfloadcount]:=i;
+       if((elfprogramheader32+i-1)^.program_virtual_address<elflowaddress) then
+       elflowaddress:=(elfprogramheader32+i-1)^.program_virtual_address;
+       if((elfprogramheader32+i-1)^.program_align>elfmaxalign) then
+       elfmaxalign:=(elfprogramheader32+i-1)^.program_align;
       end;
     end;
-   elfcodeblock:=allocmem(sizeof(Pointer)*elfheader32.elf32_section_header_number);
-   for i:=1 to elfheader32.elf32_section_header_number do
+   elfcodeblock:=AllocMem(sizeof(elf32_program_header)*sizeof(Pointer));
+   for i:=1 to elfheader32.elf32_program_header_number do
     begin
-     inputfile.Seek((elfsectionheader32+i-1)^.section_header_offset,0);
-     (elfcodeblock+i-1)^:=allocmem((elfsectionheader32+i-1)^.section_header_size);
-     if((elfsectionheader64+i-1)^.section_header_type=elf_section_header_progbits) or
-     ((elfsectionheader64+i-1)^.section_header_type=elf_section_header_strtab) then
-      begin
-       for j:=1 to (elfsectionheader64+i-1)^.section_header_size do
-       inputfile.Read(((elfcodeblock+i-1)^+j-1)^,1);
-       if((elfsectionheader64+i-1)^.section_header_flags and
-       (elf_section_header_flag_write or elf_section_header_flag_alloc or
-       elf_section_header_flag_exec_instr)=elf_section_header_flag_alloc) then
-       pehaverdata:=true;
-      end;
+     if((elfprogramheader32+i-1)^.program_type<>elf_program_table_load) then continue;
+     if((elfprogramheader32+i-1)^.program_file_size=0) then continue;
+     inputfile.Seek((elfprogramheader32+i-1)^.program_offset,0);
+     (elfcodeblock+i-1)^:=AllocMem((elfprogramheader32+i-1)^.program_memory_size);
+     for j:=1 to (elfprogramheader32+i-1)^.program_file_size do inputfile.Read(((elfcodeblock+i-1)^+j-1)^,1);
     end;
   end;
  writeln('elf file loaded!');
- {Parse elf file}
- writeln('elf file parsing......');
- elfmaxalignment:=0;
- if(is64bit) then
-  begin
-   for i:=1 to elfheader64.elf64_section_header_number do
-    begin
-     if ((elfsectionheader64+i-1)^.section_header_type<>elf_section_header_nobits)
-     and ((elfsectionheader64+i-1)^.section_header_type<>elf_section_header_progbits) then
-      begin
-       continue;
-      end;
-     if((elfsectionheader64+i-1)^.section_header_address_align>elfmaxalignment)
-     and ((elfsectionheader64+i-1)^.section_header_address_align<pecoff_max_alignment)
-     and (((elfsectionheader64+i-1)^.section_header_flags and
-     (elf_section_header_flag_exec_instr or elf_section_header_flag_alloc or
-     elf_section_header_flag_write)
-     =(elf_section_header_flag_exec_instr or elf_section_header_flag_alloc))
-     or ((elfsectionheader64+i-1)^.section_header_flags and
-     (elf_section_header_flag_write or elf_section_header_flag_alloc or
-     elf_section_header_flag_exec_instr)
-     =elf_section_header_flag_alloc)
-     or ((elfsectionheader64+i-1)^.section_header_flags and
-     (elf_section_header_flag_write or elf_section_header_flag_alloc or
-     elf_section_header_flag_exec_instr)
-     =elf_section_header_flag_alloc or elf_section_header_flag_write)) then
-      begin
-       elfmaxalignment:=(elfsectionheader64+i-1)^.section_header_address_align;
-      end;
-    end;
-  end
- else
-  begin
-   for i:=1 to elfheader32.elf32_section_header_number do
-    begin
-     if ((elfsectionheader32+i-1)^.section_header_type<>elf_section_header_nobits)
-     and ((elfsectionheader32+i-1)^.section_header_type<>elf_section_header_progbits) then
-      begin
-       continue;
-      end;
-     if((elfsectionheader32+i-1)^.section_header_address_align>elfmaxalignment)
-     and ((elfsectionheader32+i-1)^.section_header_address_align<pecoff_max_alignment)
-     and (((elfsectionheader32+i-1)^.section_header_flags and
-     (elf_section_header_flag_exec_instr or elf_section_header_flag_alloc
-     or elf_section_header_flag_write)
-     =(elf_section_header_flag_exec_instr or elf_section_header_flag_alloc))
-     or ((elfsectionheader32+i-1)^.section_header_flags and
-     (elf_section_header_flag_write or elf_section_header_flag_alloc or
-     elf_section_header_flag_exec_instr)
-     =elf_section_header_flag_alloc)
-     or ((elfsectionheader32+i-1)^.section_header_flags and
-     (elf_section_header_flag_write or elf_section_header_flag_alloc or
-     elf_section_header_flag_exec_instr)
-     =elf_section_header_flag_alloc or elf_section_header_flag_write)) then
-      begin
-       elfmaxalignment:=(elfsectionheader32+i-1)^.section_header_address_align;
-      end;
-    end;
-  end;
  {Initialize pe file}
  writeln('PE file initializing......');
+ if(elfmaxalign>$1000) then elfmaxalign:=$1000;
  if(is64bit) then
  PeCoffOffset:=sizeof(dosheader)+$40+sizeof(signature)+sizeof(fileheader)+sizeof(optionalheader64)
  else
  PeCoffOffset:=sizeof(dosheader)+$40+sizeof(signature)+sizeof(fileheader)+sizeof(optionalheader32);
- if(pehaverdata) then
- PeCoffOffset:=PeCoffOffset+sizeof(pe_image_section_header)*4
- else
- PeCoffOffset:=PeCoffOffset+sizeof(pe_image_section_header)*3;
- PeCoffOffset:=optimize_integer_divide(PeCoffOffset+elfmaxalignment-1,elfmaxalignment)*elfmaxalignment;
- PeBaseAddr:=PeCoffOffset;
- sectionoffset:=0; elffoundSection:=False;
- pecoffoffsetcount[1]:=0; pecoffoffsetcount[2]:=0; pecoffoffsetcount[3]:=0;
+ PeCoffOffset:=PeCoffOffset+sizeof(pe_image_section_header)*4;
+ PeCoffOffset:=optimize_integer_divide(PeCoffOffset+elfmaxalign-1,elfmaxalign)*elfmaxalign;
+ PeBaseAddr:=PeCoffOffset; PeRoDataOffset:=0;
  if(is64bit) then
   begin
-   elffoundSection:=False;
-   for i:=1 to elfheader64.elf64_section_header_number do
+   if(elfloadcount=2) then
     begin
-     if ((elfsectionheader64+i-1)^.section_header_type<>elf_section_header_nobits)
-     and ((elfsectionheader64+i-1)^.section_header_type<>elf_section_header_progbits) then
-      begin
-       continue;
-      end;
-     elfshname:=PChar((elfcodeblock+elfstrtab-1)^+(elfsectionheader64+i-1)^.section_header_name);
-     if(StrCmpL(elfshname,'.interp')=0) or (StrCmpL(elfshname,'.eh_frame')=0)
-     or (StrCmpL(elfshname,'.fpcdata')=0) then continue;
-     if((elfsectionheader64+i-1)^.section_header_flags and
-     (elf_section_header_flag_write or
-      elf_section_header_flag_exec_instr or elf_section_header_flag_alloc)
-     =(elf_section_header_flag_exec_instr or elf_section_header_flag_alloc)) then
-      begin
-       inc(sectionoffset);
-       inc(pecoffoffsetcount[1]);
-       if(elfheader64.elf64_entry>=(elfsectionheader64+i-1)^.section_header_address)
-       and (elfheader64.elf64_entry<(elfsectionheader64+i-1)^.section_header_address+
-       (elfsectionheader64+i-1)^.section_header_size) then
-        begin
-         pecoffentry:=PeBaseAddr+elfheader64.elf64_entry-elflowaddr;
-        end;
-       if(not elffoundSection) then
-        begin
-         PeTextOffset:=PeBaseAddr+(elfsectionheader64+i-1)^.section_header_address-elflowaddr;
-         elffoundsection:=true;
-        end;
-       pecoffoffsetarray[sectionoffset]:=PeBaseAddr
-       +(elfsectionheader64+i-1)^.section_header_address-elflowaddr;
-       pecoffindexarray[sectionoffset]:=i;
-       pecoffoffset:=PeBaseAddr+(elfsectionheader64+i-1)^.section_header_address-elflowaddr+
-       (elfsectionheader64+i-1)^.section_header_size;
-      end;
-    end;
-   elffoundSection:=False;
-   for i:=1 to elfheader64.elf64_section_header_number do
+     PeTextOffset:=PeBaseAddr+(elfprogramheader64+elfloadindex[1]-1)^.program_virtual_address-elflowaddress;
+     PeDataOffset:=PeBaseAddr+(elfprogramheader64+elfloadindex[2]-1)^.program_virtual_address-elflowaddress;
+     PeRelocationOffset:=optimize_integer_divide(
+     PeBaseAddr+(elfprogramheader64+elfloadindex[2]-1)^.program_virtual_address-elflowaddress+
+     (elfprogramheader64+elfloadindex[2]-1)^.program_memory_size+elfmaxalign-1,elfmaxalign)*elfmaxalign;
+    end
+   else if(elfloadcount=3) then
     begin
-     if(not pehaverdata) then break;
-     if ((elfsectionheader64+i-1)^.section_header_type<>elf_section_header_nobits)
-     and ((elfsectionheader64+i-1)^.section_header_type<>elf_section_header_progbits) then
-      begin
-       continue;
-      end;
-     elfshname:=PChar((elfcodeblock+elfstrtab-1)^+(elfsectionheader64+i-1)^.section_header_name);
-     if(StrCmpL(elfshname,'.interp')=0) or (StrCmpL(elfshname,'.eh_frame')=0)
-     or (StrCmpL(elfshname,'.fpcdata')=0) then continue;
-     if((elfsectionheader64+i-1)^.section_header_flags and
-     (elf_section_header_flag_write or elf_section_header_flag_alloc or
-     elf_section_header_flag_exec_instr)=elf_section_header_flag_alloc) then
-      begin
-       inc(sectionoffset);
-       inc(pecoffoffsetcount[2]);
-       if(not elffoundSection) then
-        begin
-         PeRoDataOffset:=PeBaseAddr+(elfsectionheader64+i-1)^.section_header_address-elflowaddr;
-         elffoundsection:=true;
-        end;
-       pecoffoffsetarray[sectionoffset]:=PeBaseAddr
-       +(elfsectionheader64+i-1)^.section_header_address-elflowaddr;
-       pecoffindexarray[sectionoffset]:=i;
-       pecoffoffset:=PeBaseAddr+(elfsectionheader64+i-1)^.section_header_address-elflowaddr+
-       (elfsectionheader64+i-1)^.section_header_size;
-      end;
-    end;
-   elffoundSection:=False;
-   for i:=1 to elfheader64.elf64_section_header_number do
+     PeTextOffset:=PeBaseAddr+(elfprogramheader64+elfloadindex[1]-1)^.program_virtual_address-elflowaddress;
+     PeRoDataOffset:=PeBaseAddr+(elfprogramheader64+elfloadindex[2]-1)^.program_virtual_address-elflowaddress;
+     PeDataOffset:=PeBaseAddr+(elfprogramheader64+elfloadindex[3]-1)^.program_virtual_address-elflowaddress;
+     PeRelocationOffset:=optimize_integer_divide(
+     PeBaseAddr+(elfprogramheader64+elfloadindex[3]-1)^.program_virtual_address-elflowaddress+
+     (elfprogramheader64+elfloadindex[3]-1)^.program_memory_size+elfmaxalign-1,elfmaxalign)*elfmaxalign;
+    end
+   else if(elfloadcount=4) then
     begin
-     if ((elfsectionheader64+i-1)^.section_header_type<>elf_section_header_nobits)
-     and ((elfsectionheader64+i-1)^.section_header_type<>elf_section_header_progbits) then
-      begin
-       continue;
-      end;
-     elfshname:=PChar((elfcodeblock+elfstrtab-1)^+(elfsectionheader64+i-1)^.section_header_name);
-     if(StrCmpL(elfshname,'.interp')=0) or (StrCmpL(elfshname,'.eh_frame')=0)
-     or (StrCmpL(elfshname,'.fpcdata')=0) then continue;
-     if((elfsectionheader64+i-1)^.section_header_flags and
-     (elf_section_header_flag_write or elf_section_header_flag_alloc or
-     elf_section_header_flag_exec_instr)
-     =elf_section_header_flag_alloc or elf_section_header_flag_write) then
-      begin
-       inc(sectionoffset);
-       inc(pecoffoffsetcount[3]);
-       if(not elffoundSection) then
-        begin
-         PeDataOffset:=PeBaseAddr+(elfsectionheader64+i-1)^.section_header_address-elflowaddr;
-         elffoundsection:=true;
-        end;
-       pecoffoffsetarray[sectionoffset]:=PeBaseAddr
-       +(elfsectionheader64+i-1)^.section_header_address-elflowaddr;
-       pecoffindexarray[sectionoffset]:=i;
-       pecoffoffset:=PeBaseAddr+(elfsectionheader64+i-1)^.section_header_address-elflowaddr+
-       (elfsectionheader64+i-1)^.section_header_size;
-      end;
+     elfloadindex[1]:=elfloadindex[2]; elfloadindex[2]:=elfloadindex[3]; elfloadindex[3]:=elfloadindex[4];
+     PeTextOffset:=PeBaseAddr+(elfprogramheader64+elfloadindex[1]-1)^.program_virtual_address-elflowaddress;
+     PeRoDataOffset:=PeBaseAddr+(elfprogramheader64+elfloadindex[2]-1)^.program_virtual_address-elflowaddress;
+     PeDataOffset:=PeBaseAddr+(elfprogramheader64+elfloadindex[3]-1)^.program_virtual_address-elflowaddress;
+     PeRelocationOffset:=optimize_integer_divide(
+     PeBaseAddr+(elfprogramheader64+elfloadindex[3]-1)^.program_virtual_address-elflowaddress+
+     (elfprogramheader64+elfloadindex[3]-1)^.program_memory_size+elfmaxalign-1,elfmaxalign)*elfmaxalign;
     end;
-   PeRelocationOffset:=optimize_integer_divide(pecoffoffset+elfmaxalignment-1
-   ,elfmaxalignment)*elfmaxalignment;
+   PeCoffEntry:=PeBaseAddr+elfheader64.elf64_entry-elflowaddress;
   end
  else
   begin
-   elffoundSection:=False;
-   for i:=1 to elfheader32.elf32_section_header_number do
+   if(elfloadcount=2) then
     begin
-     if ((elfsectionheader32+i-1)^.section_header_type<>elf_section_header_nobits)
-     and ((elfsectionheader32+i-1)^.section_header_type<>elf_section_header_progbits) then
-      begin
-       continue;
-      end;
-     elfshname:=PChar((elfcodeblock+elfstrtab-1)^+(elfsectionheader32+i-1)^.section_header_name);
-     if(StrCmpL(elfshname,'.interp')=0) or (StrCmpL(elfshname,'.eh_frame')=0)
-     or (StrCmpL(elfshname,'.fpcdata')=0) then continue;
-     if((elfsectionheader32+i-1)^.section_header_flags and
-     (elf_section_header_flag_write or
-      elf_section_header_flag_exec_instr or elf_section_header_flag_alloc)
-     =(elf_section_header_flag_exec_instr or elf_section_header_flag_alloc)) then
-      begin
-       inc(sectionoffset);
-       inc(pecoffoffsetcount[1]);
-       if(elfheader32.elf32_entry>=(elfsectionheader32+i-1)^.section_header_address)
-       and (elfheader32.elf32_entry<(elfsectionheader32+i-1)^.section_header_address+
-       (elfsectionheader32+i-1)^.section_header_size) then
-        begin
-         pecoffentry:=PeBaseAddr+elfheader32.elf32_entry-elflowaddr;
-        end;
-       if(not elffoundSection) then
-        begin
-         PeTextOffset:=PeBaseAddr+(elfsectionheader32+i-1)^.section_header_address-elflowaddr;
-         elffoundsection:=true;
-        end;
-       pecoffoffsetarray[sectionoffset]:=PeBaseAddr
-       +(elfsectionheader32+i-1)^.section_header_address-elflowaddr;
-       pecoffindexarray[sectionoffset]:=i;
-       pecoffoffset:=PeBaseAddr+(elfsectionheader32+i-1)^.section_header_address-elflowaddr+
-       (elfsectionheader32+i-1)^.section_header_size;
-      end;
-    end;
-   elffoundSection:=False;
-   for i:=1 to elfheader32.elf32_section_header_number do
+     PeTextOffset:=PeBaseAddr+(elfprogramheader32+elfloadindex[1]-1)^.program_virtual_address-elflowaddress;
+     PeDataOffset:=PeBaseAddr+(elfprogramheader32+elfloadindex[2]-1)^.program_virtual_address-elflowaddress;
+     PeRelocationOffset:=optimize_integer_divide(
+     PeBaseAddr+(elfprogramheader32+elfloadindex[2]-1)^.program_virtual_address-elflowaddress+
+     (elfprogramheader32+elfloadindex[2]-1)^.program_memory_size+elfmaxalign-1,elfmaxalign)*elfmaxalign;
+    end
+   else if(elfloadcount=3) then
     begin
-     if(not pehaverdata) then break;
-     if ((elfsectionheader32+i-1)^.section_header_type<>elf_section_header_nobits)
-     and ((elfsectionheader32+i-1)^.section_header_type<>elf_section_header_progbits) then
-      begin
-       continue;
-      end;
-     elfshname:=PChar((elfcodeblock+elfstrtab-1)^+(elfsectionheader32+i-1)^.section_header_name);
-     if(StrCmpL(elfshname,'.interp')=0) or (StrCmpL(elfshname,'.eh_frame')=0)
-     or (StrCmpL(elfshname,'.fpcdata')=0) then continue;
-     if((elfsectionheader32+i-1)^.section_header_flags and
-     (elf_section_header_flag_write or elf_section_header_flag_alloc or
-     elf_section_header_flag_exec_instr)=elf_section_header_flag_alloc) then
-      begin
-       inc(sectionoffset);
-       inc(pecoffoffsetcount[2]);
-       if(not elffoundSection) then
-        begin
-         PeRoDataOffset:=PeBaseAddr+(elfsectionheader32+i-1)^.section_header_address-elflowaddr;
-         PeCoffOffset:=PeRoDataOffset;
-         elffoundsection:=true;
-        end;
-       pecoffoffsetarray[sectionoffset]:=PeBaseAddr
-       +(elfsectionheader32+i-1)^.section_header_address-elflowaddr;
-       pecoffindexarray[sectionoffset]:=i;
-       pecoffoffset:=PeBaseAddr+(elfsectionheader64+i-1)^.section_header_address-elflowaddr+
-       (elfsectionheader32+i-1)^.section_header_size;
-      end;
-    end;
-   elffoundSection:=False;
-   for i:=1 to elfheader32.elf32_section_header_number do
+     PeTextOffset:=PeBaseAddr+(elfprogramheader32+elfloadindex[1]-1)^.program_virtual_address-elflowaddress;
+     PeRoDataOffset:=PeBaseAddr+(elfprogramheader32+elfloadindex[2]-1)^.program_virtual_address-elflowaddress;
+     PeDataOffset:=PeBaseAddr+(elfprogramheader32+elfloadindex[3]-1)^.program_virtual_address-elflowaddress;
+     PeRelocationOffset:=optimize_integer_divide(
+     PeBaseAddr+(elfprogramheader32+elfloadindex[3]-1)^.program_virtual_address-elflowaddress+
+     (elfprogramheader32+elfloadindex[3]-1)^.program_memory_size+elfmaxalign-1,elfmaxalign)*elfmaxalign;
+    end
+   else if(elfloadcount=4) then
     begin
-     if ((elfsectionheader32+i-1)^.section_header_type<>elf_section_header_nobits)
-     and ((elfsectionheader32+i-1)^.section_header_type<>elf_section_header_progbits) then
-      begin
-       continue;
-      end;
-     elfshname:=PChar((elfcodeblock+elfstrtab-1)^+(elfsectionheader32+i-1)^.section_header_name);
-     if(StrCmpL(elfshname,'.interp')=0) or (StrCmpL(elfshname,'.eh_frame')=0)
-     or (StrCmpL(elfshname,'.fpcdata')=0) then continue;
-     if((elfsectionheader32+i-1)^.section_header_flags and
-     (elf_section_header_flag_write or elf_section_header_flag_alloc or
-     elf_section_header_flag_exec_instr)
-     =elf_section_header_flag_alloc or elf_section_header_flag_write) then
-      begin
-       inc(sectionoffset);
-       inc(pecoffoffsetcount[3]);
-       if(not elffoundSection) then
-        begin
-         PeDataOffset:=PeBaseAddr+(elfsectionheader32+i-1)^.section_header_address-elflowaddr;
-         elffoundsection:=true;
-        end;
-       pecoffoffsetarray[sectionoffset]:=PeBaseAddr
-       +(elfsectionheader32+i-1)^.section_header_address-elflowaddr;
-       pecoffindexarray[sectionoffset]:=i;
-       pecoffoffset:=PeBaseAddr+(elfsectionheader32+i-1)^.section_header_address-elflowaddr+
-       (elfsectionheader32+i-1)^.section_header_size;
-      end;
+     elfloadindex[1]:=elfloadindex[2]; elfloadindex[2]:=elfloadindex[3]; elfloadindex[3]:=elfloadindex[4];
+     PeTextOffset:=PeBaseAddr+(elfprogramheader32+elfloadindex[1]-1)^.program_virtual_address-elflowaddress;
+     PeRoDataOffset:=PeBaseAddr+(elfprogramheader32+elfloadindex[2]-1)^.program_virtual_address-elflowaddress;
+     PeDataOffset:=PeBaseAddr+(elfprogramheader32+elfloadindex[3]-1)^.program_virtual_address-elflowaddress;
+     PeRelocationOffset:=optimize_integer_divide(
+     PeBaseAddr+(elfprogramheader32+elfloadindex[3]-1)^.program_virtual_address-elflowaddress+
+     (elfprogramheader32+elfloadindex[3]-1)^.program_memory_size+elfmaxalign-1,elfmaxalign)*elfmaxalign;
     end;
-   PeRelocationOffset:=optimize_integer_divide(pecoffoffset+elfmaxalignment-1
-   ,elfmaxalignment)*elfmaxalignment;
-  end;
- {Relocate the got's item}
- if(is64bit) then
-  begin
-   for i:=1 to elfheader64.elf64_section_header_number-1 do
-    begin
-     elfshname:=PChar((elfcodeblock+elfstrtab-1)^+(elfsectionheader64+i-1)^.section_header_name);
-     if(StrCmpL(elfshname,'.got')=0) then
-      begin
-       gotsize:=(elfsectionheader64+i-1)^.section_header_size;
-       gotitem:=Pointer((elfcodeblock+i-1)^);
-       for j:=2 to gotsize div sizeof(SizeUint) do (gotitem+j-1)^:=(gotitem+j-1)^-elflowaddr;
-      end;
-    end;
-  end
- else
-  begin
-   for i:=1 to elfheader64.elf64_section_header_number-1 do
-    begin
-     elfshname:=PChar((elfcodeblock+elfstrtab-1)^+(elfsectionheader32+i-1)^.section_header_name);
-     if(StrCmpL(elfshname,'.got')=0) then
-      begin
-       gotsize:=(elfsectionheader32+i-1)^.section_header_size;
-       gotitem:=Pointer((elfcodeblock+i-1)^);
-       for j:=2 to gotsize div sizeof(SizeUint) do (gotitem+j-1)^:=(gotitem+j-1)^-elflowaddr;
-      end;
-    end;
+   PeCoffEntry:=PeBaseAddr+elfheader32.elf32_entry-elflowaddress;
   end;
  {Initialize the pe content}
+ writeln('PeCoff Text Offset:',IntToHex(PeTextOffset));
+ if(PeRoDataOffset>0) then writeln('PeCoff RoData Offset:',IntToHex(PeRoDataOffset));
+ writeln('PeCoff Data Offset:',IntToHex(PeDataOffset));
+ writeln('PeCoff Relocation Offset:',IntToHex(PeRelocationOffset));
  writeln('Initialize the pe content......');
  ptr:=@dosheader;
  for i:=1 to sizeof(dosheader) do (ptr+i-1)^:=0;
@@ -647,7 +376,7 @@ begin
  signature:=$00004550;
  ptr:=@fileheader;
  for i:=1 to sizeof(fileheader) do (ptr+i-1)^:=0;
- for i:=1 to 8192 do memzero[i]:=0;
+ for i:=1 to 65535 do memzero[i]:=0;
  case myplatform of
  0:fileheader.Machine:=pe_image_file_machine_i386;
  1:fileheader.Machine:=pe_image_file_machine_amd64;
@@ -656,7 +385,7 @@ begin
  4:fileheader.Machine:=pe_image_file_machine_loongarch64;
  5:fileheader.Machine:=pe_image_file_machine_riscv64;
  end;
- if(pehaverdata) then fileheader.NumberOfSections:=4 else fileheader.NumberOfSections:=3;
+ if(PeRoDataOffset>0) then fileheader.NumberOfSections:=4 else fileheader.NumberOfSections:=3;
  fileheader.Characteristics:=pe_image_file_line_nums_stripped or pe_image_file_local_syms_stripped or
  pe_image_file_debug_stripped or pe_image_file_executable_image;
  if(is64bit) then
@@ -665,20 +394,21 @@ begin
    ptr:=@optionalheader64;
    for i:=1 to sizeof(optionalheader64) do (ptr+i-1)^:=0;
    optionalheader64.Magic:=pe_image_pe32plus_image_magic;
-   if(pehaverdata) then
+   if(PeRoDataOffset>0) then
    optionalheader64.SizeOfCode:=peRoDataOffset-peTextOffset
    else
    optionalheader64.SizeOfCode:=peDataOffset-peTextOffset;
-   if(pehaverdata) then
+   if(PeRoDataOffset>0) then
    optionalheader64.SizeOfInitializedData:=peRelocationOffset-peRoDataOffset
    else
    optionalheader64.SizeOfInitializedData:=peRelocationOffset-peDataOffset;
    optionalheader64.AddressOfEntryPoint:=PeCoffEntry;
    optionalheader64.BaseOfCode:=PeTextOffset;
-   optionalheader64.ImageBase:=0;
-   optionalheader64.SectionAlignment:=elfmaxalignment;
-   optionalheader64.FileAlignment:=elfmaxalignment;
-   optionalheader64.SizeOfImage:=optimize_integer_divide(PeRelocationOffset+12+elfmaxalignment-1,elfmaxalignment)*elfmaxalignment;
+   optionalheader64.ImageBase:=$00000000;
+   optionalheader64.SectionAlignment:=elfmaxalign;
+   optionalheader64.FileAlignment:=elfmaxalign;
+   optionalheader64.SizeOfImage:=optimize_integer_divide(
+   PeRelocationOffset+12+elfmaxalign-1,elfmaxalign)*elfmaxalign;
    optionalheader64.SizeOfHeaders:=PeTextOffset;
    optionalheader64.Subsystem:=pe_image_subsystem_efi_application;
    optionalheader64.NumberOfRvaandSizes:=16;
@@ -692,24 +422,25 @@ begin
    ptr:=@optionalheader32;
    for i:=1 to sizeof(optionalheader32) do (ptr+i-1)^:=0;
    optionalheader32.Magic:=pe_image_pe32_image_magic;
-   if(pehaverdata) then
+   if(PeRoDataOffset>0) then
    optionalheader32.SizeOfCode:=peRoDataOffset-peTextOffset
    else
    optionalheader32.SizeOfCode:=peDataOffset-peTextOffset;
-   if(pehaverdata) then
+   if(PeRoDataOffset>0) then
    optionalheader32.SizeOfInitializedData:=peRelocationOffset-peRoDataOffset
    else
    optionalheader32.SizeOfInitializedData:=peRelocationOffset-peDataOffset;
    optionalheader32.AddressOfEntryPoint:=PeCoffEntry;
    optionalheader32.BaseOfCode:=PeTextOffset;
-   if(pehaverdata) then
+   if(PeRoDataOffset>0) then
    optionalheader32.BaseOfData:=peRoDataOffset
    else
    optionalheader32.BaseOfData:=peDataOffset;
-   optionalheader32.ImageBase:=0;
-   optionalheader32.SectionAlignment:=elfmaxalignment;
-   optionalheader32.FileAlignment:=elfmaxalignment;
-   optionalheader32.SizeOfImage:=optimize_integer_divide(PeRelocationOffset+12+elfmaxalignment-1,elfmaxalignment)*elfmaxalignment;
+   optionalheader32.ImageBase:=$00000000;
+   optionalheader32.SectionAlignment:=elfmaxalign;
+   optionalheader32.FileAlignment:=elfmaxalign;
+   optionalheader32.SizeOfImage:=optimize_integer_divide(
+   PeRelocationOffset+12+elfmaxalign-1,elfmaxalign)*elfmaxalign;
    optionalheader32.SizeOfHeaders:=PeTextOffset;
    optionalheader32.Subsystem:=pe_image_subsystem_efi_application;
    optionalheader32.NumberOfRvaandSizes:=16;
@@ -717,36 +448,40 @@ begin
    optionalheader32.DataDirectory[6].size:=12;
    optionalheader32.Checksum:=0;
   end;
- if(pehaverdata) then
+ if(PeRoDataOffset>0) then
  sectionheader:=allocmem(Sizeof(pe_image_section_header)*4)
  else
  sectionheader:=allocmem(Sizeof(pe_image_section_header)*3);
- if(pehaverdata) then
+ if(PeRoDataOffset>0) then
   begin
    sectionheader^.Name:='.text';
    sectionheader^.Misc.VirtualSize:=PeRoDataOffset-PeTextOffset;
    sectionheader^.VirtualAddress:=PeTextOffset;
    sectionheader^.SizeOfRawData:=PeRoDataOffset-PeTextOffset;
    sectionheader^.PointerToRawData:=PeTextOffset;
-   sectionheader^.Characteristics:=pe_image_scn_cnt_code or pe_image_mem_execute or pe_image_mem_read;
+   sectionheader^.Characteristics:=pe_image_scn_cnt_code or pe_image_mem_execute
+   or pe_image_mem_read;
    (sectionheader+1)^.Name:='.rdata';
    (sectionheader+1)^.Misc.VirtualSize:=PeDataOffset-PeRoDataOffset;
    (sectionheader+1)^.VirtualAddress:=PeRoDataOffset;
    (sectionheader+1)^.SizeOfRawData:=PeDataOffset-PeRoDataOffset;
    (sectionheader+1)^.PointerToRawData:=PeRoDataOffset;
-   (sectionheader+1)^.Characteristics:=pe_image_scn_cnt_initialized_data or pe_image_mem_read;
+   (sectionheader+1)^.Characteristics:=pe_image_scn_cnt_initialized_data
+   or pe_image_mem_read;
    (sectionheader+2)^.Name:='.data';
    (sectionheader+2)^.Misc.VirtualSize:=PeRelocationOffset-PeDataOffset;
    (sectionheader+2)^.VirtualAddress:=PeDataOffset;
    (sectionheader+2)^.SizeOfRawData:=PeRelocationOffset-PeDataOffset;
    (sectionheader+2)^.PointerToRawData:=PeDataOffset;
-   (sectionheader+2)^.Characteristics:=pe_image_scn_cnt_initialized_data or pe_image_mem_write or pe_image_mem_read;
+   (sectionheader+2)^.Characteristics:=pe_image_scn_cnt_initialized_data
+   or pe_image_mem_write or pe_image_mem_read;
    (sectionheader+3)^.Name:='.reloc';
    (sectionheader+3)^.Misc.VirtualSize:=12;
    (sectionheader+3)^.VirtualAddress:=PeRelocationOffset;
    (sectionheader+3)^.SizeOfRawData:=12;
    (sectionheader+3)^.PointerToRawData:=PeRelocationOffset;
-   (sectionheader+3)^.Characteristics:=pe_image_scn_cnt_initialized_data or pe_image_mem_read;
+   (sectionheader+3)^.Characteristics:=pe_image_scn_cnt_initialized_data
+   or pe_image_mem_read or pe_image_mem_discardable;
   end
  else
   begin
@@ -755,19 +490,22 @@ begin
    sectionheader^.VirtualAddress:=PeTextOffset;
    sectionheader^.SizeOfRawData:=PeDataOffset-PeTextOffset;
    sectionheader^.PointerToRawData:=PeTextOffset;
-   sectionheader^.Characteristics:=pe_image_scn_cnt_code or pe_image_mem_execute or pe_image_mem_read;
+   sectionheader^.Characteristics:=pe_image_scn_cnt_code or
+   pe_image_mem_execute or pe_image_mem_read;
    (sectionheader+1)^.Name:='.data';
    (sectionheader+1)^.Misc.VirtualSize:=PeRelocationOffset-PeDataOffset;
    (sectionheader+1)^.VirtualAddress:=PeDataOffset;
    (sectionheader+1)^.SizeOfRawData:=PeRelocationOffset-PeDataOffset;
    (sectionheader+1)^.PointerToRawData:=PeDataOffset;
-   (sectionheader+1)^.Characteristics:=pe_image_scn_cnt_initialized_data or pe_image_mem_write or pe_image_mem_read;
+   (sectionheader+1)^.Characteristics:=pe_image_scn_cnt_initialized_data or
+   pe_image_mem_write or pe_image_mem_read;
    (sectionheader+2)^.Name:='.reloc';
    (sectionheader+2)^.Misc.VirtualSize:=12;
    (sectionheader+2)^.VirtualAddress:=PeRelocationOffset;
    (sectionheader+2)^.SizeOfRawData:=12;
    (sectionheader+2)^.PointerToRawData:=PeRelocationOffset;
-   (sectionheader+2)^.Characteristics:=pe_image_scn_cnt_initialized_data or pe_image_mem_read;
+   (sectionheader+2)^.Characteristics:=pe_image_scn_cnt_initialized_data or
+   pe_image_mem_read or pe_image_mem_discardable;
   end;
  relocationheader.VirtualAddress:=PeDataOffset;
  relocationheader.SizeOfBlock:=12;
@@ -809,9 +547,9 @@ begin
   end;
  writeln('Writing PE file......');
  outputfile.Seek(0,0);
- for i:=1 to optimize_integer_divide(PeRelocationOffset+12+elfmaxalignment-1,elfmaxalignment) do
+ for i:=1 to optimize_integer_divide(PeRelocationOffset+12+elfmaxalign-1,elfmaxalign) do
   begin
-   outputfile.Write(memzero,elfmaxalignment);
+   outputfile.Write(memzero,elfmaxalign);
   end;
  outputfile.Seek(0,0);
  outputfile.Write(dosheader,sizeof(dosheader));
@@ -824,33 +562,31 @@ begin
  outputfile.Write((sectionheader+i-1)^,sizeof(pe_image_section_header));
  if(is64bit) then
   begin
-   pecoffindex:=0;
-   for i:=1 to pecoffoffsetcount[1] do
+   outputfile.Seek(PeTextOffset,0);
+   for i:=1 to (elfprogramheader64+elfloadindex[1]-1)^.program_memory_size do
     begin
-     inc(pecoffindex);
-     outputfile.Seek(pecoffoffsetarray[pecoffindex],0);
-     pecalindex:=pecoffindexarray[pecoffindex];
-     pecalsize:=(elfsectionheader64+pecalindex-1)^.section_header_size;
-     for j:=1 to pecalsize do outputfile.Write(((elfcodeblock+pecalindex-1)^+j-1)^,1)
+     outputfile.Write(((elfcodeblock+elfloadindex[1]-1)^+i-1)^,1);
     end;
-   if(pehaverdata) then
+   if(PeRodataOffset>0) then
     begin
-     for i:=1 to pecoffoffsetcount[2] do
+     outputfile.Seek(PeRoDataOffset,0);
+     for i:=1 to (elfprogramheader64+elfloadindex[2]-1)^.program_memory_size do
       begin
-       inc(pecoffindex);
-       outputfile.Seek(pecoffoffsetarray[pecoffindex],0);
-       pecalindex:=pecoffindexarray[pecoffindex];
-       pecalsize:=(elfsectionheader64+pecalindex-1)^.section_header_size;
-       for j:=1 to pecalsize do outputfile.Write(((elfcodeblock+pecalindex-1)^+j-1)^,1)
+       outputfile.Write(((elfcodeblock+elfloadindex[2]-1)^+i-1)^,1);
       end;
-    end;
-   for i:=1 to pecoffoffsetcount[3] do
+     outputfile.Seek(PeDataOffset,0);
+     for i:=1 to (elfprogramheader64+elfloadindex[3]-1)^.program_memory_size do
+      begin
+       outputfile.Write(((elfcodeblock+elfloadindex[3]-1)^+i-1)^,1);
+      end;
+    end
+   else
     begin
-     inc(pecoffindex);
-     outputfile.Seek(pecoffoffsetarray[pecoffindex],0);
-     pecalindex:=pecoffindexarray[pecoffindex];
-     pecalsize:=(elfsectionheader64+pecalindex-1)^.section_header_size;
-     for j:=1 to pecalsize do outputfile.Write(((elfcodeblock+pecalindex-1)^+j-1)^,1)
+     outputfile.Seek(PeDataOffset,0);
+     for i:=1 to (elfprogramheader64+elfloadindex[2]-1)^.program_memory_size do
+      begin
+       outputfile.Write(((elfcodeblock+elfloadindex[2]-1)^+i-1)^,1);
+      end;
     end;
    outputfile.Seek(PeRelocationOffset,0);
    outputfile.Write(Relocationheader,sizeof(pe_image_base_relocation));
@@ -868,33 +604,31 @@ begin
   end
  else
   begin
-   pecoffindex:=0;
-   for i:=1 to pecoffoffsetcount[1] do
+   outputfile.Seek(PeTextOffset,0);
+   for i:=1 to (elfprogramheader32+elfloadindex[1]-1)^.program_memory_size do
     begin
-     inc(pecoffindex);
-     outputfile.Seek(pecoffoffsetarray[pecoffindex],0);
-     pecalindex:=pecoffindexarray[pecoffindex];
-     pecalsize:=(elfsectionheader32+pecalindex-1)^.section_header_size;
-     for j:=1 to pecalsize do outputfile.Write(((elfcodeblock+pecalindex-1)^+j-1)^,1)
+     outputfile.Write(((elfcodeblock+elfloadindex[1]-1)^+i-1)^,1);
     end;
-   if(pehaverdata) then
+   if(PeRodataOffset>0) then
     begin
-     for i:=1 to pecoffoffsetcount[2] do
+     outputfile.Seek(PeRoDataOffset,0);
+     for i:=1 to (elfprogramheader32+elfloadindex[2]-1)^.program_memory_size do
       begin
-       inc(pecoffindex);
-       outputfile.Seek(pecoffoffsetarray[pecoffindex],0);
-       pecalindex:=pecoffindexarray[pecoffindex];
-       pecalsize:=(elfsectionheader32+pecalindex-1)^.section_header_size;
-       for j:=1 to pecalsize do outputfile.Write(((elfcodeblock+pecalindex-1)^+j-1)^,1)
+       outputfile.Write(((elfcodeblock+elfloadindex[2]-1)^+i-1)^,1);
       end;
-    end;
-   for i:=1 to pecoffoffsetcount[3] do
+     outputfile.Seek(PeDataOffset,0);
+     for i:=1 to (elfprogramheader32+elfloadindex[3]-1)^.program_memory_size do
+      begin
+       outputfile.Write(((elfcodeblock+elfloadindex[3]-1)^+i-1)^,1);
+      end;
+    end
+   else
     begin
-     inc(pecoffindex);
-     outputfile.Seek(pecoffoffsetarray[pecoffindex],0);
-     pecalindex:=pecoffindexarray[pecoffindex];
-     pecalsize:=(elfsectionheader32+pecalindex-1)^.section_header_size;
-     for j:=1 to pecalsize do outputfile.Write(((elfcodeblock+pecalindex-1)^+j-1)^,1)
+     outputfile.Seek(PeDataOffset,0);
+     for i:=1 to (elfprogramheader32+elfloadindex[2]-1)^.program_memory_size do
+      begin
+       outputfile.Write(((elfcodeblock+elfloadindex[2]-1)^+i-1)^,1);
+      end;
     end;
    outputfile.Seek(PeRelocationOffset,0);
    outputfile.Write(Relocationheader,sizeof(pe_image_base_relocation));
@@ -916,15 +650,15 @@ begin
  freemem(sectionheader);
  if(is64bit) then
   begin
-   for i:=elfheader64.elf64_section_header_number downto 1 do FreeMem((elfcodeblock+i-1)^);
+   for i:=elfheader64.elf64_program_header_number downto 1 do FreeMem((elfcodeblock+i-1)^);
    FreeMem(elfcodeblock);
-   FreeMem(elfsectionheader64);
+   FreeMem(elfprogramheader64);
   end
  else
   begin
-   for i:=elfheader32.elf32_section_header_number downto 1 do FreeMem((elfcodeblock+i-1)^);
+   for i:=elfheader32.elf32_program_header_number downto 1 do FreeMem((elfcodeblock+i-1)^);
    FreeMem(elfcodeblock);
-   FreeMem(elfsectionheader32);
+   FreeMem(elfprogramheader32);
   end;
  inputfile.Free;
 end.
