@@ -63,6 +63,8 @@ var i,j:qword;
     ptr:PByte;
     namecustom:boolean=false;
     namestr:string;
+    merge:boolean=false;
+    mergeindex:byte=0;
     {For elf files input}
     inputfile:TFileStream;
     inputfilepath:string;
@@ -107,6 +109,7 @@ var i,j:qword;
     FileBufferSize:SizeUint;
 label label1,label2,label3,label4;
 begin
+ merge:=false; mergeindex:=0;
  writeln('Usage:elf2efi <inputfile> <outputpath>');
  {Pass the parameter}
  if(ParamCount<=0) then
@@ -322,7 +325,8 @@ begin
     end
    else if(elfloadcount=4) then
     begin
-     elfloadindex[1]:=elfloadindex[2]; elfloadindex[2]:=elfloadindex[3]; elfloadindex[3]:=elfloadindex[4];
+     mergeindex:=elfloadindex[2]; merge:=true;
+     elfloadindex[2]:=elfloadindex[3]; elfloadindex[3]:=elfloadindex[4];
      PeTextOffset:=PeBaseAddr+(elfprogramheader64+elfloadindex[1]-1)^.program_virtual_address-elflowaddress;
      PeRoDataOffset:=PeBaseAddr+(elfprogramheader64+elfloadindex[2]-1)^.program_virtual_address-elflowaddress;
      PeDataOffset:=PeBaseAddr+(elfprogramheader64+elfloadindex[3]-1)^.program_virtual_address-elflowaddress;
@@ -353,7 +357,8 @@ begin
     end
    else if(elfloadcount=4) then
     begin
-     elfloadindex[1]:=elfloadindex[2]; elfloadindex[2]:=elfloadindex[3]; elfloadindex[3]:=elfloadindex[4];
+     mergeindex:=elfloadindex[2]; merge:=true;
+     elfloadindex[2]:=elfloadindex[3]; elfloadindex[3]:=elfloadindex[4];
      PeTextOffset:=PeBaseAddr+(elfprogramheader32+elfloadindex[1]-1)^.program_virtual_address-elflowaddress;
      PeRoDataOffset:=PeBaseAddr+(elfprogramheader32+elfloadindex[2]-1)^.program_virtual_address-elflowaddress;
      PeDataOffset:=PeBaseAddr+(elfprogramheader32+elfloadindex[3]-1)^.program_virtual_address-elflowaddress;
@@ -507,7 +512,7 @@ begin
    (sectionheader+2)^.Characteristics:=pe_image_scn_cnt_initialized_data or
    pe_image_mem_read or pe_image_mem_discardable;
   end;
- relocationheader.VirtualAddress:=PeDataOffset;
+ relocationheader.VirtualAddress:=PeTextOffset;
  relocationheader.SizeOfBlock:=12;
  relocationitem[1].Offset:=0;
  relocationitem[1].peType:=0;
@@ -567,6 +572,14 @@ begin
     begin
      outputfile.Write(((elfcodeblock+elfloadindex[1]-1)^+i-1)^,1);
     end;
+   if(merge) then
+    begin
+     outputfile.Seek(PeBaseAddr+(elfprogramheader64+mergeindex-1)^.program_virtual_address-elflowaddress,0);
+     for i:=1 to (elfprogramheader64+mergeindex-1)^.program_memory_size do
+      begin
+       outputfile.Write(((elfcodeblock+mergeindex-1)^+i-1)^,1);
+      end;
+    end;
    if(PeRodataOffset>0) then
     begin
      outputfile.Seek(PeRoDataOffset,0);
@@ -608,6 +621,14 @@ begin
    for i:=1 to (elfprogramheader32+elfloadindex[1]-1)^.program_memory_size do
     begin
      outputfile.Write(((elfcodeblock+elfloadindex[1]-1)^+i-1)^,1);
+    end;
+   if(merge) then
+    begin
+     outputfile.Seek(PeBaseAddr+(elfprogramheader32+mergeindex-1)^.program_virtual_address-elflowaddress,0);
+     for i:=1 to (elfprogramheader32+mergeindex-1)^.program_memory_size do
+      begin
+       outputfile.Write(((elfcodeblock+mergeindex-1)^+i-1)^,1);
+      end;
     end;
    if(PeRodataOffset>0) then
     begin
