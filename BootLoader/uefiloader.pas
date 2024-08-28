@@ -155,7 +155,7 @@ begin
  {For memory allocation only}
  memorymap:=efi_loader_get_memory_map;
  memoryavailable:=efi_loader_get_memory_available(memorymap);
- if(memoryavailable.memory_size<1 shl 20+(1 shl 12)*sizeof(heap_segment)+(1 shl 28)*sizeof(graphics_item)+(1 shl 18)*sizeof(graphics_segment)+loaderscreenconfig.screen_width*loaderscreenconfig.screen_height*sizeof(graphics_color)+1 shl 21+(1 shl 16)*sizeof(heap_segment)) then
+ if(memoryavailable.memory_size<1 shl 20+(1 shl 12)*sizeof(heap_segment)+(1 shl 28)*sizeof(graphics_item)+(1 shl 18)*sizeof(graphics_segment)+loaderscreenconfig.screen_width*loaderscreenconfig.screen_height*sizeof(graphics_color)+1 shl 22+(1 shl 16)*sizeof(heap_segment)) then
   begin
    efi_console_output_string('Error:memory size does not enough to start this operating system.'#10);
    while True do;
@@ -164,25 +164,30 @@ begin
  addressoffset:=1 shl 20+(1 shl 12)*sizeof(heap_segment);
  graphics_heap_initialize(Pointer(memoryavailable.memory_address+addressoffset),1 shl 28,1 shl 18,loaderscreenconfig.screen_width,loaderscreenconfig.screen_height,Pointer(loaderscreenconfig.screen_address),loaderscreenconfig.screen_type);
  addressoffset:=addressoffset+(1 shl 28)*sizeof(graphics_item)+(1 shl 18)*sizeof(graphics_segment)+loaderscreenconfig.screen_width*loaderscreenconfig.screen_height*sizeof(graphics_color);
- if(addressoffset+4 shl 30<memoryavailable.memory_size) then
+ if(addressoffset+8 shl 30<memoryavailable.memory_size) then
   begin
-   sysheap_initialize(Pointer(memoryavailable.memory_address+addressoffset),1 shl 30,1 shl 23);
-   addressoffset:=addressoffset+1 shl 30+(1 shl 23)*sizeof(heap_segment);
+   sysheap_initialize(Pointer(memoryavailable.memory_address+addressoffset),1 shl 32,1 shl 24);
+   addressoffset:=addressoffset+1 shl 32+(1 shl 24)*sizeof(heap_segment);
+  end
+ else if(addressoffset+4 shl 30<memoryavailable.memory_size) then
+  begin
+   sysheap_initialize(Pointer(memoryavailable.memory_address+addressoffset),1 shl 31,1 shl 23);
+   addressoffset:=addressoffset+1 shl 31+(1 shl 23)*sizeof(heap_segment);
   end
  else if(addressoffset+2 shl 30<memoryavailable.memory_size) then
   begin
-   sysheap_initialize(Pointer(memoryavailable.memory_address+addressoffset),1 shl 27,1 shl 22);
-   addressoffset:=addressoffset+1 shl 27+(1 shl 22)*sizeof(heap_segment);
+   sysheap_initialize(Pointer(memoryavailable.memory_address+addressoffset),1 shl 28,1 shl 22);
+   addressoffset:=addressoffset+1 shl 28+(1 shl 22)*sizeof(heap_segment);
   end
  else if(addressoffset+1 shl 30<memoryavailable.memory_size) then
   begin
-   sysheap_initialize(Pointer(memoryavailable.memory_address+addressoffset),1 shl 24,1 shl 19);
-   addressoffset:=addressoffset+1 shl 24+(1 shl 19)*sizeof(heap_segment);
+   sysheap_initialize(Pointer(memoryavailable.memory_address+addressoffset),1 shl 25,1 shl 19);
+   addressoffset:=addressoffset+1 shl 25+(1 shl 19)*sizeof(heap_segment);
   end
  else
   begin
-   sysheap_initialize(Pointer(memoryavailable.memory_address+addressoffset),1 shl 21,1 shl 16);
-   addressoffset:=addressoffset+1 shl 21+(1 shl 16)*sizeof(heap_segment);
+   sysheap_initialize(Pointer(memoryavailable.memory_address+addressoffset),1 shl 22,1 shl 16);
+   addressoffset:=addressoffset+1 shl 22+(1 shl 16)*sizeof(heap_segment);
   end;
  {Set the parameter for kernel}
  initparam:=allocmem(sizeof(sys_parameter_item)*3);
