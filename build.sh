@@ -111,7 +111,7 @@
 	if [ "$CCARCHNAME" = "arm" ]||[ "$CCARCHNAME" = "aarch64" ]; then
 	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -CX -XXs -Cg -FUBinaries/BootLoader BaseUnits/prt0.pas
 	fi
-	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -CX -XX -Xi -Cg -al -k-static -k-nostdlib -k-znoexecstack -k-znow -k-pie -k--no-dynamic-linker -dCPU$CCARCHNAMEL -dcpu$CCARCHNAME -dCPU$BITS -FuBaseUnits -FEBinaries/BootLoader BootLoader/uefiloader.pas -oBinaries/BootLoader/uefiloader.elf
+	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -al -Sg -Xd -Ur -CX -XX -Xi -Cg -k-nostdlib -k-znoexecstack -k-znodefaultlib -k-pie -k--no-dynamic-linker -k-znow -dCPU$CCARCHNAMEL -dcpu$CCARCHNAME -dCPU$BITS -FuBaseUnits -FEBinaries/BootLoader BootLoader/uefiloader.pas -oBinaries/BootLoader/uefiloader.elf
 	rm -rf Utility/elf2efi
 	/home/tydq/source/compiler/ppc$CARCH -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Fu/home/tydq/source/compiler/x86_64/units/$CARCHNAME-linux -Fu/home/tydq/source/rtl/units/$CARCHNAME-linux -dcpu$BITS -Cg Utility/elf2efi.pas
 	rm -rf Utility/*.o Utility/*.ppu
@@ -124,7 +124,7 @@
 	if [ "$CCARCHNAME" = "arm" ]||[ "$CCARCHNAME" = "aarch64" ]; then
 	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -CX -XXs -Cg -FUBinaries/System BaseUnits/prt0.pas
 	fi
-	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -CX -XXs -Xi -Cg -k-static -k-nostdlib -k-znoexecstack -k-znodefaultlib -k-znow -k-pie -k--no-dynamic-linker -dCPU$CCARCHNAMEL -dcpu$CCARCHNAME -dCPU$BITS -FuBaseUnits -FEBinaries/System System/kernelmain.pas -oBinaries/System/kernelmain.elf
+	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -CX -XXs -Xi -Cg -k-nostdlib -k-znoexecstack -k-znodefaultlib -k-pie -k--no-dynamic-linker -k-znow -dCPU$CCARCHNAMEL -dcpu$CCARCHNAME -dCPU$BITS -FuBaseUnits -FEBinaries/System System/kernelmain.pas -oBinaries/System/kernelmain.elf
 	rm -rf BaseUnits/*.ppu BaseUnits/*.o BaseUnits/*.res BaseUnits/*.sh System/*.ppu System/*.o System/*.res System/*.sh 
 	dd if=/dev/zero of=Binaries/fat.img bs=512 count=131072
 	/usr/sbin/mkfs.vfat -F 32 Binaries/fat.img
