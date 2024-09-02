@@ -2,7 +2,9 @@ program elf2efi;
 uses binarybase,sysutils,classes;
 type natuint=qword;
      natint=int64;
-     relocarray=array[1..2] of pe_image_type_offset;
+     relocarray=array[1..256] of pe_image_type_offset;
+     Pelf32_rela=^elf32_rela;
+     Pelf64_rela=^elf64_rela;
 const pecoff_max_alignment=$10000;
 function optimize_integer_divide(a,b:natuint):natuint;[public,alias:'optimize_integer_divide'];
 var procnum1,procnum2,degree,res:natuint;
@@ -73,14 +75,23 @@ var i,j:qword;
     myplatform:byte=0;
     elfheader32:elf32_header;
     elfprogramheader32:^elf32_program_header;
+    elfrela32:elf32_section_header;
+    elfrela32item:elf32_rela;
+    elf32value:dword;
     elfheader64:elf64_header;
     elfprogramheader64:^elf64_program_header;
+    elfrela64:elf64_section_header;
+    elfrela64item:elf64_rela;
+    elf64value:qword;
+    elfrelacontent:Pointer;
+    elfrelasize:dword;
     elfcodeblock:^Pointer;
     elfloadcount:byte;
     elfloadindex:array[1..4] of byte;
     elflowaddress:SizeUint;
     elfmaxalign:dword;
     {For efi files output}
+    peLowAddress:integer=-1;
     pebaseaddr:dword;
     pecoffindex:word;
     pecoffoffset:dword;
@@ -258,6 +269,22 @@ begin
      (elfcodeblock+i-1)^:=AllocMem((elfprogramheader64+i-1)^.program_memory_size);
      for j:=1 to (elfprogramheader64+i-1)^.program_file_size do inputfile.Read(((elfcodeblock+i-1)^+j-1)^,1);
     end;
+   inputfile.Seek(elfheader64.elf64_section_header_offset,0);
+   i:=1; elfrelasize:=0;
+   while(i<=elfheader64.elf64_section_header_number) do
+    begin
+     inputfile.Read(elfrela64,sizeof(elf64_section_header));
+     if(elfrela64.section_header_type=elf_section_header_rela) then break;
+     inc(i);
+    end;
+   if(i<=elfheader64.elf64_section_header_number) then
+    begin
+     inputfile.Seek(elfrela64.section_header_offset,0);
+     elfrelasize:=elfrela64.section_header_size;
+     elfrelacontent:=AllocMem(elfrelasize);
+     for j:=1 to elfrela64.section_header_size do inputfile.Read((elfrelacontent+j-1)^,1);
+    end
+   else elfrelasize:=0;
   end
  else
   begin
@@ -284,7 +311,7 @@ begin
       end;
     end;
    elfcodeblock:=AllocMem(sizeof(elf32_program_header)*sizeof(Pointer));
-   for i:=1 to elfheader32.elf32_program_header_number do
+   for i:=1 to elfheader32.elf32_program_header_number-1 do
     begin
      if((elfprogramheader32+i-1)^.program_type<>elf_program_table_load) then continue;
      if((elfprogramheader32+i-1)^.program_file_size=0) then continue;
@@ -292,6 +319,21 @@ begin
      (elfcodeblock+i-1)^:=AllocMem((elfprogramheader32+i-1)^.program_memory_size);
      for j:=1 to (elfprogramheader32+i-1)^.program_file_size do inputfile.Read(((elfcodeblock+i-1)^+j-1)^,1);
     end;
+   i:=1; elfrelasize:=0;
+   while(i<=elfheader32.elf32_section_header_number) do
+    begin
+     inputfile.Read(elfrela32,sizeof(elf64_section_header));
+     if(elfrela32.section_header_type=elf_section_header_rela) then break;
+     inc(i);
+    end;
+   if(i<=elfheader32.elf32_section_header_number) then
+    begin
+     inputfile.Seek(elfrela32.section_header_offset,0);
+     elfrelasize:=elfrela32.section_header_size;
+     elfrelacontent:=AllocMem(elfrelasize);
+     for j:=1 to elfrela32.section_header_size do inputfile.Read((elfrelacontent+j-1)^,1);
+    end
+   else elfrelasize:=0;
   end;
  writeln('elf file loaded!');
  {Initialize pe file}
@@ -413,12 +455,12 @@ begin
    optionalheader64.SectionAlignment:=elfmaxalign;
    optionalheader64.FileAlignment:=elfmaxalign;
    optionalheader64.SizeOfImage:=optimize_integer_divide(
-   PeRelocationOffset+12+elfmaxalign-1,elfmaxalign)*elfmaxalign;
+   PeRelocationOffset+12+optimize_integer_divide(elfrelasize,24)*2+elfmaxalign-1,elfmaxalign)*elfmaxalign;
    optionalheader64.SizeOfHeaders:=PeTextOffset;
    optionalheader64.Subsystem:=pe_image_subsystem_efi_application;
    optionalheader64.NumberOfRvaandSizes:=16;
    optionalheader64.DataDirectory[6].virtualaddress:=PeRelocationOffset;
-   optionalheader64.DataDirectory[6].size:=12;
+   optionalheader64.DataDirectory[6].size:=12+optimize_integer_divide(elfrelasize,24)*2;
    optionalheader64.CheckSum:=0;
   end
  else
@@ -445,12 +487,12 @@ begin
    optionalheader32.SectionAlignment:=elfmaxalign;
    optionalheader32.FileAlignment:=elfmaxalign;
    optionalheader32.SizeOfImage:=optimize_integer_divide(
-   PeRelocationOffset+12+elfmaxalign-1,elfmaxalign)*elfmaxalign;
+   PeRelocationOffset+12+optimize_integer_divide(elfrelasize,12)*2+elfmaxalign-1,elfmaxalign)*elfmaxalign;
    optionalheader32.SizeOfHeaders:=PeTextOffset;
    optionalheader32.Subsystem:=pe_image_subsystem_efi_application;
    optionalheader32.NumberOfRvaandSizes:=16;
    optionalheader32.DataDirectory[6].virtualaddress:=PeRelocationOffset;
-   optionalheader32.DataDirectory[6].size:=12;
+   optionalheader32.DataDirectory[6].size:=12+optimize_integer_divide(elfrelasize,12)*2;
    optionalheader32.Checksum:=0;
   end;
  if(PeRoDataOffset>0) then
@@ -480,13 +522,26 @@ begin
    (sectionheader+2)^.PointerToRawData:=PeDataOffset;
    (sectionheader+2)^.Characteristics:=pe_image_scn_cnt_initialized_data
    or pe_image_mem_write or pe_image_mem_read;
-   (sectionheader+3)^.Name:='.reloc';
-   (sectionheader+3)^.Misc.VirtualSize:=12;
-   (sectionheader+3)^.VirtualAddress:=PeRelocationOffset;
-   (sectionheader+3)^.SizeOfRawData:=12;
-   (sectionheader+3)^.PointerToRawData:=PeRelocationOffset;
-   (sectionheader+3)^.Characteristics:=pe_image_scn_cnt_initialized_data
-   or pe_image_mem_read or pe_image_mem_discardable;
+   if(is64bit) then
+    begin
+     (sectionheader+3)^.Name:='.reloc';
+     (sectionheader+3)^.Misc.VirtualSize:=12+optimize_integer_divide(elfrelasize,24)*2;
+     (sectionheader+3)^.VirtualAddress:=PeRelocationOffset;
+     (sectionheader+3)^.SizeOfRawData:=12+optimize_integer_divide(elfrelasize,24)*2;
+     (sectionheader+3)^.PointerToRawData:=PeRelocationOffset;
+     (sectionheader+3)^.Characteristics:=pe_image_scn_cnt_initialized_data
+     or pe_image_mem_read or pe_image_mem_discardable;
+    end
+   else
+    begin
+     (sectionheader+3)^.Name:='.reloc';
+     (sectionheader+3)^.Misc.VirtualSize:=12+optimize_integer_divide(elfrelasize,12)*2;
+     (sectionheader+3)^.VirtualAddress:=PeRelocationOffset;
+     (sectionheader+3)^.SizeOfRawData:=12+optimize_integer_divide(elfrelasize,12)*2;
+     (sectionheader+3)^.PointerToRawData:=PeRelocationOffset;
+     (sectionheader+3)^.Characteristics:=pe_image_scn_cnt_initialized_data
+     or pe_image_mem_read or pe_image_mem_discardable;
+    end;
   end
  else
   begin
@@ -505,19 +560,62 @@ begin
    (sectionheader+1)^.Characteristics:=pe_image_scn_cnt_initialized_data or
    pe_image_mem_write or pe_image_mem_read;
    (sectionheader+2)^.Name:='.reloc';
-   (sectionheader+2)^.Misc.VirtualSize:=12;
-   (sectionheader+2)^.VirtualAddress:=PeRelocationOffset;
-   (sectionheader+2)^.SizeOfRawData:=12;
-   (sectionheader+2)^.PointerToRawData:=PeRelocationOffset;
-   (sectionheader+2)^.Characteristics:=pe_image_scn_cnt_initialized_data or
-   pe_image_mem_read or pe_image_mem_discardable;
+   if(is64bit) then
+    begin
+     (sectionheader+2)^.Misc.VirtualSize:=12+optimize_integer_divide(elfrelasize,24)*2;
+     (sectionheader+2)^.VirtualAddress:=PeRelocationOffset;
+     (sectionheader+2)^.SizeOfRawData:=12+optimize_integer_divide(elfrelasize,24)*2;
+     (sectionheader+2)^.PointerToRawData:=PeRelocationOffset;
+     (sectionheader+2)^.Characteristics:=pe_image_scn_cnt_initialized_data or
+     pe_image_mem_read or pe_image_mem_discardable;
+    end
+   else
+    begin
+     (sectionheader+2)^.Misc.VirtualSize:=12+optimize_integer_divide(elfrelasize,12)*2;
+     (sectionheader+2)^.VirtualAddress:=PeRelocationOffset;
+     (sectionheader+2)^.SizeOfRawData:=12+optimize_integer_divide(elfrelasize,12)*2;
+     (sectionheader+2)^.PointerToRawData:=PeRelocationOffset;
+     (sectionheader+2)^.Characteristics:=pe_image_scn_cnt_initialized_data or
+     pe_image_mem_read or pe_image_mem_discardable;
+    end;
   end;
- relocationheader.VirtualAddress:=PeTextOffset;
- relocationheader.SizeOfBlock:=12;
- relocationitem[1].Offset:=0;
- relocationitem[1].peType:=0;
- relocationitem[2].Offset:=0;
- relocationitem[2].peType:=0;
+ pelowaddress:=-1;
+ if(is64bit) then
+  begin
+   relocationheader.SizeOfBlock:=12+optimize_integer_divide(elfrelasize,24)*2;
+   relocationitemcount:=optimize_integer_divide(elfrelasize,24);
+   i:=0;
+   while(i<optimize_integer_divide(elfrelasize,24)) do
+    begin
+     inc(i);
+     relocationitem[i].peType:=10;
+     if(pelowaddress=-1) then pelowaddress:=Pelf64_rela(elfrelacontent+(i-1)*24)^.rela_offset;
+     relocationitem[i].Offset:=Pelf64_rela(elfrelacontent+(i-1)*24)^.rela_offset-pelowaddress;
+    end;
+   relocationitem[i+1].peType:=0;
+   relocationitem[i+2].peType:=0;
+   relocationitem[i+1].Offset:=0;
+   relocationitem[i+2].Offset:=0;
+  end
+ else
+  begin
+   relocationheader.SizeOfBlock:=12+optimize_integer_divide(elfrelasize,12)*2;
+   relocationitemcount:=optimize_integer_divide(elfrelasize,12);
+   i:=0;
+   while(i<optimize_integer_divide(elfrelasize,12)) do
+    begin
+     inc(i);
+     relocationitem[i].peType:=3;
+     if(pelowaddress=-1) then pelowaddress:=Pelf32_rela(elfrelacontent+(i-1)*12)^.rela_offset;
+     relocationitem[i].Offset:=Pelf32_rela(elfrelacontent+(i-1)*12)^.rela_offset-pelowaddress;
+    end;
+   relocationitem[i+1].peType:=0;
+   relocationitem[i+2].peType:=0;
+   relocationitem[i+1].Offset:=0;
+   relocationitem[i+2].Offset:=0;
+  end;
+ if(pelowaddress>-1) then relocationheader.VirtualAddress:=PeBaseAddr+pelowaddress
+ else relocationheader.VirtualAddress:=PeTextOffset;
  {Write pe file}
  if(namecustom) then
   begin
@@ -552,7 +650,7 @@ begin
   end;
  writeln('Writing PE file......');
  outputfile.Seek(0,0);
- for i:=1 to optimize_integer_divide(PeRelocationOffset+12+elfmaxalign-1,elfmaxalign) do
+ for i:=1 to optimize_integer_divide(PeRelocationOffset+12+relocationitemcount*2+elfmaxalign-1,elfmaxalign) do
   begin
    outputfile.Write(memzero,elfmaxalign);
   end;
@@ -602,9 +700,18 @@ begin
       end;
     end;
    outputfile.Seek(PeRelocationOffset,0);
-   outputfile.Write(Relocationheader,sizeof(pe_image_base_relocation));
-   outputfile.Write(Relocationitem[1],sizeof(pe_image_type_offset));
-   outputfile.Write(Relocationitem[2],sizeof(pe_image_type_offset));
+   outputfile.Write(relocationheader,sizeof(relocationheader));
+   for i:=1 to relocationitemcount+2 do
+    begin
+     outputfile.Write(Relocationitem[i],sizeof(pe_image_type_offset));
+    end;
+   outputfile.Seek(PeBaseAddr+pelowaddress,0);
+   for i:=1 to elfrelasize div 24 do
+    begin
+     elfrela64item:=Pelf64_rela(elfrelacontent+(i-1)*24)^;
+     elf64value:=PeBaseAddr+elfrela64item.rela_addend;
+     outputfile.Write(elf64value,sizeof(qword));
+    end;
    outputfile.Seek(0,0);
    FileBuffer:=allocmem(optionalheader64.SizeOfImage);
    for i:=1 to optionalheader64.SizeOfImage do
@@ -653,8 +760,17 @@ begin
     end;
    outputfile.Seek(PeRelocationOffset,0);
    outputfile.Write(Relocationheader,sizeof(pe_image_base_relocation));
-   outputfile.Write(Relocationitem[1],sizeof(pe_image_type_offset));
-   outputfile.Write(Relocationitem[2],sizeof(pe_image_type_offset));
+   for i:=1 to relocationitemcount+2 do
+    begin
+     outputfile.Write(Relocationitem[i],sizeof(pe_image_type_offset));
+    end;
+   outputfile.Seek(PeBaseAddr+pelowaddress,0);
+   for i:=1 to elfrelasize div 12 do
+    begin
+     elfrela32item:=Pelf32_rela(elfrelacontent+(i-1)*12)^;
+     elf32value:=PeBaseAddr+elfrela32item.rela_addend;
+     outputfile.Write(elf32value,sizeof(dword));
+    end;
    outputfile.Seek(0,0);
    FileBuffer:=allocmem(optionalheader32.SizeOfImage);
    for i:=1 to optionalheader32.SizeOfImage do
@@ -669,6 +785,7 @@ begin
  Freemem(filebuffer);
  outputfile.Free;
  freemem(sectionheader);
+ Freemem(elfrelacontent);
  if(is64bit) then
   begin
    for i:=elfheader64.elf64_program_header_number downto 1 do FreeMem((elfcodeblock+i-1)^);
