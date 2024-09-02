@@ -489,6 +489,20 @@ const elf_file_identify:array[1..4] of char=(#$7F,'E','L','F');
       pe_image_rel_base_high=1;
       pe_image_rel_base_low=2;
       pe_image_rel_base_highlow=3;
+      pe_image_rel_base_highadj=4;
+      pe_image_rel_base_mips_jmpaddr=5;
+      pe_image_rel_base_arm_mov32a=6;
+      pe_image_rel_base_arm_mov32t=7;
+      pe_image_rel_base_ia64_imm64=8;
+      pe_image_rel_base_mips_jmpaddr16=9;
+      pe_image_rel_base_dir64=10;
+      {For RISC-V}
+      pe_image_rel_base_riscv_hi20=5;
+      pe_image_rel_base_riscv_low12i=7;
+      pe_image_rel_base_riscv_low12s=8;
+      {For LoongArch}
+      pe_image_rel_base_loongarch32_mark_la=8;
+      pe_image_rel_base_loongarch64_mark_la=8;
       
 type elf32_header=packed record 
                   elf32_identify:array[1..16] of byte;
@@ -837,4 +851,4 @@ begin
  elf64_relocation_info:=s shl 32+t and $FFFFFFFF;
 end;
 
-end. 
+end.
