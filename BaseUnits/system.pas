@@ -39,25 +39,39 @@ type
   PNatUint=^dword;
   Natint=integer;
   PNatint=^integer;
-  Uint128=record
+  Uint128=packed record
           Dwords:array[1..4] of dword;
           end;
-  Int128=record
+  Int128=packed record
          Highdword:Integer;
          Lowdwords:array[1..3] of dword;
          end;
+  Uint96=packed record
+         Dwords:array[1..3] of dword;
+         end;
+  Int96=packed record
+        HighDword:Integer;
+        Dwords:array[1..2] of dword;
+        end;
   {$ELSE CPU32}
   NatUint=qword;
   PNatUint=^qword;
   Natint=int64;
   PNatint=^int64;
-  Uint128=record
+  Uint128=packed record
           High,Low:qword;
           end;
-  Int128=record
+  Int128=packed record
          High:Int64;
          Low:qword;
          end;
+  Uint96=packed record
+         Dwords:array[1..3] of dword;
+         end;
+  Int96=packed record
+        HighDword:Integer;
+        Dwords:qword;
+        end;
   {$ENDIF CPU32}
   TTypeKind = (tkUnknown, tkInteger, tkChar, tkEnumeration, tkFloat, tkSet,
     tkMethod, tkSString, tkLString, tkAString, tkWString, tkVariant, tkArray,
@@ -115,19 +129,13 @@ type
       node: array [0 .. 5] of byte; // The spatially unique node identifier
     );
   end;
-  heap_segment=packed record
-                  segment_start:natuint;
-                  segment_end:natuint;
-                  end;
   heap_record=packed record
-              content:Pointer;
-              contentused:natuint;
-              contentmax:natuint;
-              segment:^heap_segment;
-              segmentcount:natuint;
-              segmentcountmax:natuint;
+              segment_address:^natuint;
+              segment_end_count:natuint;
+              segment_max_count:natuint;
+              content_address:Pointer;
+              content_block_size:word;
               end;
-  Pheap_record=^heap_record;
   maskwildcard=packed record
                liststr:^PChar;
                listpos:^natuint;
@@ -179,20 +187,29 @@ procedure fpc_setjmp;compilerproc;
 procedure fpc_pushexceptaddr;compilerproc;
 function fpc_qword_to_double(q:qword):double;compilerproc;
 function fpc_int64_to_double(i:int64):double;compilerproc;
-procedure compheap_initialize(Memorystart:Pointer;ContentSize:natuint;SegmentMaxCount:natuint);
-function fpc_getmem(size:natuint):Pointer;compilerproc;
-function fpc_allocmem(size:natuint):Pointer;compilerproc;
-function fpc_getmemsize(ptr:Pointer):natuint;
+function optimize_integer_divide(a,b:natuint):natuint;
+function optimize_integer_modulo(a,b:natuint):natuint;
+procedure compheap_initialize(start,totalsize:natuint;blocksize:word);
+function fpc_getmem(size:Natuint):Pointer;compilerproc;
+function fpc_getmemsize(ptr:Pointer):Natuint;
+function fpc_allocmem(size:Natuint):Pointer;compilerproc;
 procedure fpc_freemem(var ptr:Pointer);compilerproc;
 procedure fpc_reallocmem(var ptr:Pointer;size:natuint);compilerproc;
-procedure fpc_move(const Source;var Dest;Size:natuint);compilerproc;
-procedure sysheap_initialize(MemoryStart:Pointer;ContentSize:natuint;SegmentMaxCount:natuint);
+procedure fpc_move(Const Source;Var Dest;Size:natuint);compilerproc;
+procedure sysheap_initialize(start,totalsize:natuint;blocksize:word);
 function getmem(size:natuint):Pointer;
-function allocmem(size:natuint):Pointer;
 function getmemsize(ptr:Pointer):natuint;
+function allocmem(size:natuint):Pointer;
 procedure freemem(var ptr:Pointer);
+procedure reallocmem(var ptr:Pointer;size:natuint);
 procedure move(const Source;var Dest;Size:natuint);
-procedure reallocmem(var ptr:Pointer;Size:natuint); 
+procedure exeheap_initialize(start,totalsize:natuint;blocksize:word);
+function exeheap_getmem(size:natuint):Pointer;
+function exeheap_getmemsize(ptr:Pointer):natuint;
+function exeheap_allocmem(size:natuint):Pointer;
+procedure exeheap_freemem(var ptr:Pointer);
+procedure exeheap_reallocmem(var ptr:Pointer;size:natuint);
+procedure exeheap_move(const Source;var Dest;Size:natuint);
 function abs(x:natint):natint;
 function abs(x:extended):extended;
 function frac(x:extended):extended;
@@ -204,8 +221,6 @@ function banker_round(x:extended):natint;
 function sqr(x:natuint):natuint;
 function sqr(x:natint):natint;
 function sqr(x:extended):extended;
-function optimize_integer_divide(a,b:natuint):natuint;
-function optimize_integer_modulo(a,b:natuint):natuint;
 function strlen(str:Pchar):natuint;
 function wstrlen(str:PWideChar):natuint;
 procedure strinit(var str:PChar;size:natuint);
@@ -294,7 +309,7 @@ function PChar_encrypt_to_password(str:Pchar;index:natuint):PWideChar;
 function PWChar_encrypt_to_password(str:PWideChar;index:natuint):PWideChar;
 
 var totalmemorysize:natuint;
-    compheap,sysheap:heap_record;
+    compheap,sysheap,exeheap:heap_record;
     ranseed:natuint;
     
 implementation
@@ -337,344 +352,333 @@ function fpc_int64_to_double(i:int64):double;compilerproc;[public,alias:'FPC_INT
 begin
  fpc_int64_to_double:=dword(i and $ffffffff)+longint(i shr 32)*double(4294967296.0);
 end;
-procedure compheap_initialize(Memorystart:Pointer;ContentSize:natuint;SegmentMaxCount:natuint);[public,alias:'compheap_initialize'];
+function optimize_integer_divide(a,b:natuint):natuint;[public,alias:'optimize_integer_divide'];
+var procnum1,procnum2,degree,res:natuint;
 begin
- compheap.content:=MemoryStart;
- compheap.contentused:=0;
- compheap.contentmax:=ContentSize;
- compheap.segment:=MemoryStart+ContentSize;
- compheap.segmentcount:=0;
- compheap.segmentcountmax:=SegmentMaxCount;
-end;
-procedure compheap_delete_item(ptr:Pointer);[public,alias:'compheap_delete_item'];
-var index,i,j,size:natuint;
-    ptr1,ptr2:Pbyte;
-begin
- index:=1;
- while(index<=compheap.segmentcount) do
+ if(a=0) then exit(0);
+ if(a<b) then exit(0);
+ if(a=b) then exit(1);
+ if(b=1) or (b=0) then exit(a);
+ procnum1:=a; procnum2:=b; degree:=1; res:=0;
+ while(procnum2<=procnum1 shr 1) do
   begin
-   if(Natuint(ptr)>=(compheap.segment+index-1)^.segment_start) and
-   (Natuint(ptr)<=(compheap.segment+index-1)^.segment_end) then break;
-   inc(index);
+   procnum2:=procnum2 shl 1;
+   degree:=degree shl 1;
   end;
- if(index>compheap.segmentcount) then exit;
- size:=(compheap.segment+index-1)^.segment_end-(compheap.segment+index-1)^.segment_start+1;
- for i:=index+1 to compheap.segmentcount do
+ while(procnum1>=b) do
   begin
-   for j:=(compheap.segment+i-1)^.segment_start to (compheap.segment+i-1)^.segment_end do
+   if(procnum1>=procnum2) then
     begin
-     ptr1:=Pointer(j); ptr2:=Pointer(j-size);
-     ptr2^:=ptr1^; ptr1^:=0;
+     procnum1:=procnum1-procnum2;
+     res:=res+degree;
     end;
-   (compheap.segment+i-2)^.segment_start:=(compheap.segment+i-1)^.segment_start-size;
-   (compheap.segment+i-2)^.segment_end:=(compheap.segment+i-1)^.segment_end-size;
+   degree:=degree shr 1;
+   procnum2:=procnum2 shr 1;
   end;
- dec(compheap.contentused,size);
- dec(compheap.segmentcount,1);
+ optimize_integer_divide:=res;
 end;
-function fpc_getmem(size:natuint):Pointer;compilerproc;[public,alias:'FPC_GETMEM'];
-var procptr:PByte;
-    j:natuint;
+function optimize_integer_modulo(a,b:natuint):natuint;[public,alias:'optimize_integer_modulo'];
+var res,procnum:natuint;
 begin
- if(compheap.contentused+size>compheap.contentmax) then exit(nil);
- if(compheap.segmentcount>=compheap.segmentcountmax) then exit(nil);
+ if(a=0) then exit(0);
+ if(a<b) then exit(a);
+ if(a=b) then exit(0);
+ if(b=1) or (b=0) then exit(0);
+ res:=a; procnum:=b;
+ while(procnum<=res shr 1) do
+  begin
+   procnum:=procnum shl 1;
+  end;
+ while(res>=b) do
+  begin
+   if(res>=procnum) then res:=res-procnum;
+   procnum:=procnum shr 1;
+  end;
+ optimize_integer_modulo:=res;
+end; 
+procedure heap_initialize(var heap:heap_record;start,segcount:Natuint;blocksize:dword);[public,alias:'heap_record_initialize'];
+begin
+ heap.segment_address:=Pointer(start);
+ heap.segment_end_count:=0;
+ heap.segment_max_count:=segcount;
+ heap.content_address:=Pointer(start+segcount*sizeof(natuint));
+ heap.content_block_size:=blocksize;
+end;
+function heap_find_first_empty_block(heap:heap_record;size:Natuint):Pointer;[public,alias:'heap_find_first_empty_block'];
+var i,j:dword;
+    res:Pointer;
+begin
+ i:=1; res:=nil;
  if(size=0) then exit(nil);
- inc(compheap.segmentcount,1);
- if(compheap.segmentcount=1) then
+ while(i<=heap.segment_end_count+1) and (i<=heap.segment_max_count) do
   begin
-   (compheap.segment+compheap.segmentcount-1)^.segment_start:=Natuint(compheap.content);
-  end
- else if(compheap.segmentcount>1) then
-  begin
-   (compheap.segment+compheap.segmentcount-1)^.segment_start:=
-   (compheap.segment+compheap.segmentcount-1)^.segment_end+1;
+   if((heap.segment_address+i-1)^=0) or (i>heap.segment_end_count) then
+    begin
+     j:=i;
+     while(j<=i+optimize_integer_divide(size-1,heap.content_block_size)) and (j<=heap.segment_max_count) do
+      begin
+       if((heap.segment_address+j-1)^=0) and (j<=heap.segment_end_count) then inc(j)
+       else if(j>heap.segment_end_count) then inc(j)
+       else break;
+      end;
+     if(j>i+optimize_integer_divide(size-1,heap.content_block_size)) then
+      begin
+       res:=Pointer(heap.content_address+heap.content_block_size*(i-1)); break;
+      end;
+    end;
+   inc(i,1);
   end;
- (compheap.segment+compheap.segmentcount-1)^.segment_end:=
- (compheap.segment+compheap.segmentcount-1)^.segment_start+size-1;
- for j:=(compheap.segment+compheap.segmentcount-1)^.segment_start to
- (compheap.segment+compheap.segmentcount-1)^.segment_end do
-  begin
-   procptr:=Pointer(j); procptr^:=0;
-  end;
- inc(compheap.contentused,size);
- fpc_getmem:=Pointer((compheap.segment+compheap.segmentcount-1)^.segment_start);
+ heap_find_first_empty_block:=res;
 end;
-function fpc_getmemsize(ptr:Pointer):natuint;[public,alias:'FPC_GETMEMSIZE'];
-var index:natuint;
+function heap_find_suitable_index(heap:heap_record):natuint;[public,alias:'heap_find_suitable_index'];
+var i,index:Natuint;
 begin
- index:=1;
- while(index<=compheap.segmentcount) do
+ index:=0;
+ while True do
   begin
-   if(Natuint(ptr)>=(compheap.segment+index-1)^.segment_start) and
-   (Natuint(ptr)<=(compheap.segment+index-1)^.segment_end) then break;
    inc(index);
+   i:=1;
+   while(i<=heap.segment_end_count) do
+    begin
+     if((heap.segment_address+i-1)^=index) then break;
+     inc(i,1);
+    end;
+   if(i>heap.segment_end_count) then break;
   end;
- if(index>compheap.segmentcount) then
- fpc_getmemsize:=0
- else
- fpc_getmemsize:=(compheap.segment+index-1)^.segment_end-(compheap.segment+index-1)^.segment_start+1;
+ heap_find_suitable_index:=index;
 end;
-function fpc_allocmem(size:natuint):Pointer;compilerproc;[public,alias:'FPC_ALLOCMEM'];
-var procptr:PByte;
-    j:natuint;
+function heap_request_memory(var heap:heap_record;size:Natuint;meminit:boolean):Pointer;[public,alias:'heap_request_memory'];
+var ptr:PByte;
+    i:Natuint;
+    index:natuint;
 begin
- if(compheap.contentused+size>compheap.contentmax) then exit(nil);
- if(compheap.segmentcount>=compheap.segmentcountmax) then exit(nil);
- if(size=0) then exit(nil);
- inc(compheap.segmentcount,1);
- if(compheap.segmentcount=1) then
+ ptr:=heap_find_first_empty_block(heap,size);
+ if(ptr=nil) then exit(ptr);
+ index:=heap_find_suitable_index(heap);
+ if(meminit) then
   begin
-   (compheap.segment+compheap.segmentcount-1)^.segment_start:=Natuint(compheap.content);
-  end
- else if(compheap.segmentcount>1) then
-  begin
-   (compheap.segment+compheap.segmentcount-1)^.segment_start:=
-   (compheap.segment+compheap.segmentcount-1)^.segment_end+1;
+   i:=1;
+   while(i<=optimize_integer_divide(size+heap.content_block_size-1,heap.content_block_size)*heap.content_block_size) do
+    begin
+     (ptr+i-1)^:=0;
+     inc(i,1);
+    end;
   end;
- (compheap.segment+compheap.segmentcount-1)^.segment_end:=
- (compheap.segment+compheap.segmentcount-1)^.segment_start+size-1;
- for j:=(compheap.segment+compheap.segmentcount-1)^.segment_start to
- (compheap.segment+compheap.segmentcount-1)^.segment_end do
+ i:=1;
+ while(i<=optimize_integer_divide(size-1,heap.content_block_size)+1) do
   begin
-   procptr:=Pointer(j); procptr^:=0;
+   (heap.segment_address+i-1)^:=index; inc(i,1);
   end;
- inc(compheap.contentused,size);
- fpc_allocmem:=Pointer((compheap.segment+compheap.segmentcount-1)^.segment_start);
+ if(ptr>=Pointer(Natuint(heap.content_address)+heap.segment_end_count*heap.content_block_size)) then
+  begin
+   inc(heap.segment_end_count,optimize_integer_divide(size-1,heap.content_block_size)+1);
+  end;
+ heap_request_memory:=ptr;
+end;
+procedure heap_free_memory(var heap:heap_record;var ptr:Pointer);[public,alias:'heap_free_memory'];
+var mempos,memindex:natuint;
+    memstart,memcount:Natuint;
+    i:Natuint;
+begin
+ mempos:=optimize_integer_divide((ptr-heap.content_address),heap.content_block_size)+1;
+ memindex:=(heap.segment_address+mempos-1)^;
+ while((heap.segment_address+mempos-1)^=memindex) and (mempos>1) do dec(mempos);
+ if((heap.segment_address+mempos-1)^<>memindex) then inc(mempos);
+ i:=1; memcount:=0;
+ while((heap.segment_address+mempos-1)^=memindex) do
+  begin
+   (heap.segment_address+mempos-1)^:=0; inc(mempos); inc(memcount);
+  end;
+ if(mempos>heap.segment_end_count) then dec(heap.segment_end_count,memcount);
+ ptr:=nil;
+end;
+procedure heap_move_memory(var heap:heap_record;srcptr,destptr:Pointer;size:Natuint);[public,alias:'heap_move_memory'];
+var mempos1,mempos2:natuint;
+    memsize1,memsize2:natuint;
+    memindex1,memindex2:natuint;
+    memptr1,memptr2:Pointer;
+    memrsize1,memrsize2:natuint;
+    copysize:Natuint;
+    i:Natuint;
+    ptr1,ptr2:PByte;
+begin
+ mempos1:=optimize_integer_divide((srcptr-heap.content_address),heap.content_block_size)+1;
+ memindex1:=(heap.segment_address+mempos1-1)^; memsize1:=0;
+ while((heap.segment_address+mempos1-1)^=memindex1) and (mempos1>1) do dec(mempos1);
+ if((heap.segment_address+mempos1-1)^<>memindex1) then inc(mempos1);
+ while((heap.segment_address+mempos1-1+memsize1)^=memindex1) do inc(memsize1);
+ memptr1:=heap.content_address+(mempos1-1)*heap.content_block_size;
+ memrsize1:=memsize1*heap.content_block_size;
+ mempos2:=optimize_integer_divide((destptr-heap.content_address),heap.content_block_size)+1;
+ memindex2:=(heap.segment_address+mempos2-1)^; memsize2:=0;
+ while((heap.segment_address+mempos2-1)^=memindex2) and (mempos2>1) do dec(mempos2);
+ if((heap.segment_address+mempos2-1)^<>memindex2) then inc(mempos2);
+ while((heap.segment_address+mempos2-1+memsize2)^=memindex2) do inc(memsize2);
+ memptr2:=heap.content_address+(mempos2-1)*heap.content_block_size;
+ memrsize2:=memsize2*heap.content_block_size;
+ copysize:=size;
+ if(srcptr+copysize-1>memptr1+memrsize1-1) then
+  begin
+   copysize:=memptr1+memrsize1-srcptr;
+  end;
+ if(destptr+copysize-1>memptr2+memrsize2-1) then
+  begin
+   copysize:=memptr2+memrsize2-destptr;
+  end;
+ ptr1:=srcptr; ptr2:=destptr;
+ for i:=1 to copysize do (ptr2+i-1)^:=(ptr1+i-1)^;
+end;
+function heap_get_memory_size(heap:heap_record;ptr:Pointer):natuint;[public,alias:'heap_get_memory_size'];
+var memindex,mempos:natuint;
+    memsize:natuint;
+begin
+ mempos:=optimize_integer_divide((ptr-heap.content_address),heap.content_block_size)+1;
+ memindex:=(heap.segment_address+mempos-1)^; memsize:=0;
+ if(memindex=0) then exit(0);
+ while((heap.segment_address+mempos-1)^=memindex) and (mempos>1) do dec(mempos);
+ if((heap.segment_address+mempos-1)^<>memindex) then inc(mempos);
+ while((heap.segment_address+mempos-1+memsize)^=memindex) do inc(memsize);
+ heap_get_memory_size:=memsize*heap.content_block_size;
+end;
+function heap_get_memory_start(heap:heap_record;ptr:Pointer):Pointer;[public,alias:'heap_get_memory_start'];
+var memindex,mempos:natuint;
+begin
+ mempos:=optimize_integer_divide((ptr-heap.content_address),heap.content_block_size)+1;
+ memindex:=(heap.segment_address+mempos-1)^;
+ if(memindex=0) then exit(nil);
+ while((heap.segment_address+mempos-1)^=memindex) and (mempos>1) do dec(mempos);
+ if((heap.segment_address+mempos-1)^<>memindex) then inc(mempos);
+ heap_get_memory_start:=heap.content_address+(mempos-1)*heap.content_block_size;
+end; 
+procedure compheap_initialize(start,totalsize:natuint;blocksize:word);[public,alias:'compheap_initialize'];
+var segment_count:natuint;
+begin
+ segment_count:=optimize_integer_divide(totalsize,blocksize+sizeof(natuint));
+ heap_initialize(compheap,start,segment_count,blocksize);
+end;
+function fpc_getmem(size:Natuint):Pointer;compilerproc;[public,alias:'FPC_GETMEM'];
+var ptr:Pointer;
+begin
+ fpc_getmem:=heap_request_memory(compheap,size,false);
+end;
+function fpc_getmemsize(ptr:Pointer):Natuint;[public,alias:'FPC_GETMEMSIZE'];
+begin
+ fpc_getmemsize:=heap_get_memory_size(compheap,ptr); 
+end;
+function fpc_allocmem(size:Natuint):Pointer;compilerproc;[public,alias:'FPC_ALLOCMEM'];
+begin
+ fpc_allocmem:=heap_request_memory(compheap,size,true);
 end;
 procedure fpc_freemem(var ptr:Pointer);compilerproc;[public,alias:'FPC_FREEMEM'];
 begin
- if(ptr<>nil) then
-  begin
-   compheap_delete_item(ptr); ptr:=nil;
-  end;
+ heap_free_memory(compheap,ptr); 
 end;
 procedure fpc_reallocmem(var ptr:Pointer;size:natuint);compilerproc;[public,alias:'FPC_REALLOCMEM'];
-var oldptr,newptr,procptr:PByte;
-    oldsize,newsize,j,k,offset,index:natuint;
+var oldptr,newptr:Pointer;
 begin
- if(compheap.contentused+size>compheap.contentmax) then exit;
- if(compheap.segmentcount>=compheap.segmentcountmax) then exit;
- if(size=0) then
+ oldptr:=heap_get_memory_start(compheap,ptr);
+ newptr:=heap_request_memory(compheap,size,true);
+ if(newptr=nil) then
   begin
-   compheap_delete_item(ptr);
-   ptr:=nil;
-   exit;
-  end;
- inc(compheap.segmentcount,1);
- if(compheap.segmentcount=1) then
-  begin
-   (compheap.segment+compheap.segmentcount-1)^.segment_start:=Natuint(compheap.content);
-  end
- else if(compheap.segmentcount>1) then
-  begin
-   (compheap.segment+compheap.segmentcount-1)^.segment_start:=
-   (compheap.segment+compheap.segmentcount-1)^.segment_end+1;
-  end;
- (compheap.segment+compheap.segmentcount-1)^.segment_end:=
- (compheap.segment+compheap.segmentcount-1)^.segment_start+size-1;
- for j:=(compheap.segment+compheap.segmentcount-1)^.segment_start to
- (compheap.segment+compheap.segmentcount-1)^.segment_end do
-  begin
-   procptr:=Pointer(j); procptr^:=0;
-  end;
- inc(compheap.contentused,size);
- newptr:=Pointer((compheap.segment+compheap.segmentcount-1)^.segment_start);
- if(ptr=nil) then
-  begin
+   heap_free_memory(compheap,oldptr);
    ptr:=newptr; exit;
   end;
- index:=1;
- while(index<=compheap.segmentcount) do
-  begin
-   if(Natuint(ptr)>=(compheap.segment+index-1)^.segment_start) and
-   (Natuint(ptr)<=(compheap.segment+index-1)^.segment_end) then break;
-   inc(index);
-  end;
- if(index>compheap.segmentcount-1) then
-  begin
-   ptr:=newptr; exit;
-  end;
- offset:=Natuint(oldptr-(compheap.segment+index-1)^.segment_start);
- oldptr:=Pointer((compheap.segment+index-1)^.segment_start);
- newsize:=size; oldsize:=fpc_getmemsize(oldptr);
- if(newsize>oldsize) then
-  begin
-   for k:=1 to oldsize do
-    begin
-     (newptr+k-1)^:=(oldptr+k-1)^;
-    end;
-  end
- else if(newsize<=oldsize) then
-  begin
-   for k:=1 to newsize do
-    begin
-     (newptr+k-1)^:=(oldptr+k-1)^;
-    end;
-  end;
- compheap_delete_item(oldptr);
- ptr:=newptr+offset-oldsize;
+ heap_move_memory(compheap,oldptr,newptr,size);
+ heap_free_memory(compheap,oldptr);
+ ptr:=newptr;
 end;
-procedure fpc_move(const Source;var Dest;Size:natuint);[public,alias:'FPC_MOVE'];
-var ptr1,ptr2:Pbyte;
+procedure fpc_move(Const Source;Var Dest;Size:natuint);compilerproc;[public,alias:'FPC_MOVE'];
+var ptr1,ptr2:PByte;
     i:natuint;
 begin
- ptr1:=@Dest; ptr2:=@Source;
- for i:=1 to Size do (ptr1+i-1)^:=(ptr2+i-1)^;
+ ptr1:=@Source; ptr2:=@Dest;
+ for i:=1 to Size do (ptr2+i-1)^:=(ptr1+i-1)^;
 end;
-procedure sysheap_initialize(MemoryStart:Pointer;ContentSize:natuint;SegmentMaxCount:natuint);[public,alias:'sysheap_initialize'];
+procedure sysheap_initialize(start,totalsize:natuint;blocksize:word);[public,alias:'sysheap_initialize'];
+var segment_count:natuint;
 begin
- sysheap.content:=MemoryStart;
- sysheap.contentused:=0;
- sysheap.contentmax:=ContentSize;
- sysheap.segment:=MemoryStart+ContentSize;
- sysheap.segmentcount:=0;
- sysheap.segmentcountmax:=SegmentMaxCount;
-end;
-procedure sysheap_delete_item(ptr:Pointer);[public,alias:'sysheap_delete_item'];
-var index,size,i,j:natuint;
-    procptr1,procptr2:PByte;
-begin
- index:=1;
- while(index<=sysheap.segmentcount) do
-  begin
-   if(Natuint(ptr)>=(sysheap.segment+index-1)^.segment_start) and
-   (Natuint(ptr)<=(sysheap.segment+index-1)^.segment_end) then
-   break;
-   inc(index);
-  end;
- if(index>sysheap.segmentcount) then exit;
- size:=(sysheap.segment+index-1)^.segment_end-(sysheap.segment+index-1)^.segment_start+1;
- for i:=index+1 to sysheap.segmentcount do
-  begin
-   for j:=(sysheap.segment+i-1)^.segment_start to (sysheap.segment+i-1)^.segment_end do
-    begin
-     procptr1:=Pointer(j); procptr2:=Pointer(j-size);
-     procptr2^:=procptr1^; procptr1^:=0;
-    end;
-   (sysheap.segment+i-2)^.segment_start:=(sysheap.segment+i-1)^.segment_start-size;
-   (sysheap.segment+i-2)^.segment_end:=(sysheap.segment+i-1)^.segment_end-size;
-  end;
- dec(sysheap.contentused,size);
- dec(sysheap.segmentcount);
+ segment_count:=optimize_integer_divide(totalsize,blocksize+sizeof(natuint));
+ heap_initialize(sysheap,start,segment_count,blocksize);
 end;
 function getmem(size:natuint):Pointer;[public,alias:'getmem'];
-var index,i:natuint;
-    procptr:PByte;
 begin
- if(sysheap.contentused+size>sysheap.contentmax) then exit(nil);
- if(sysheap.segmentcount>=sysheap.segmentcountmax) then exit(nil);
- if(size=0) then exit(nil);
- inc(sysheap.segmentcount);
- if(sysheap.segmentcount=1) then
-  begin
-   (sysheap.segment+sysheap.segmentcount-1)^.segment_start:=Natuint(sysheap.content);
-  end
- else if(sysheap.segmentcount>1) then
-  begin
-   (sysheap.segment+sysheap.segmentcount-1)^.segment_start:=
-   (sysheap.segment+sysheap.segmentcount-2)^.segment_end+1;
-  end;
- (sysheap.segment+sysheap.segmentcount-1)^.segment_end:=
- (sysheap.segment+sysheap.segmentcount-1)^.segment_start+size-1;
- for i:=(sysheap.segment+sysheap.segmentcount-1)^.segment_start to
- (sysheap.segment+sysheap.segmentcount-1)^.segment_end do
-  begin
-   procptr:=Pointer(i); procptr^:=0;
-  end;
- inc(sysheap.contentused,size);
- getmem:=Pointer((sysheap.segment+sysheap.segmentcount-1)^.segment_start);
-end;
-function allocmem(size:natuint):Pointer;[public,alias:'allocmem'];
-var index,i:natuint;
-    procptr:PByte;
-begin
- if(sysheap.contentused+size>sysheap.contentmax) then exit(nil);
- if(sysheap.segmentcount>=sysheap.segmentcountmax) then exit(nil);
- if(size=0) then exit(nil);
- inc(sysheap.segmentcount);
- if(sysheap.segmentcount=1) then
-  begin
-   (sysheap.segment+sysheap.segmentcount-1)^.segment_start:=Natuint(sysheap.content);
-  end
- else if(sysheap.segmentcount>1) then
-  begin
-   (sysheap.segment+sysheap.segmentcount-1)^.segment_start:=
-   (sysheap.segment+sysheap.segmentcount-2)^.segment_end+1;
-  end;
- (sysheap.segment+sysheap.segmentcount-1)^.segment_end:=
- (sysheap.segment+sysheap.segmentcount-1)^.segment_start+size-1;
- for i:=(sysheap.segment+sysheap.segmentcount-1)^.segment_start to
- (sysheap.segment+sysheap.segmentcount-1)^.segment_end do
-  begin
-   procptr:=Pointer(i); procptr^:=0;
-  end;
- inc(sysheap.contentused,size);
- allocmem:=Pointer((sysheap.segment+sysheap.segmentcount-1)^.segment_start);
+ getmem:=heap_request_memory(sysheap,size,false);
 end;
 function getmemsize(ptr:Pointer):natuint;[public,alias:'getmemsize'];
-var index:natuint;
 begin
- index:=1;
- while(index<=sysheap.segmentcount) do
-  begin
-   if(Natuint(ptr)>=(sysheap.segment+index-1)^.segment_start) and
-   (Natuint(ptr)<=(sysheap.segment+index-1)^.segment_end) then break;
-   inc(index);
-  end;
- if(index>sysheap.segmentcount) then getmemsize:=0
- else getmemsize:=(sysheap.segment+index-1)^.segment_end-(sysheap.segment+index-1)^.segment_start+1;
+ getmemsize:=heap_get_memory_size(sysheap,ptr);
+end;
+function allocmem(size:natuint):Pointer;[public,alias:'allocmem'];
+begin
+ allocmem:=heap_request_memory(sysheap,size,true);
 end;
 procedure freemem(var ptr:Pointer);[public,alias:'freemem'];
 begin
- if(ptr<>nil) then
-  begin
-   sysheap_delete_item(ptr); ptr:=nil;
-  end;
+ heap_free_memory(sysheap,ptr);
 end;
-procedure move(const Source;var Dest;Size:natuint);[public,alias:'move'];
-var ptr1,ptr2:Pbyte;
-    i:natuint;
-begin
- ptr1:=@Dest; ptr2:=@Source;
- for i:=1 to Size do (ptr1+i-1)^:=(ptr2+i-1)^;
-end;
-procedure reallocmem(var ptr:Pointer;Size:natuint);[public,alias:'reallocmem'];
+procedure reallocmem(var ptr:Pointer;size:natuint);[public,alias:'reallocmem'];
 var oldptr,newptr:Pointer;
-    oldsize,newsize,index,offset:natuint;
 begin
- newptr:=allocmem(size);
+ oldptr:=heap_get_memory_start(sysheap,ptr);
+ newptr:=heap_request_memory(sysheap,size,true);
  if(newptr=nil) then
   begin
-   sysheap_delete_item(ptr); ptr:=nil; exit;
-  end;
- if(ptr=nil) then
-  begin
+   heap_free_memory(sysheap,oldptr);
    ptr:=newptr; exit;
   end;
- index:=1;
- while(index<=sysheap.segmentcount) do
+ heap_move_memory(sysheap,oldptr,newptr,size);
+ heap_free_memory(sysheap,oldptr);
+ ptr:=newptr;
+end;
+procedure move(const Source;var Dest;Size:natuint);[public,alias:'move'];
+var ptr1,ptr2:PByte;
+    i:natuint;
+begin
+ ptr1:=@Source; ptr2:=@Dest;
+ for i:=1 to size do (ptr2+i-1)^:=(ptr1+i-1)^;
+end;
+procedure exeheap_initialize(start,totalsize:natuint;blocksize:word);[public,alias:'exeheap_initialize'];
+var segment_count:natuint;
+begin
+ segment_count:=optimize_integer_divide(totalsize,blocksize+sizeof(natuint));
+ heap_initialize(exeheap,start,segment_count,blocksize);
+end;
+function exeheap_getmem(size:natuint):Pointer;[public,alias:'exeheap_getmem'];
+begin
+ exeheap_getmem:=heap_request_memory(exeheap,size,false); 
+end;
+function exeheap_getmemsize(ptr:Pointer):natuint;[public,alias:'exeheap_getmemsize'];
+begin
+ exeheap_getmemsize:=heap_get_memory_size(exeheap,ptr);
+end;
+function exeheap_allocmem(size:natuint):Pointer;[public,alias:'exeheap_allocmem'];
+begin
+ exeheap_allocmem:=heap_request_memory(exeheap,size,true); 
+end;
+procedure exeheap_freemem(var ptr:Pointer);[public,alias:'exeheap_freemem'];
+begin
+ heap_free_memory(exeheap,ptr);
+end;
+procedure exeheap_reallocmem(var ptr:Pointer;size:natuint);[public,alias:'exeheap_reallocmem'];
+var oldptr,newptr:Pointer;
+begin
+ oldptr:=heap_get_memory_start(exeheap,ptr);
+ newptr:=heap_request_memory(exeheap,size,true);
+ if(newptr=nil) then
   begin
-   if(Natuint(ptr)>=(sysheap.segment+index-1)^.segment_start) and
-   (Natuint(ptr)<=(sysheap.segment+index-1)^.segment_end) then break;
-   inc(index);
-  end;
- if(index>sysheap.segmentcount-1) then 
-  begin
+   heap_free_memory(exeheap,oldptr);
    ptr:=newptr; exit;
   end;
- oldptr:=Pointer((sysheap.segment+index-1)^.segment_start);
- offset:=Natuint(ptr-(sysheap.segment+index-1)^.segment_start);
- newsize:=size; oldsize:=getmemsize(oldptr);
- if(newsize>=oldsize) then
-  begin
-   Move(oldptr^,newptr^,oldsize);
-  end
- else if(newsize<oldsize) then
-  begin
-   Move(oldptr^,newptr^,newsize);
-  end;
- sysheap_delete_item(oldptr);
- ptr:=newptr+offset-oldsize;
+ heap_move_memory(exeheap,oldptr,newptr,size);
+ heap_free_memory(exeheap,oldptr);
+ ptr:=newptr;
+end;
+procedure exeheap_move(const Source;var Dest;Size:natuint);[public,alias:'exeheap_move'];
+var ptr1,ptr2:PByte;
+    i:natuint;
+begin
+ ptr1:=@Source; ptr2:=@Dest;
+ for i:=1 to size do (ptr2+i-1)^:=(ptr1+i-1)^;
 end;
 function abs(x:natint):natint;[public,alias:'abs_natint'];
 begin
@@ -756,7 +760,7 @@ begin
    if(procnum>1) then procnum:=procnum shr 4 else break;
   end;
  if(x<0) then res:=-res;
- if(num>0) then dec(res);
+ if(num<0) then dec(res);
  floor:=res;
 end;
 function trunc(x:extended):natint;[public,alias:'trunc'];
@@ -845,50 +849,6 @@ function sqr(x:extended):extended;[public,alias:'sqr_extended'];
 begin
  sqr:=x*x;
 end;
-function optimize_integer_divide(a,b:natuint):natuint;[public,alias:'optimize_integer_divide'];
-var procnum1,procnum2,degree,res:natuint;
-begin
- if(a=0) then exit(0);
- if(a<b) then exit(0);
- if(a=b) then exit(1);
- if(b=1) or (b=0) then exit(a);
- procnum1:=a; procnum2:=b; degree:=1; res:=0;
- while(procnum2<=procnum1 shr 1) do
-  begin
-   procnum2:=procnum2 shl 1;
-   degree:=degree shl 1;
-  end;
- while(procnum1>=b) do
-  begin
-   if(procnum1>=procnum2) then
-    begin
-     procnum1:=procnum1-procnum2;
-     res:=res+degree;
-    end;
-   degree:=degree shr 1;
-   procnum2:=procnum2 shr 1;
-  end;
- optimize_integer_divide:=res;
-end;
-function optimize_integer_modulo(a,b:natuint):natuint;[public,alias:'optimize_integer_modulo'];
-var res,procnum:natuint;
-begin
- if(a=0) then exit(0);
- if(a<b) then exit(a);
- if(a=b) then exit(0);
- if(b=1) or (b=0) then exit(0);
- res:=a; procnum:=b;
- while(procnum<=res shr 1) do
-  begin
-   procnum:=procnum shl 1;
-  end;
- while(res>=b) do
-  begin
-   if(res>=procnum) then res:=res-procnum;
-   procnum:=procnum shr 1;
-  end;
- optimize_integer_modulo:=res;
-end; 
 function strlen(str:Pchar):natuint;[public,alias:'strlen'];
 var res:natuint;
 begin

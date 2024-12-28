@@ -3,6 +3,7 @@ unit uefi;
 {$MODE FPC}
 
 interface
+
 const efi_usb_max_bulk_buffer_num=10;
       efi_usb_max_iso_buffer_num=7;
       efi_usb_max_iso_buffer_num1=2;
@@ -32,48 +33,12 @@ const efi_usb_max_bulk_buffer_num=10;
  {$PACKRECORDS 4}
 {$endif cpui386}
 type efi_lba=qword;
-     fat32_header=packed record
-                  JumpOrder:array[1..3] of byte;
-                  OemCode:array[1..8] of char;
-                  BytesPerSector:word;
-                  SectorPerCluster:byte;
-                  ReservedSectorCount:word;
-                  NumFATs:byte;
-                  RootEntryCount:word;
-                  TotalSector16:word;
-                  Media:byte;
-                  FATSectors16:word;
-                  SectorPerTrack:word;
-                  NumHeads:word;
-                  HiddenSectors:dword;
-                  TotalSectors32:dword;
-                  FATSector32:dword;
-                  ExtendedFlags:word;
-                  FileSystemVersion:word;
-                  RootCluster:dword;
-                  FileSystemInfo:word;
-                  BootSector:word;
-                  Reserved:array[1..12] of byte;
-                  DriverNumber:byte;
-                  Reserved1:byte;
-                  BootSignature:byte;
-                  VolumeID:dword;
-                  VolumeLabel:array[1..11] of char;
-                  FileSystemType:array[1..8] of char;
-                  Reserved2:array[1..420] of byte;
-                  SignatureWord:word;
-                  Reserved3:array[1..65023] of byte;
-                  end;
-     fat32_file_system_info=packed record
-                            FSI_leadSig:dword;
-                            FSI_Reserved1:array[1..480] of byte;
-                            FSI_StrucSig:dword;
-                            FSI_FreeCount:dword;
-                            FSI_NextFree:dword;
-                            FSI_Reserved2:array[1..12] of byte;
-                            FSI_TrailSig:dword;
-                            FSI_Reserved3:array[1..65023] of byte;
-                            end;
+     efi_guid=packed record
+              data1:dword;
+              data2:word;
+              data3:word;
+              data4:array[1..8] of byte;
+              end; 
      mbr_partition_record=packed record
                           BootIndicator:byte;
                           StartingCHS:array[1..3] of byte;
@@ -89,12 +54,6 @@ type efi_lba=qword;
                         Partition:array[1..4] of mbr_partition_record;
                         Signature:word;
                         end;
-     efi_guid=packed record
-              data1:dword;
-              data2:word;
-              data3:word;
-              data4:array[1..8] of byte;
-              end; 
      efi_gpt_header=packed record
                     signature:qword;
                     Revision:dword;
@@ -110,7 +69,7 @@ type efi_lba=qword;
                     NumberOfPartitionEntries:dword;
                     SizeOfPartitionEntry:dword;
                     PartitionEntryArrayCRC32:dword;
-                    Reserved2:array[1..65444] of byte;
+                    Reserved2:array[1..420] of byte;
                     end;
      efi_partition_entry=packed record
                          PartitionTypeGUID:efi_guid;
@@ -444,7 +403,7 @@ type efi_lba=qword;
                       RuntimeServices:^efi_runtime_services;
                       bootservices:^efi_boot_services;
                       numberofTableEntries:NatUint;
-                      configuration_table:^efi_configuration_table;
+                      ConfigurationTable:^efi_configuration_table;
                       end;
      Pefi_system_table=^efi_system_table;
      Pefi_loaded_image_protocol=^efi_loaded_image_protocol;    
@@ -796,7 +755,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                    LastAccessTime:efi_time;
                    ModificationTime:efi_time;
                    Attributes:qword;
-                   FileName:array[1..261] of WideChar;
+                   FileName:array[1..1] of WideChar;
                    end;
      Pefi_file_info=^efi_file_info;
      efi_file_system_info=record
@@ -805,11 +764,11 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                           VolumeSize:qword;
                           FreeSpace:qword;
                           BlockSize:dword;
-                          VolumeLabel:array[1..261] of WideChar;
+                          VolumeLabel:array[1..1] of WideChar;
                           end;
      Pefi_file_system_info=^efi_file_system_info;
      efi_file_system_volume_label=record
-                                  VolumeLabel:array[1..261] of WideChar;
+                                  VolumeLabel:array[1..1] of WideChar;
                                   end;
      Pefi_tape_io_protocol=^efi_tape_io_protocol;
      efi_tape_read=function (This:Pefi_tape_io_protocol;var BufferSize:natuint;var Buffer):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif}
@@ -1900,7 +1859,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                                     UseMCast,UseBCast,UseUList,Mustuselist:boolean;
                                     ServerMCastIp:efi_ip_address;
                                     IpCnt:word;
-                                    SrvList:array[1..65535] of efi_pxe_base_code_srvlist;
+                                    SrvList:array[1..1] of efi_pxe_base_code_srvlist; 
                                     end;
     Pefi_pxe_base_code_discover_info=^efi_pxe_base_code_discover_info;
     efi_pxe_base_code_discover=function (This:Pefi_pxe_base_code_protocol;ftype:word;Layer:Pword;UseBis:boolean;Info:Pefi_pxe_base_code_discover_info):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif} efi_pxe_base_code_tftp_opcode=(efi_pxe_base_code_tftp_first,efi_pxe_base_code_tftp_get_file_size,efi_pxe_base_code_tftp_read_file,efi_pxe_base_code_tftp_write_file,efi_pxe_base_code_tftp_read_directory,efi_pxe_base_code_mtftp_get_file_size,efi_pxe_base_code_mtftp_read_file,efi_pxe_base_codemtftp_read_directory,efi_pxe_base_code_mtftp_last);
@@ -2217,18 +2176,33 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                    memory_key:natuint;
                    memory_descriptor_count:natuint;
                    end;    
-    efi_memory_result=record
-                      memory_address:natuint;
-                      memory_size:natuint;
-                      end;
+    efi_memory_map_simple=record
+                          memory_start:^natuint;
+                          memory_size:^natuint;
+                          memory_total_size:natuint;
+                          memory_count:natuint;
+                          end;
+    efi_memory_map_result=record
+                          memory_start:Pointer;
+                          memory_size:natuint;
+                          end;
+    efi_acpi_table_list=record
+                        version:^boolean;
+                        content:^Pointer;
+                        count:natuint;
+                        end;
 {User Defined End}
 const efi_system_table_signature:qword=$5453595320494249;
       efi_system_table_revision:array[1..14] of dword=((2 shl 16) or 100,(2 shl 16) or 90,(2 shl 16) or 80,(2 shl 16) or 70,(2 shl 16) or 60,(2 shl 16) or 50,(2 shl 16) or 40,(2 shl 16) or 31,(2 shl 16) or 30,(2 shl 16) or 20,(2 shl 16) or 10,(2 shl 16) or 0,(1 shl 16) or 10,(1 shl 16) or 2);
       unused_entry_guid:efi_guid=(data1:$00000000;data2:$0000;data3:$0000;data4:($00,$00,$00,$00,$00,$00,$00,$00));
       efi_system_partition_guid:efi_guid=(data1:$C12A7328;data2:$F81F;data3:$11D2;data4:($BA,$4B,$00,$A0,$C9,$3E,$C9,$3B));
       partition_containing_a_legacy_mbr_guid:efi_guid=(data1:$024DEE41;data2:$33E7;data3:$11D3;data4:($9D,$69,$00,$08,$C7,$81,$F3,$9F));
-      system_console_restart_guid:efi_guid=(data1:$C14A7398;data2:$2819;data3:$4DF2;data4:($BA,$4F,$00,$A0,$C4,$3F,$C9,$4A));
-      system_graphics_restart_guid:efi_guid=(data1:$C34F9328;data2:$2EE9;data3:$41F2;data4:($AE,$4F,$00,$A0,$C5,$3F,$C9,$4A));
+      efi_acpi_20_table_guid:efi_guid=(data1:$8868E871;data2:$E4F1;data3:$11D3;data4:($BC,$22,$00,$80,$C7,$3C,$88,$81));
+      acpi_table_guid:efi_guid=(data1:$EB9D2D30;data2:$2D88;data3:$11D3;data4:($9A,$16,$00,$90,$27,$3F,$C1,$D4));
+      sal_system_table_guid:efi_guid=(data1:$EB9D2D32;data2:$2D88;data3:$11D3;data4:($9A,$16,$00,$90,$27,$3F,$C1,$4D));
+      smbios_table_guid:efi_guid=(data1:$EB9D2D31;data2:$2D88;data3:$11D3;data4:($9A,$16,$00,$90,$27,$3F,$C1,$4D));
+      smbios3_table_guid:efi_guid=(data1:$F2FD1544;data2:$9794;data3:$4A2C;data4:($99,$2E,$E5,$BB,$CF,$20,$E3,$94));
+      mps_table_guid:efi_guid=(data1:$EB9D2D2F;data2:$2D88;data3:$11D3;data4:($9A,$16,$00,$90,$27,$3F,$C1,$4D));
       evt_timer:dword=$80000000;
       evt_runtime:dword=$40000000;
       evt_notify_wait:dword=$00000100;
@@ -2844,9 +2818,13 @@ function efi_list_all_file_system_ext:efi_file_system_list_ext;
 procedure efi_console_initialize(bck_colour,text_colour:byte;blinkmiliseconds:qword);
 function efi_graphics_initialize:efi_graphics_list;
 procedure efi_graphics_get_maxwidth_maxheight_and_maxdepth(egl:efi_graphics_list;eglindex:natuint);
+procedure efi_graphics_free(var egl:efi_graphics_list);
 function efi_loader_get_memory_map:efi_memory_map;
-function efi_loader_get_memory_available(memorymap:efi_memory_map):efi_memory_result;
+function efi_loader_handle_memory_map(memorymap:efi_memory_map):efi_memory_map_simple;
+function efi_loader_find_suitable_memory_map(var smm:efi_memory_map_simple;size:natuint):efi_memory_map_result;
 procedure efi_loader_exit_boot_services(memorymap:efi_memory_map);
+function efi_get_acpi_table_list:efi_acpi_table_list;
+procedure efi_free_acpi_table_list(var tablelist:efi_acpi_table_list);
 
 var maxcolumn:Natuint=80;
     maxrow:Natuint=25;
@@ -2869,6 +2847,20 @@ end;
 function bis_get_siginfo_array(bisdataPtr:Pefi_bis_data):Pefi_bis_signature_info;[public,alias:'BIS_GET_SIGINFO_ARRAY'];
 begin
  bis_get_siginfo_array:=Pefi_bis_signature_info(bisdataPtr^.Data);
+end;
+function efi_guid_compare(guid1,guid2:efi_guid):boolean;[public,alias:'EFI_GUID_COMPARE'];
+var res:boolean;
+    i:byte;
+begin
+ res:=true;
+ if(guid1.data1<>guid2.data1) then exit(false);
+ if(guid1.data2<>guid2.data2) then exit(false);
+ if(guid1.data3<>guid2.data3) then exit(false);
+ for i:=1 to 8 do
+  begin
+   if(guid1.data4[i]<>guid2.data4[i]) then exit(false);
+  end;
+ efi_guid_compare:=res;
 end;
 procedure efi_initialize(InputImageHandle:efi_handle;InputSystemTable:Pefi_system_table);[public,alias:'EFI_INITIALIZE'];
 begin
@@ -3277,6 +3269,7 @@ begin
  (numstr+index2-1)^:=#0;
  if(negative) then efi_console_output_string('-');
  efi_console_output_string(numstr);
+ efi_freemem(numstr);
 end;
 procedure efi_console_output_hex(hex:natuint);[public,alias:'EFI_CONSOLE_OUTPUT_HEX'];
 const numchar:PWideChar='0123456789ABCDEF';
@@ -3300,6 +3293,7 @@ begin
   end;
  (numstr+index2-1)^:=#0;
  efi_console_output_string(numstr);
+ efi_freemem(numstr);
 end;
 procedure efi_console_enable_mouse;[public,alias:'EFI_CONSOLE_ENABLE_MOUSE'];
 begin
@@ -3488,14 +3482,16 @@ begin
   begin
    status:=ptr^.SetMode(ptr,i);
    if((ptr^.Mode^.Info^.PixelFormat=PixelBlueGreenRedReserved8BitPerColor) or 
-   (ptr^.Mode^.Info^.PixelFormat=PixelRedGreenBlueReserved8BitPerColor)) and (ptr^.Mode^.FrameBufferSize>screensize) and (status=efi_success) then 
+   (ptr^.Mode^.Info^.PixelFormat=PixelRedGreenBlueReserved8BitPerColor)) and 
+   (ptr^.Mode^.Info^.HorizontalResolution*ptr^.Mode^.Info^.VerticalResolution*4>screensize) 
+   and (status=efi_success) then 
     begin
-     graphicsindex:=i; screensize:=ptr^.Mode^.FrameBufferSize;
+     graphicsindex:=i; screensize:=ptr^.Mode^.Info^.HorizontalResolution*ptr^.Mode^.Info^.VerticalResolution*4;
     end;
   end;
  ptr^.SetMode(ptr,graphicsindex);
 end;
-procedure efi_graphics_free(var egl:efi_graphics_list);[public,alias:'EFI_GRAPICS_FREE'];
+procedure efi_graphics_free(var egl:efi_graphics_list);[public,alias:'EFI_GRAPHICS_FREE'];
 begin
  efi_freemem(egl.graphics_item); egl.graphics_count:=0;
 end;
@@ -3526,27 +3522,89 @@ begin
  efi_freemem(ptr);
  efi_loader_get_memory_map:=res;
 end;
-function efi_loader_get_memory_available(memorymap:efi_memory_map):efi_memory_result;[public,alias:'EFI_LOADER_GET_MEMORY_AVAILABLE'];
-var memoryaddress,index,maxsize:natuint;
-    res:efi_memory_result;
+function efi_loader_handle_memory_map(memorymap:efi_memory_map):efi_memory_map_simple;[public,alias:'EFI_LOADER_HANDLE_MEMORY_MAP'];
+var res:efi_memory_map_simple;
+    i:natuint;
+    position,partsize:natuint;
+    bool:boolean;
 begin
- index:=1; maxsize:=0; memoryaddress:=0;
- while(index<=memorymap.memory_descriptor_count) do
+ res.memory_count:=0; i:=0; position:=1; partsize:=0; bool:=false;
+ res.memory_start:=efi_allocmem(sizeof(natuint)*memorymap.memory_descriptor_count);
+ res.memory_size:=efi_allocmem(sizeof(natuint)*memorymap.memory_descriptor_count);
+ res.memory_total_size:=0;
+ while(i<memorymap.memory_descriptor_count) do
   begin
-   if((memorymap.memory_descriptor+index-1)^.NumberOfPages shl 12>maxsize) and ((memorymap.memory_descriptor+index-1)^.efitype=7) then
+   inc(i);
+   if((memorymap.memory_descriptor+i-1)^.efiType=3) or ((memorymap.memory_descriptor+i-1)^.efitype=4) or
+   ((memorymap.memory_descriptor+i-1)^.efiType=7) then
     begin
-     maxsize:=(memorymap.memory_descriptor+index-1)^.NumberOfPages shl 12;
-     memoryaddress:=(memorymap.memory_descriptor+index-1)^.PhysicalStart;
+     if(bool=false) then 
+      begin
+       (res.memory_start+position-1)^:=(memorymap.memory_descriptor+i-1)^.PhysicalStart;
+       partsize:=(memorymap.memory_descriptor+i-1)^.NumberOfPages shl 12;
+      end
+     else partsize:=partsize+(memorymap.memory_descriptor+i-1)^.NumberOfPages shl 12;
+     res.memory_total_size:=res.memory_total_size+(memorymap.memory_descriptor+i-1)^.NumberOfPages shl 12;
+     (res.memory_size+position-1)^:=partsize;
+     bool:=true;
+    end
+   else
+    begin
+     if(bool) then
+      begin
+       inc(position); bool:=false;
+      end;
     end;
-   inc(index);
   end;
- res.memory_address:=memoryaddress;
- res.memory_size:=maxsize;
- efi_loader_get_memory_available:=res;
+ res.memory_count:=position;
+ efi_loader_handle_memory_map:=res;
+end;
+function efi_loader_find_suitable_memory_map(var smm:efi_memory_map_simple;size:natuint):efi_memory_map_result;[public,alias:'EFI_LOADER_FIND_SUITABLE_MEMORY_MAP'];
+var i:natuint;
+    res:efi_memory_map_result;
+begin
+ i:=0; res.memory_start:=nil; res.memory_size:=0;
+ while(i<smm.memory_count) do
+  begin
+   inc(i);
+   if(size<=(smm.memory_size+i-1)^) then
+    begin
+     res.memory_start:=Pointer((smm.memory_start+i-1)^);
+     res.memory_size:=size;
+     (smm.memory_start+i-1)^:=(smm.memory_start+i-1)^+size;
+     (smm.memory_size+i-1)^:=(smm.memory_size+i-1)^-size;
+     break;
+    end;
+  end;
+ efi_loader_find_suitable_memory_map:=res;
 end;
 procedure efi_loader_exit_boot_services(memorymap:efi_memory_map);[public,alias:'EFI_LOADER_EXIT_BOOT_SERVICES'];
 begin
  GlobalSystemTable^.BootServices^.ExitBootServices(ParentImageHandle,memorymap.memory_key);
+end;
+function efi_get_acpi_table_list:efi_acpi_table_list;[public,alias:'EFI_GET_ACPI_TABLE_LIST'];
+var res:efi_acpi_table_list;
+    i:natuint;
+    ctable:efi_configuration_table;
+begin
+ res.version:=efi_allocmem(GlobalSystemTable^.NumberOfTableEntries);
+ res.content:=efi_allocmem(GlobalSystemTable^.NumberOfTableEntries*sizeof(Pointer));
+ res.count:=0;
+ for i:=1 to GlobalSystemTable^.NumberOfTableEntries do
+  begin
+   ctable:=(GlobalSystemTable^.ConfigurationTable+i-1)^;
+   if(efi_guid_compare(ctable.VendorGuid,efi_acpi_20_table_guid)) or (efi_guid_compare(ctable.VendorGuid,acpi_table_guid)) then
+    begin
+     inc(res.count); 
+     (res.version+res.count-1)^:=efi_guid_compare(ctable.VendorGuid,efi_acpi_20_table_guid);
+     (res.content+res.count-1)^:=ctable.VendorTable; 
+    end;
+  end;
+ efi_get_acpi_table_list:=res;
+end;
+procedure efi_free_acpi_table_list(var tablelist:efi_acpi_table_list);[public,alias:'EFI_FREE_ACPI_TABLE_LIST'];
+begin
+ efi_freemem(tablelist.content); efi_freemem(tablelist.version); tablelist.count:=0;
 end;
 
 end.
