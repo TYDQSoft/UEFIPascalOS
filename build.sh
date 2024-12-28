@@ -1,7 +1,7 @@
 	# ARCH is architecture,CROSSARCH(optional) is cross-compile architecture,CUSTOMBIN(optional) is your custom binutils path.
 	ARCH=$(uname -m)
 	CROSSARCH=$1
-	CROSSBIN=$2
+	CUSTOMBIN=$2
 	if [ "$ARCH" = "x86_64" ]; then
 	 CARCH="x64"
 	 CARCHNAME="x86_64"
@@ -102,37 +102,25 @@
 	 BUNAME="-XP"$CUSTOMBIN
 	fi
  	mkdir Binaries
-	mkdir Binaries/BootLoader
-	mkdir Binaries/System
+	mkdir Binaries/Kernel
 	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -Us -CX -XXs -Cg BaseUnits/system.pas
 	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -CX -XXs -Cg BaseUnits/fpintres.pas
 	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -CX -XXs -Cg BaseUnits/sysinit.pas
 	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -CX -XXs -Cg BaseUnits/si_prc.pas
 	if [ "$CCARCHNAME" = "arm" ]||[ "$CCARCHNAME" = "aarch64" ]; then
-	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -CX -XXs -Cg -FUBinaries/BootLoader BaseUnits/prt0.pas
+	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -CX -XXs -Cg -FUBinaries/Kernel BaseUnits/prt0.pas
 	fi
-	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -al -Sg -Xd -Ur -CX -XX -Xi -Cg -k-nostdlib -k-znoexecstack -k-znodefaultlib -k-pie -k--no-dynamic-linker -k-znow -dCPU$CCARCHNAMEL -dcpu$CCARCHNAME -dCPU$BITS -FuBaseUnits -FEBinaries/BootLoader BootLoader/uefiloader.pas -oBinaries/BootLoader/uefiloader.elf
+	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -al -Sg -Xd -Ur -CX -XX -Xi -Cg -k-nostdlib -k-znoexecstack -k-znodefaultlib -k-pie -k--no-dynamic-linker -k-znow -dCPU$CCARCHNAMEL -dcpu$CCARCHNAME -dCPU$BITS -FuBaseUnits -FEBinaries/Kernel Kernel/kernel.pas -oBinaries/Kernel/kernel.elf
 	rm -rf Utility/elf2efi
 	/home/tydq/source/compiler/ppc$CARCH -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Fu/home/tydq/source/compiler/x86_64/units/$CARCHNAME-linux -Fu/home/tydq/source/rtl/units/$CARCHNAME-linux -dcpu$BITS -Cg Utility/elf2efi.pas
 	rm -rf Utility/*.o Utility/*.ppu
-	Utility/elf2efi "Binaries/BootLoader/uefiloader.elf" Custom "Binaries/BootLoader/boot"$CCISONAME".efi"
+	Utility/elf2efi "Binaries/Kernel/kernel.elf" "Binaries/Kernel/boot"$CCISONAME".efi"
 	rm -rf BaseUnits/*.ppu BaseUnits/*.o BaseUnits/*.res BaseUnits/*.sh BootLoader/*.ppu BootLoader/*.o BootLoader/*.res BootLoader/*.sh
-	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -Us -CX -XXs -Cg BaseUnits/system.pas
-	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -CX -XXs -Cg BaseUnits/fpintres.pas
-	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -CX -XXs -Cg BaseUnits/sysinit.pas
-	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -CX -XXs -Cg BaseUnits/si_prc.pas
-	if [ "$CCARCHNAME" = "arm" ]||[ "$CCARCHNAME" = "aarch64" ]; then
-	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -CX -XXs -Cg -FUBinaries/System BaseUnits/prt0.pas
-	fi
-	/home/tydq/source/compiler/ppc$CCARCH -n -O4 -Si $BUNAME -Sc -Sg -Xd -Ur -CX -XXs -Xi -Cg -k-nostdlib -k-znoexecstack -k-znodefaultlib -k-pie -k--no-dynamic-linker -k-znow -dCPU$CCARCHNAMEL -dcpu$CCARCHNAME -dCPU$BITS -FuBaseUnits -FEBinaries/System System/kernelmain.pas -oBinaries/System/kernelmain.elf
-	rm -rf BaseUnits/*.ppu BaseUnits/*.o BaseUnits/*.res BaseUnits/*.sh System/*.ppu System/*.o System/*.res System/*.sh 
 	dd if=/dev/zero of=Binaries/fat.img bs=512 count=131072
 	/usr/sbin/mkfs.vfat -F 32 Binaries/fat.img
 	mmd -i Binaries/fat.img ::/EFI
 	mmd -i Binaries/fat.img ::/EFI/BOOT
-	mmd -i Binaries/fat.img ::/EFI/SYSTEM
-	mcopy -i Binaries/fat.img Binaries/BootLoader/*.efi ::/EFI/BOOT/
-	mcopy -i Binaries/fat.img Binaries/System/*.elf ::/EFI/SYSTEM/
+	mcopy -i Binaries/fat.img Binaries/Kernel/*.efi ::/EFI/BOOT/
 	mkdir Binaries/iso
 	cp Binaries/fat.img Binaries/iso
 	xorriso -as mkisofs -R -f -e fat.img -no-emul-boot -o Binaries/cdimage$CCISONAME.iso Binaries/iso
