@@ -2,7 +2,7 @@ program elf2efi;
 uses binarybase,sysutils,classes;
 type natuint=qword;
      natint=int64;
-     relocarray=array[1..256] of pe_image_type_offset;
+     relocarray=array[1..65535] of pe_image_type_offset;
      Pelf32_rela=^elf32_rela;
      Pelf64_rela=^elf64_rela;
 const pecoff_max_alignment=$10000;
@@ -63,13 +63,11 @@ begin
 end;
 var i,j:qword;
     ptr:PByte;
-    namecustom:boolean=false;
-    namestr:string;
     merge:boolean=false;
     mergeindex:byte=0;
     {For elf files input}
     inputfile:TFileStream;
-    inputfilepath:string;
+    infilename,outfilename,prostr1,prostr2:string;
     is64bit:boolean;
     elfmachine:word;
     myplatform:byte=0;
@@ -120,95 +118,77 @@ var i,j:qword;
     FileBufferSize:SizeUint;
 label label1,label2,label3,label4;
 begin
- merge:=false; mergeindex:=0;
- writeln('Usage:elf2efi <inputfile> <outputpath>');
- {Pass the parameter}
- if(ParamCount<=0) then
+ if(ParamCount<>2) then
   begin
+   writeln('ERROR:Program run when only two parameters provided.');
    goto label1;
-  end
- else if(ParamCount<=1) then
-  begin
-   inputfilepath:=ParamStr(1); outputpath:='';
-   if(inputfilepath[1]='"') or (inputfilepath[1]=#39) then
-    begin
-     inputfilepath:=copy(inputfilepath,2,length(inputfilepath)-2);
-    end;
-   goto label2;
-  end
- else if(ParamCount<=2) then
-  begin
-   inputfilepath:=ParamStr(1); outputpath:=ParamStr(2);
-   if(inputfilepath[1]='"') or (inputfilepath[1]=#39) then
-    begin
-     inputfilepath:=copy(inputfilepath,2,length(inputfilepath)-2);
-    end;
-   if(outputpath[1]='"') or (outputpath[1]=#39) then
-    begin
-     outputpath:=copy(outputpath,2,length(outputpath)-2);
-    end;
-   goto label3;
-  end
- else if(ParamCount<=3) then
-  begin
-   inputfilepath:=ParamStr(1); outputpath:=ParamStr(3);
-   if(inputfilepath[1]='"') or (inputfilepath[1]=#39) then
-    begin
-     inputfilepath:=copy(inputfilepath,2,length(inputfilepath)-2);
-    end;
-   if(outputpath[1]='"') or (outputpath[1]=#39) then
-    begin
-     outputpath:=copy(outputpath,2,length(outputpath)-2);
-    end;
-   if(ParamStr(2)='Custom') or (ParamStr(2)='-Custom') or (ParamStr(2)='custom') or (ParamStr(2)='-custom') then namecustom:=true else namecustom:=false;
-   goto label3;
-  end
- else if(ParamCount>3) then
-  begin
-   writeln('Too many parameter passed to program!');
-   goto label1;
-  end;
- {Read elf file}
- label1:
- writeln('Input the file path you want to convert:');
- readln(inputfilepath);
- if(inputfilepath[1]='"') or (inputfilepath[1]=#39) then
-  begin
-   inputfilepath:=copy(inputfilepath,2,length(inputfilepath)-2);
-  end;
- if(not FileExists(inputfilepath)) then
-  begin
-   writeln('Error:File does not exist.');
-   goto label1;
-  end;
- label4:
- writeln('Do you want to input your custom file name:');
- readln(namestr);
- if(namestr='T') or (namestr='True') or (namestr='true') or (namestr='Y') or (namestr='Yes')
- or(namestr='yes') then
-  begin
-   namecustom:=true;
-  end
- else if(namestr='F') or (namestr='False') or (namestr='false') or (namestr='N') or (namestr='No')
- or(namestr='no') then
-  begin
-   namecustom:=false;
   end
  else
   begin
-   writeln('Error:Invaild input.');
+   infilename:=ParamStr(1);
+   if(infilename[1]='"') or (infilename[1]=#39) then
+    begin
+     infilename:=copy(infilename,2,length(infilename)-2);
+    end;
+   if(not FileExists(infilename)) then
+    begin
+     writeln('ERROR:File does not exist.');
+     goto label1;
+    end;
+   outfilename:=ParamStr(2);
+   if(outfilename[1]='"') or (outfilename[1]=#39) then
+    begin
+     outfilename:=copy(outfilename,2,length(outfilename)-2);
+    end;
+   prostr1:=ExtractFilePath(outfilename);
+   prostr2:=copy(prostr1,1,length(prostr1)-1);
+   if(not DirectoryExists(prostr2)) then
+    begin
+     writeln('ERROR:File Path does not exist.');
+     goto label1;
+    end;
+   if(ExtractFileName(outfilename)='.efi') or (ExtractFileName(outfilename)='.EFI') then
+    begin
+     writeln('ERROR:File Extended name does not to be UEFI file.');
+     goto label1;
+    end;
+   goto label2;
+  end;
+ label1:
+ label3:
+ writeln('Input your input file name to convert:');
+ readln(infilename);
+ if(infilename[1]='"') or (infilename[1]=#39) then
+  begin
+   infilename:=copy(infilename,2,length(infilename)-2);
+  end;
+ if(not FileExists(infilename)) then
+  begin
+   writeln('ERROR:File does not exist.');
+   goto label3;
+  end;
+ label4:
+ writeln('Input your output file name converted:');
+ readln(outfilename);
+ if(outfilename[1]='"') or (outfilename[1]=#39) then
+  begin
+   outfilename:=copy(outfilename,2,length(outfilename)-2);
+  end;
+ prostr1:=ExtractFilePath(outfilename);
+ prostr2:=copy(prostr1,1,length(prostr1)-1);
+ if(not DirectoryExists(prostr2)) then
+  begin
+   writeln('ERROR:File Path does not exist.');
+   goto label4;
+  end;
+ if(ExtractFileName(outfilename)='.efi') or (ExtractFileName(outfilename)='.EFI') then
+  begin
+   writeln('ERROR:File Extended name does not to be UEFI file.');
    goto label4;
   end;
  label2:
- writeln('Input the output path you want to place the converted file:');
- readln(outputpath);
- if(outputpath[1]='"') or (outputpath[1]=#39) then
-  begin
-   outputpath:=copy(outputpath,2,length(outputpath)-2);
-  end;
- label3:
- is64bit:=false;
- inputfile:=TFileStream.Create(inputfilepath,fmOpenRead);
+ merge:=false; mergeindex:=0; is64bit:=false;
+ inputfile:=TFileStream.Create(infilename,fmOpenRead);
  inputfile.Read(elfheader32,sizeof(elfheader32));
  if(elfheader32.elf32_identify[elf_class_pos]=2) then
   begin
@@ -617,37 +597,7 @@ begin
  if(pelowaddress>-1) then relocationheader.VirtualAddress:=PeBaseAddr+pelowaddress
  else relocationheader.VirtualAddress:=PeTextOffset;
  {Write pe file}
- if(namecustom) then
-  begin
-   outputfile:=TFileStream.Create(outputpath,fmCreate);
-  end
- else
-   case myplatform of
-   0:
-    begin
-     outputfile:=TFileStream.Create(outputpath+'bootia32.efi',fmCreate);
-    end;
-   1:
-    begin
-     outputfile:=TFileStream.Create(outputpath+'bootx64.efi',fmCreate);
-    end;
-   2:
-    begin
-     outputfile:=TFileStream.Create(outputpath+'bootarm.efi',fmCreate);
-    end;
-   3:
-    begin
-     outputfile:=TFileStream.Create(outputpath+'bootaa64.efi',fmCreate);
-    end;
-   4:
-    begin
-     outputfile:=TFileStream.Create(outputpath+'bootloongarch64.efi',fmCreate);
-    end;
-   5:
-    begin
-     outputfile:=TFileStream.Create(outputpath+'bootriscv64.efi',fmCreate);
-    end;
-  end;
+ outputfile:=TFileStream.Create(outfilename,fmCreate);
  writeln('Writing PE file......');
  outputfile.Seek(0,0);
  for i:=1 to optimize_integer_divide(PeRelocationOffset+12+relocationitemcount*2+elfmaxalign-1,elfmaxalign) do
