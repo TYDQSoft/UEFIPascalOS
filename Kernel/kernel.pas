@@ -2,7 +2,7 @@ program kernel;
 
 {$MODE FPC}
 
-uses uefi,binarybase,bootconfig,graphics,acpi;
+uses uefi,binarybase,graphics;
     
 procedure kernel_main;[public,alias:'kernel_main'];
 var ptr:Pgraph_item;
@@ -20,8 +20,6 @@ var memmap:efi_memory_map;
     graphaddress:natuint=0;
     graphwidth,graphheight:dword;
     graphcolortype:byte;
-    acpilist:efi_acpi_table_list;
-    acpitree:Pacpi_hardware_tree;
     i:qword;
 begin  
  {Initialize uefi environment}
@@ -36,14 +34,12 @@ begin
  graphwidth:=(graphlist.graphics_item^)^.Mode^.Info^.HorizontalResolution;
  graphheight:=(graphlist.graphics_item^)^.Mode^.Info^.VerticalResolution;
  if((graphlist.graphics_item^)^.Mode^.Info^.PixelFormat=PixelRedGreenBlueReserved8BitPerColor) then graphcolortype:=1 else graphcolortype:=0;
+ efi_console_output_hex(graphaddress,true);
  if(graphaddress=0) or (graphwidth=0) or (graphheight=0) then 
   begin
    efi_console_output_string('Graphics initialization failed.'#10);
    while True do;
   end;
- {Obtain the ACPI Table}
- efi_console_output_string('ACPI initializing......'#10);
- acpilist:=efi_get_acpi_table_list;
  {Initialize the memory map of UEFI}
  efi_console_output_string('Memory initializing......'#10);
  memmap:=efi_loader_get_memory_map;
@@ -60,14 +56,10 @@ begin
  {Set the graphics heap}
  memres:=efi_loader_find_suitable_memory_map(smemmap,smemmap.memory_total_size shr 2); 
  graph_heap_initialize(Natuint(memres.memory_start),memres.memory_size,4096,graphwidth,graphheight,graphaddress,graphcolortype);
- {Set the ACPI hardware}
- efi_console_output_string('Preparing the ACPI hardware......'#10);
- for i:=1 to acpilist.count do acpitree:=acpi_start_analyze_hardware((acpilist.content+i-1)^);
  {Clear the list of memory map}
  efi_freemem(memmap.memory_descriptor);
  efi_freemem(smemmap.memory_start);
  efi_freemem(smemmap.memory_size);
- efi_free_acpi_table_list(acpilist);
  efi_graphics_free(graphlist);
  {Exit boot services}
  efi_console_output_string('Exit the Boot Services......'#10);
