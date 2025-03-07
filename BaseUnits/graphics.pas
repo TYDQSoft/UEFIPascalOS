@@ -48,6 +48,10 @@ const graph_zero:graph_item=(Red:$00;Green:$00;Blue:$00;Alpha:$00);
       graph_black:graph_item=(Red:$00;Green:$00;Blue:$00;Alpha:$FF);
 
 procedure graph_heap_initialize(startaddress:natuint;totalsize:natuint;blocksize:word;width,height:dword;outputaddress:natuint;colortype:byte);
+function graph_convert_dword_to_color(data:dword):graph_item;
+function graph_convert_dword_to_colour(data:dword):graph_item;
+function graph_convert_color_to_dword(color:graph_item):dword;
+function graph_convert_colour_to_dword(color:graph_item):dword;
 function graph_heap_getmem(x,y,width,height:dword;visible:boolean):Pgraph_item;
 function graph_heap_getmemsize(ptr:Pgraph_item):natuint;
 function graph_heap_allocmem(x,y,width,height:dword;visible:boolean):Pgraph_item;
@@ -66,13 +70,31 @@ var graph_heap:graph_heap_record;
 
 implementation
 
-function dword_to_graph_color(colornum:dword):graph_item;[public,alias:'dword_to_graph_color'];
+function graph_convert_dword_to_color(data:dword):graph_item;[public,alias:'graph_convert_dword_to_color'];
 var res:graph_item;
 begin
- res.Red:=colornum shr 24;
- res.Green:=colornum shl 8 shr 24;
- res.Blue:=colornum shl 16 shr 24;
- res.Alpha:=colornum shl 24 shr 24;
+ res.Red:=data shr 24;
+ res.Green:=data shl 8 shr 24;
+ res.Blue:=data shl 16 shr 24;
+ res.Alpha:=data shl 24 shr 24;
+ graph_convert_dword_to_color:=res;
+end;
+function graph_convert_dword_to_colour(data:dword):graph_item;[public,alias:'graph_convert_dword_to_colour'];
+var res:graph_item;
+begin
+ res.Red:=data shr 24;
+ res.Green:=data shl 8 shr 24;
+ res.Blue:=data shl 16 shr 24;
+ res.Alpha:=data shl 24 shr 24;
+ graph_convert_dword_to_colour:=res;
+end;
+function graph_convert_color_to_dword(color:graph_item):dword;[public,alias:'graph_convert_color_to_dword'];
+begin
+ graph_convert_color_to_dword:=color.red shl 24+color.green shl 16+color.blue shl 8+color.alpha;
+end;
+function graph_convert_colour_to_dword(color:graph_item):dword;[public,alias:'graph_convert_colour_to_dword'];
+begin
+ graph_convert_colour_to_dword:=color.red shl 24+color.green shl 16+color.blue shl 8+color.alpha;
 end;
 procedure graph_heap_initialize(startaddress:natuint;totalsize:natuint;blocksize:word;width,height:dword;outputaddress:natuint;colortype:byte);
 [public,alias:'graph_heap_initialize'];

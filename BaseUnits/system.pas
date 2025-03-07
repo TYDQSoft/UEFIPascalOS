@@ -135,46 +135,11 @@ type
               segment_max_count:natuint;
               content_address:Pointer;
               content_block_size:word;
-              end;
-  maskwildcard=packed record
-               liststr:^PChar;
-               listpos:^natuint;
-               listlen:^natuint;
-               listcount:natuint;
-               end;
-  Wmaskwildcard=packed record
-                liststr:^PWideChar;
-                listpos:^natuint;
-                listlen:^natuint;
-                listcount:natuint;
-                end; 
-  sys_parameter_item=packed record
-                     item_content:PByte;
-                     item_size:natuint;
-                     end;
-  Psys_parameter_item=^sys_parameter_item;
-  sys_parameter=packed record 
-                param_content:PByte;
-                param_size:^natuint;
-                param_count:natuint;
-                end;
-  Psys_parameter=^sys_parameter;
-  sys_function=function (parameter:Psys_parameter):PByte;{$ifdef cpux86_64}SysV_abi_default;{$endif cpux86_64}
-  sys_procedure=procedure (parameter:Psys_parameter);{$ifdef cpux86_64}SysV_abi_default;{$endif cpux86_64}
-  sys_parameter_function=packed record
-                         case Boolean of 
-                         True:(func:sys_function;);
-                         False:(proc:sys_procedure;);
-                         end;
-  sys_parameter_function_and_parameter=packed record
-                                       parameter_function:sys_parameter_function;
-                                       parameter_parameter:sys_parameter;
-                                       parameter_result_size:natuint;
-                                       parameter_disposed:boolean;
-                                       end;
+              end; 
+
 const passwdstr:PChar='rbflMNldcanDUmuuov2CLochbexUVOVdFyuM5sdhxl6tsNMb3kGpMYfq6unhLkLJVHN16dNfGrF0HUyiuJMux9jR29SC9F0MrlJmksMwps5oipJIIwFa7HNixo0oWR9NHpc1sJRpdlXbRIqBZwo7TKSAtXRLLYAXsMwLfZCQsVBDbhm2XAMtomD8hu2DC3KOBW0HNSw2VVDiIKL2xfAOlzhx0EKCULVsdbuDpKi8oxZyFbrMh4DBcFJPtCWlTqFgASL9i7ZxL3R8I0Xoa10llEBt4xy4Be5Oph6KPsifZtc0sDbuxDZjJ85aw1XmNCIof73eBYUFyuoId9TPxAfVeVdrBUfPvxcqliMO82T08lEoXPftR54siClSdSV4PTsjoNZKvIf4j0z4ntESeh2Qq6smyE1pgAQjfY0YG8kvD4mo4AkTUHs3YkvbhCNySrv9f0XEP6Lp35sdlBHG85WCSk15uB6WxaJx9Wke8kRZckuEFSMyV2AjBfrwqGa5R3Rr';
       passwdstroffset:array[1..5,1..11] of shortint=((-1,-3,-4,-7,4,3,9,11,13,-9,2),(-2,-3,-4,-6,4,3,9,13,13,-9,2),(-4,-7,-4,-7,4,3,4,11,21,-9,2),(-2,-3,-4,-7,4,5,9,11,13,-9,4),(-3,-9,-4,-7,4,3,15,11,13,-9,13));
-      pi:extended=3.1415926;
+      pi:extended=3.141592654;
 procedure fpc_specific_handler;compilerproc;
 procedure fpc_handleerror;compilerproc;
 procedure fpc_lib_exit;compilerproc;
@@ -221,6 +186,14 @@ function banker_round(x:extended):natint;
 function sqr(x:natuint):natuint;
 function sqr(x:natint):natint;
 function sqr(x:extended):extended;
+function sqrt(x:natuint):natuint;
+function sqrt(x:extended):extended;
+function log2(x:extended):extended;
+function ln(x:extended):extended;
+function log10(x:extended):extended;
+function IntPower(base:extended;exponent:Natint):extended;
+function Power(base:extended;exponent:extended):extended;
+function exp(exponent:extended):extended;
 function strlen(str:Pchar):natuint;
 function wstrlen(str:PWideChar):natuint;
 procedure strinit(var str:PChar;size:natuint);
@@ -269,37 +242,6 @@ function strcount(str,substr:PChar;start:Natuint):natuint;
 function Wstrcount(str,substr:PWideChar;start:Natuint):natuint;
 function strposinverse(str,substr:PChar;start:Natuint):Natuint;
 function Wstrposinverse(str,substr:PWideChar;start:natuint):natuint;
-function UIntToPChar(UInt:natuint):Pchar;
-function UIntToPWChar(UInt:natuint):PWideChar;
-function PCharToUint(str:PChar):natuint;
-function PWCharToUint(str:PWideChar):natuint;
-function IntToPChar(Int:natint):Pchar;
-function IntToPWChar(Int:natint):PWideChar;
-function PCharToInt(str:PChar):natint;
-function PWCharToInt(str:PWideChar):natint;
-function ExtendedToPChar(num:Extended;Reserveddecimal:byte):PChar;
-function ExtendedToPWChar(num:Extended;Reserveddecimal:byte):PWideChar;
-function PCharToExtended(str:PChar):extended;
-function PWCharToExtended(str:PWideChar):extended;
-function IntPower(a:natint;b:natuint):natint;
-function UIntPower(a,b:natuint):natuint;
-function ExtendedPower(a:extended;b:natuint):extended;
-function UintToHex(inputint:natuint):Pchar;
-function UintToWhex(inputint:natuint):PWideChar;
-function HexToUint(inputhex:PChar):natuint;
-function WHexToUint(inputhex:PWideChar):natuint;
-function PCharToPWChar(orgstr:PChar):PWideChar;
-function PWCharToPChar(orgstr:PWideChar):PChar;
-function PCharIsInt(str:PChar):boolean;
-function PWCharIsInt(str:PWideChar):boolean;
-function PCharMatchMask(orgstr,maskstr:PChar):boolean;
-function PWCharMatchMask(orgstr,maskstr:PWideChar):boolean;
-function PCharGetWildcard(orgstr,maskstr:PChar):maskwildcard;
-function PWCharGetWildcard(orgstr,maskstr:PWideChar):Wmaskwildcard;
-function sys_parameter_construct(original_parameter_items:Psys_parameter_item;original_parameter_number:natuint):sys_parameter;
-function sys_parameter_and_function_construct(parameter:sys_parameter;func:sys_parameter_function;result_size:natuint):sys_parameter_function_and_parameter;
-function sys_parameter_function_execute(func:sys_parameter_function_and_parameter):Pointer;
-procedure sys_parameter_and_function_free(var func:sys_parameter_function_and_parameter);
 procedure randomize(seed_data:Pointer;seed_data_size:natuint);
 function random(maxnum:extended):extended;
 function random_range(left,right:extended):extended;
@@ -848,6 +790,89 @@ end;
 function sqr(x:extended):extended;[public,alias:'sqr_extended'];
 begin
  sqr:=x*x;
+end;
+function sqrt(x:natuint):natuint;
+var i:Natuint;
+begin
+ i:=0;
+ while(i*i<x)do inc(i);
+ sqrt:=i;
+end;
+function sqrt(x:extended):extended;
+begin
+ sqrt:=Power(x,0.5);
+end;
+function factorial(x:natuint):extended;
+var i:Natuint;
+    tempnum:extended;
+begin
+ tempnum:=1;
+ for i:=1 to x do tempnum:=tempnum*i;
+ factorial:=tempnum;
+end;
+function log2(x:extended):extended;
+begin
+ log2:=ln(x)/ln(10);
+end;
+function ln(x:extended):extended;
+var i:Natuint;
+    tempnum:extended;
+begin
+ i:=1; tempnum:=0;
+ while(i<=10)do
+  begin
+   if(i mod 2=0) then tempnum:=tempnum-IntPower(x-1,i)/i else tempnum:=tempnum+IntPower(x-1,i)/i;
+   inc(i);
+  end;
+ ln:=tempnum;
+end;
+function log10(x:extended):extended;
+begin
+ log10:=ln(x)/ln(10);
+end;
+function logn(n:extended;x:extended):extended;
+begin
+ logn:=ln(x)/ln(n);
+end;
+function IntPower(base:extended;exponent:Natint):extended;
+var i:Natint;
+    tempnum:extended;
+begin
+ tempnum:=1;
+ if(exponent>0) then
+  begin
+   for i:=1 to exponent do tempnum:=tempnum*base;
+  end
+ else if(exponent=0) then IntPower:=1
+ else 
+  begin
+   for i:=-1 downto exponent do tempnum:=tempnum/base;
+  end;
+ IntPower:=tempnum;
+end;
+function Power(base:extended;exponent:extended):extended;
+var i:natuint;
+    tempnum:extended;
+begin
+ tempnum:=1; i:=1;
+ while(i<=10)do
+  begin
+   tempnum:=tempnum+IntPower(exponent*ln(base),i-1)/factorial(i-1);
+   inc(i);
+  end;
+ Power:=tempnum;
+end;
+function exp(exponent:extended):extended;
+var i:Natint;
+    tempnum:extended;
+begin
+ i:=1; tempnum:=0;
+ while(i<=10)do
+  begin
+   tempnum:=tempnum+IntPower(exponent,i-1)/factorial(i-1);
+   inc(i);
+  end;
+ exp:=tempnum;
 end;
 function strlen(str:Pchar):natuint;[public,alias:'strlen'];
 var res:natuint;
@@ -1706,568 +1731,6 @@ begin
   end;
  if(i<start) then Wstrposinverse:=0 else Wstrposinverse:=i;
 end;
-function UIntToPChar(UInt:natuint):Pchar;[public,alias:'uinttochar'];
-const numchar:PChar='0123456789';
-var i:byte;
-    myint:natuint;
-    mychar:PChar;
-begin
- mychar:=allocmem(sizeof(Char)*31);
- i:=20; myint:=uint; (mychar+30)^:=#0;
- repeat
-  begin
-   (mychar+i-1)^:=(numchar+myint mod 10)^;
-   myint:=myint div 10;
-   dec(i);
-  end;
- until (myint=0);
- UIntToPChar:=mychar+i;
-end;
-function UIntToPWChar(UInt:natuint):PWideChar;[public,alias:'uinttopwchar'];
-const numchar:PWideChar='0123456789';
-var i:byte;
-    myint:natuint;
-    mychar:PWideChar;
-begin
- mychar:=allocmem(sizeof(WideChar)*31);
- i:=20; myint:=uint; (mychar+30)^:=#0;
- repeat
-  begin
-   (mychar+i-1)^:=(numchar+myint mod 10)^;
-   myint:=myint div 10;
-   dec(i);
-  end;
- until (myint=0);
- UIntToPWChar:=mychar+i;
-end;
-function PCharToUint(str:PChar):natuint;[public,alias:'PCharToUint'];
-const numchar:Pchar='0123456789';
-var i,j,res:natuint;
-begin
- res:=0; i:=0;
- if(str=nil) then exit(0);
- while ((str+i)^<>#0) do
-  begin
-   for j:=0 to 9 do 
-    if((str+i)^=(numchar+j)^) then 
-     begin
-      res:=res*10+j;
-      break;
-     end;
-   inc(i);
-  end;
- PCharToUint:=res;
-end;
-function PWCharToUint(str:PWidechar):natuint;[public,alias:'PWCharToUint'];
-const numchar:PWidechar='0123456789';
-var i,j,res:natuint;
-begin
- res:=0; i:=0;
- if(str=nil) then exit(0);
- while ((str+i)^<>#0) do
-  begin
-   for j:=0 to 9 do 
-    if((str+i)^=(numchar+j)^) then 
-     begin
-      res:=res*10+j;
-      break;
-     end;
-   inc(i);
-  end;
- PWCharToUint:=res;
-end;
-function IntToPChar(int:natint):PChar;[public,alias:'IntToPChar'];
-const numchar:Pchar='0123456789';
-var negative:boolean=false;
-    procnum:natint;
-    mystr:Pchar;
-    myrightnum:natint=30;
-begin
- procnum:=int; strinit(mystr,30);
- if(int<0) then
-  begin
-   procnum:=-int;
-   negative:=true;
-  end;
- repeat 
-  begin
-   (mystr+myrightnum-1)^:=(numchar+procnum mod 10)^;
-   dec(myrightnum);
-   procnum:=procnum div 10;
-  end;
- until (procnum=0);
- if(negative=true)then 
-  begin
-   (mystr+myrightnum-1)^:='-';
-   IntToPChar:=mystr+myrightnum-1;
-  end
- else
-  begin
-   IntToPChar:=mystr+myrightnum;
-  end;
-end;
-function IntToPWChar(int:natint):PWideChar;[public,alias:'IntToPWChar'];
-const numchar:PWidechar='0123456789';
-var negative:boolean=false;
-    procnum:natint;
-    mystr:PWidechar;
-    myrightnum:natint=30;
-begin
- procnum:=int; Wstrinit(mystr,30);
- if(int<0) then
-  begin
-   procnum:=-int;
-   negative:=true;
-  end;
- repeat 
-  begin
-   (mystr+myrightnum-1)^:=(numchar+procnum mod 10)^;
-   dec(myrightnum);
-   procnum:=procnum div 10;
-  end;
- until (procnum=0);
- if(negative=true)then 
-  begin
-   (mystr+myrightnum-1)^:='-';
-   IntToPWChar:=mystr+myrightnum-1;
-  end
- else
-  begin
-   IntToPWChar:=mystr+myrightnum;
-  end;
-end;
-function PCharToInt(str:PChar):natint;[public,alias:'PCharToInt'];
-const numchar:PChar='0123456789';
-var i,j:natuint;
-    res,start:natint;
-    negative:boolean;
-begin
- res:=0; start:=1;
- if(str=nil) then exit(0);
- if(str^='-') then 
-  begin
-   start:=2;
-   negative:=true;
-  end;
- for i:=start to strlen(str) do
-  begin
-   for j:=0 to 9 do 
-    if((str+i-1)^=(numchar+j)^) then 
-     begin
-      res:=res*10+j;
-      break;
-     end; 
-  end;
- if(negative=true) then PCharToInt:=-res else PCharToInt:=res;
-end;
-function PWCharToInt(str:PWideChar):natint;[public,alias:'PWCharToInt'];
-const numchar:PWideChar='0123456789';
-var i,j:natuint;
-    res,start:natint;
-    negative:boolean;
-begin
- res:=0; start:=1;
- if(str=nil) then exit(0);
- if(str^='-') then 
-  begin
-   start:=2;
-   negative:=true;
-  end;
- for i:=start to Wstrlen(str) do
-  begin
-   for j:=0 to 9 do 
-    if((str+i-1)^=(numchar+j)^) then 
-     begin
-      res:=res*10+j;
-      break;
-     end; 
-  end;
- if(negative=true) then PWCharToInt:=-res else PWCharToInt:=res;
-end;
-function ExtendedToPChar(num:Extended;Reserveddecimal:byte):PChar;[public,alias:'ExtendedToPChar'];
-const numchar:PChar='0123456789';
-var orgnum,intpart,decpart,procnum:extended;
-    partstr1,partstr2,res:PChar;
-    isnegative,havedecimal,judge:boolean;
-    len1,len2,i,size:natuint;
-begin
- if(num>0) then
-  begin
-   orgnum:=num; isnegative:=false;
-  end
- else
-  begin
-   orgnum:=-num; isnegative:=true;
-  end;
- intpart:=orgnum-frac(orgnum); decpart:=frac(orgnum)*ExtendedPower(10,Reserveddecimal);
- partstr1:=nil; partstr2:=nil;
- len1:=0; len2:=0;
- if(decpart<1) then havedecimal:=false else havedecimal:=true;
- procnum:=1;
- while(procnum<=intpart) do
-  begin
-   procnum:=procnum*10;
-  end;
- while(intpart>0) do
-  begin
-   inc(len1);
-   if(procnum>1) then procnum:=procnum/10;
-   i:=0;
-   while(i<=9) do
-    begin
-     if(intpart>=procnum*i) and (intpart<procnum*(i+1)) then break;
-     inc(i);
-    end;
-   intpart:=intpart-procnum*i;
-   strrealloc(partstr1,len1);
-   (partstr1+len1-1)^:=(numchar+i)^;
-   if(i>=10) or (procnum<=1) then break;
-  end;
- procnum:=1;
- while(procnum<=decpart) do
-  begin
-   procnum:=procnum*10;
-  end;
- while(decpart>=1) do
-  begin
-   inc(len2);
-   if(procnum>1) then procnum:=procnum/10;
-   i:=0;
-   while(i<=9) do
-    begin
-     if(decpart>=procnum*i) and (decpart<procnum*(i+1)) then break;
-     inc(i);
-    end;
-   if(decpart>=procnum*(i+0.5)) and (procnum<10) then judge:=true else judge:=false;
-   decpart:=decpart-procnum*i;
-   strrealloc(partstr2,len2);
-   if(judge=false) then (partstr2+len2-1)^:=(numchar+i)^ else (partstr2+len2-1)^:=(numchar+i+1)^;
-   if(i>=10) or (procnum<=1) then break;
-  end;
- if(len2>0) then size:=len1+len2+2 else size:=len1+1;
- if(isnegative) then
-  begin
-   if(havedecimal) then
-    begin
-     strinit(res,1+len1+1+reserveddecimal);
-     strset(res,'-');
-     strcat(res,partstr1);
-     strcat(res,'.');
-     for i:=1 to reserveddecimal-len2 do strcat(res,'0');
-     strcat(res,partstr2);
-    end
-   else
-    begin
-     strinit(res,1+len1);
-     strset(res,'-');
-     strcat(res,partstr1);
-    end;
-  end
- else
-  begin
-   if(havedecimal) then
-    begin
-     strinit(res,len1+1+reserveddecimal);
-     strset(res,partstr1);
-     strcat(res,'.');
-     for i:=1 to reserveddecimal-len2 do strcat(res,'0');
-     strcat(res,partstr2);
-    end
-   else
-    begin
-     strinit(res,len1);
-     strset(res,partstr1);
-    end;
-  end;
- size:=getmemsize(partstr1)+getmemsize(partstr2);
- if(havedecimal) then strfree(partstr2);
- strfree(partstr1);
- res:=Pointer(Pointer(res)-size);
- ExtendedToPChar:=res;
-end; 
-function ExtendedToPWChar(num:Extended;Reserveddecimal:byte):PWideChar;[public,alias:'ExtendedToPWChar'];
-const numchar:PWideChar='0123456789';
-var orgnum,intpart,decpart,procnum:extended;
-    partstr1,partstr2,res:PWideChar;
-    isnegative,havedecimal,judge:boolean;
-    len1,len2,i,size:natuint;
-begin
- if(num>0) then
-  begin
-   orgnum:=num; isnegative:=false;
-  end
- else
-  begin
-   orgnum:=-num; isnegative:=true;
-  end;
- intpart:=orgnum-frac(orgnum); decpart:=frac(orgnum)*ExtendedPower(10,Reserveddecimal);
- partstr1:=nil; partstr2:=nil;
- len1:=0; len2:=0;
- if(decpart<1) then havedecimal:=false else havedecimal:=true;
- procnum:=1;
- while(procnum<=intpart) do
-  begin
-   procnum:=procnum*10;
-  end;
- while(intpart>0) do
-  begin
-   inc(len1);
-   if(procnum>1) then procnum:=procnum/10;
-   i:=0;
-   while(i<=9) do
-    begin
-     if(intpart>=procnum*i) and (intpart<procnum*(i+1)) then break;
-     inc(i);
-    end;
-   intpart:=intpart-procnum*i;
-   Wstrrealloc(partstr1,len1);
-   (partstr1+len1-1)^:=(numchar+i)^;
-   if(i>=10) or (procnum<=1) then break;
-  end;
- procnum:=1;
- while(procnum<=decpart) do
-  begin
-   procnum:=procnum*10;
-  end;
- while(decpart>=1) do
-  begin
-   inc(len2);
-   if(procnum>1) then procnum:=procnum/10;
-   i:=0;
-   while(i<=9) do
-    begin
-     if(decpart>=procnum*i) and (decpart<procnum*(i+1)) then break;
-     inc(i);
-    end;
-   if(decpart>=procnum*(i+0.5)) and (procnum<10) then judge:=true else judge:=false;
-   decpart:=decpart-procnum*i;
-   Wstrrealloc(partstr2,len2);
-   if(judge=false) then (partstr2+len2-1)^:=(numchar+i)^ else (partstr2+len2-1)^:=(numchar+i+1)^;
-   if(i>=10) or (procnum<=1) then break;
-  end;
- if(len2>0) then size:=len1+len2+2 else size:=len1+1;
- if(isnegative) then
-  begin
-   if(havedecimal) then
-    begin
-     Wstrinit(res,1+len1+1+reserveddecimal);
-     Wstrset(res,'-');
-     Wstrcat(res,partstr1);
-     Wstrcat(res,'.');
-     for i:=1 to reserveddecimal-len2 do Wstrcat(res,'0');
-     Wstrcat(res,partstr2);
-    end
-   else
-    begin
-     Wstrinit(res,1+len1);
-     Wstrset(res,'-');
-     Wstrcat(res,partstr1);
-    end;
-  end
- else
-  begin
-   if(havedecimal) then
-    begin
-     Wstrinit(res,len1+1+reserveddecimal);
-     Wstrset(res,partstr1);
-     Wstrcat(res,'.');
-     for i:=1 to reserveddecimal-len2 do Wstrcat(res,'0');
-     Wstrcat(res,partstr2);
-    end
-   else
-    begin
-     Wstrinit(res,len1);
-     Wstrset(res,partstr1);
-    end;
-  end;
- size:=getmemsize(partstr1)+getmemsize(partstr2);
- if(havedecimal) then Wstrfree(partstr2);
- Wstrfree(partstr1);
- res:=Pointer(Pointer(res)-size);
- ExtendedToPWChar:=res;
-end;
-function PCharToExtended(str:PChar):extended;[public,alias:'PCharToExtended'];
-const numchar:PChar='0123456789';
-var intpart,decpart:extended;
-    position,startx,i,j,len:natuint;
-begin
- position:=strpos(str,'.',1);
- if(str^='-') then startx:=2 else startx:=1;
- len:=Strlen(str); intpart:=0; decpart:=0;
- if(position>0) then
-  begin
-   for i:=startx to position-1 do
-    begin
-     j:=0;
-     while(j<=9) do if((str+i-1)^=(numchar+j)^) then break;
-     intpart:=intpart*10+j;
-    end;
-   for i:=position+1 to len do
-    begin
-     j:=0;
-     while(j<=9) do if((str+i-1)^=(numchar+j)^) then break;
-     decpart:=decpart*10+j;
-    end;
-  end
- else
-  begin
-   for i:=startx to len do
-    begin
-     j:=0;
-     while(j<=9) do if((str+i-1)^=(numchar+j)^) then break;
-     intpart:=intpart*10+j;
-    end;
-  end;
- if(startx=2) then
-  begin
-   PCharToExtended:=intpart+decpart/ExtendedPower(10,len-position);
-  end
- else if(startx=1) then
-  begin
-   PCharToExtended:=intpart+decpart/ExtendedPower(10,len-position);
-  end;
-end; 
-function PWCharToExtended(str:PWideChar):extended;[public,alias:'PWCharToExtended'];
-const numchar:PWideChar='0123456789';
-var intpart,decpart:extended;
-    position,startx,i,j,len:natuint;
-begin
- position:=Wstrpos(str,'.',1);
- if(str^='-') then startx:=2 else startx:=1;
- len:=WStrlen(str); intpart:=0; decpart:=0;
- if(position>0) then
-  begin
-   for i:=startx to position-1 do
-    begin
-     j:=0;
-     while(j<=9) do if((str+i-1)^=(numchar+j)^) then break;
-     intpart:=intpart*10+j;
-    end;
-   for i:=position+1 to len do
-    begin
-     j:=0;
-     while(j<=9) do if((str+i-1)^=(numchar+j)^) then break;
-     decpart:=decpart*10+j;
-    end;
-  end
- else
-  begin
-   for i:=startx to len do
-    begin
-     j:=0;
-     while(j<=9) do if((str+i-1)^=(numchar+j)^) then break;
-     intpart:=intpart*10+j;
-    end;
-  end;
- if(startx=2) then
-  begin
-   PWCharToExtended:=intpart+decpart/ExtendedPower(10,len-position);
-  end
- else if(startx=1) then
-  begin
-   PWCharToExtended:=intpart+decpart/ExtendedPower(10,len-position);
-  end;
-end; 
-function IntPower(a:natint;b:natuint):natint;[public,alias:'IntPower'];
-var i:natuint;
-    res:natint;
-begin
- res:=1;
- for i:=1 to b do
-  begin
-   res:=res*a;
-  end;
- intPower:=res;
-end;
-function UIntPower(a,b:natuint):natuint;[public,alias:'UintPower'];
-var res,i:natuint;
-begin
- res:=1;
- for i:=1 to b do
-  begin
-   res:=res*a;
-  end;
- UintPower:=res;
-end;
-function ExtendedPower(a:extended;b:natuint):extended;[public,alias:'ExtendedPower'];
-var res:extended;
-    i:natuint;
-begin
- res:=1;
- for i:=1 to b do
-  begin
-   res:=res*a;
-  end;
- ExtendedPower:=res;
-end;
-function UintToHex(inputint:natuint):Pchar;[public,alias:'UintToHex'];
-const hexcode:PChar='0123456789ABCDEF';
-var i,j,k,procint,procnum:natuint;
-    str:PChar;
-begin
- i:=0; procint:=inputint; procnum:=1;
- while(optimize_integer_divide(procint,procnum)>=16) do 
-  begin
-   procnum:=procnum*16;
-   inc(i);
-  end;
- strinit(str,i+1);
- for j:=i+1 downto 1 do
-  begin 
-   (str+j-1)^:=(hexcode+procint mod 16)^;
-   procint:=procint div 16;
-  end;
- (str+i+1)^:=#0;
- UintToHex:=str;
-end;
-function UintToWhex(inputint:natuint):PWideChar;[public,alias:'UintToWHex'];
-const hexcode:PWideChar='0123456789ABCDEF';
-var i,j,k,procint,procnum:natuint;
-    str:PWideChar;
-begin
- i:=0; procint:=inputint; procnum:=1;
- while(optimize_integer_divide(procint,procnum)>=16) do 
-  begin
-   procnum:=procnum*16;
-   inc(i);
-  end;
- Wstrinit(str,i+1);
- for j:=i+1 downto 1 do
-  begin 
-   (str+j-1)^:=(hexcode+procint mod 16)^;
-   procint:=procint div 16;
-  end;
- (str+i+1)^:=#0;
- UintToWHex:=str;
-end;
-function HexToUint(inputhex:PChar):natuint;[public,alias:'HexToUint'];
-const hexcode1:PChar='0123456789ABCDEF';
-      hexcode2:PChar='0123456789abcdef';
-var res,i,j:natuint;
-begin
- i:=1; res:=0;
- while((inputhex+i-1)^<>#0) do
-  begin
-   j:=0;
-   while(j<=15) and ((inputhex+i-1)^<>(hexcode1+j)^) and ((inputhex+i-1)^<>(hexcode2+j)^) do inc(j);
-   res:=res*16+j;
-  end;
- HexToUint:=res;
-end;
-function WHexToUint(inputhex:PWideChar):natuint;[public,alias:'WHexToUint'];
-const hexcode1:PWideChar='0123456789ABCDEF';
-      hexcode2:PWideChar='0123456789abcdef';
-var res,i,j:natuint;
-begin
- i:=1; res:=0;
- while((inputhex+i-1)^<>#0) do
-  begin
-   j:=0;
-   while(j<=15) and ((inputhex+i-1)^<>(hexcode1+j)^) and ((inputhex+i-1)^<>(hexcode2+j)^) do inc(j);
-   res:=res*16+j;
-  end;
- WHexToUint:=res;
-end;
 function PCharToPWChar(orgstr:PChar):PWideChar;[public,alias:'PCharToPWChar'];
 var res:PWideChar;
     len,i:natuint;
@@ -2317,263 +1780,6 @@ begin
    if(j>9) then break;
   end;
  if(j>9) then PWCharIsInt:=false else PWCharIsInt:=true;
-end;
-function PCharMatchMask(orgstr,maskstr:PChar):boolean;[public,alias:'PCharMatchMask'];
-var i,j,k,len1,len2:natuint;
-begin
- len1:=strlen(orgstr); len2:=strlen(maskstr); i:=1; j:=1;
- while(i<=len1) and (j<=len2) do
-  begin
-   if((maskstr+j-1)^='*') then
-    begin
-     if((maskstr+j)^='*') then
-      begin
-       inc(j); inc(i);
-      end
-     else
-      begin
-       k:=i+1;
-       while(k<=len1) do
-        begin
-         if((maskstr+j)^=(orgstr+k-1)^) then break;
-         inc(k);
-        end;
-       if(k>len1) then break else
-        begin
-         i:=k; inc(j);
-        end;
-      end;
-    end
-   else if((maskstr+j-1)^='?') then
-    begin
-     inc(j); inc(i);
-    end
-   else if((maskstr+j-1)^=(orgstr+i-1)^) then
-    begin
-     inc(j); inc(i);
-    end
-   else break;
-  end;
- if(i<=len1) and (j<=len2) then PCharMatchMask:=false else PCharMatchMask:=true;
-end;
-function PWCharMatchMask(orgstr,maskstr:PWideChar):boolean;[public,alias:'PWCharMatchMask'];
-var i,j,k,len1,len2:natuint;
-begin
- len1:=Wstrlen(orgstr); len2:=Wstrlen(maskstr); i:=1; j:=1;
- while(i<=len1) and (j<=len2) do
-  begin
-   if((maskstr+j-1)^='*') then
-    begin
-     if((maskstr+j)^='*') then
-      begin
-       inc(j); inc(i);
-      end
-     else
-      begin
-       k:=i+1;
-       while(k<=len1) do
-        begin
-         if((maskstr+j)^=(orgstr+k-1)^) then break;
-         inc(k);
-        end;
-       if(k>len1) then break else
-        begin
-         i:=k; inc(j);
-        end;
-      end;
-    end
-   else if((maskstr+j-1)^='?') then
-    begin
-     inc(j); inc(i);
-    end
-   else if((maskstr+j-1)^=(orgstr+i-1)^) then
-    begin
-     inc(j); inc(i);
-    end
-   else break;
-  end;
- if(i<=len1) and (j<=len2) then PWCharMatchMask:=false else PWCharMatchMask:=true;
-end;
-function PCharGetWildcard(orgstr,maskstr:PChar):maskwildcard;[public,alias:'PCharGetWildcard'];
-var res:maskwildcard;
-    i,j,k,m,len1,len2,spos,slen,size:natuint;
-begin
- res.liststr:=nil; res.listcount:=0;
- len1:=strlen(orgstr); len2:=strlen(maskstr); i:=1; j:=1;
- while(i<=len1) and (j<=len2) do
-  begin
-   if((maskstr+j-1)^='*') then
-    begin
-     inc(res.listcount);
-     size:=getmemsize(res.liststr);
-     ReallocMem(res.liststr,sizeof(PChar)*res.listcount);
-     res.listlen:=Pointer(Pointer(res.listlen)-size);
-     size:=size+getmemsize(res.listlen);
-     ReallocMem(res.listlen,sizeof(natuint)*res.listcount);
-     res.listpos:=Pointer(Pointer(res.listpos)-size);
-     size:=size+getmemsize(res.listpos);
-     ReallocMem(res.listpos,sizeof(natuint)*res.listcount);
-     for m:=1 to res.listcount-1 do (res.liststr+m-1)^:=PChar(Pointer((res.liststr+m-1)^)-size);
-     k:=j+1; spos:=i; slen:=0;
-     while((maskstr+k-1)^='*') do inc(k);
-     while((orgstr+spos+slen-1)^<>(maskstr+k-1)^) and (spos+slen<=len1) do inc(slen);
-     if(k>len1) then
-      begin
-       dec(res.listcount);
-       size:=getmemsize(res.liststr);
-       ReallocMem(res.liststr,sizeof(PChar)*res.listcount);
-       for m:=1 to res.listcount do (res.liststr+m-1)^:=PChar(Pointer((res.liststr+m-1)^)-size);
-       break;
-      end;
-     (res.liststr+res.listcount-1)^:=strcopy(orgstr,spos,slen);
-     (res.listlen+res.listcount-1)^:=spos;
-     (res.listpos+res.listcount-1)^:=k-j;
-     i:=spos+slen; j:=k;
-    end
-   else if((maskstr+j-1)^='?') then
-    begin
-     inc(res.listcount);
-     size:=getmemsize(res.liststr);
-     ReallocMem(res.liststr,sizeof(PChar)*res.listcount);
-     res.listlen:=Pointer(Pointer(res.listlen)-size);
-     size:=size+getmemsize(res.listlen);
-     ReallocMem(res.listlen,sizeof(natuint)*res.listcount);
-     res.listpos:=Pointer(Pointer(res.listpos)-size);
-     size:=size+getmemsize(res.listpos);
-     ReallocMem(res.listpos,sizeof(natuint)*res.listcount);
-     for m:=1 to res.listcount-1 do (res.liststr+m-1)^:=PChar(Pointer((res.liststr+m-1)^)-size);
-     k:=j+1; spos:=i; slen:=1;
-     while((maskstr+k+slen-1)^='?') do inc(slen);
-     (res.liststr+res.listcount-1)^:=strcopy(orgstr,spos,slen);
-     (res.listlen+res.listcount-1)^:=spos;
-     (res.listpos+res.listcount-1)^:=slen;
-     i:=spos+slen; j:=k;
-    end
-   else if((maskstr+j-1)^=(orgstr+i-1)^) then
-    begin
-     inc(i); inc(j);
-    end
-   else break;
-  end;
- if(i<=len1) and (j<=len2) then
-  begin
-   res.liststr:=nil; res.listcount:=0;
-  end;
- PCharGetWildCard:=res;
-end;
-function PWCharGetWildcard(orgstr,maskstr:PWideChar):Wmaskwildcard;[public,alias:'PWCharGetWildcard'];
-var res:Wmaskwildcard;
-    i,j,k,m,len1,len2,spos,slen,size:natuint;
-begin
- res.liststr:=nil; res.listcount:=0;
- len1:=Wstrlen(orgstr); len2:=Wstrlen(maskstr); i:=1; j:=1;
- while(i<=len1) and (j<=len2) do
-  begin
-   if((maskstr+j-1)^='*') then
-    begin
-     inc(res.listcount);
-     size:=getmemsize(res.liststr);
-     ReallocMem(res.liststr,sizeof(PWideChar)*res.listcount);
-     res.listlen:=Pointer(Pointer(res.listlen)-size);
-     size:=size+getmemsize(res.listlen);
-     ReallocMem(res.listlen,sizeof(natuint)*res.listcount);
-     res.listpos:=Pointer(Pointer(res.listpos)-size);
-     size:=size+getmemsize(res.listpos);
-     ReallocMem(res.listpos,sizeof(natuint)*res.listcount);
-     for m:=1 to res.listcount-1 do (res.liststr+m-1)^:=PWideChar(Pointer((res.liststr+m-1)^)-size);
-     k:=j+1; spos:=i; slen:=0;
-     while((maskstr+k-1)^='*') do inc(k);
-     while((orgstr+spos+slen-1)^<>(maskstr+k-1)^) and (spos+slen<=len1) do inc(slen);
-     if(k>len1) then
-      begin
-       dec(res.listcount);
-       size:=getmemsize(res.liststr);
-       ReallocMem(res.liststr,sizeof(PWideChar)*res.listcount);
-       for m:=1 to res.listcount do (res.liststr+m-1)^:=PWideChar(Pointer((res.liststr+m-1)^)-size);
-       break;
-      end;
-     (res.liststr+res.listcount-1)^:=Wstrcopy(orgstr,spos,slen);
-     (res.listlen+res.listcount-1)^:=spos;
-     (res.listpos+res.listcount-1)^:=k-j;
-     i:=spos+slen; j:=k;
-    end
-   else if((maskstr+j-1)^='?') then
-    begin
-     inc(res.listcount);
-     size:=getmemsize(res.liststr);
-     ReallocMem(res.liststr,sizeof(PWideChar)*res.listcount);
-     res.listlen:=Pointer(Pointer(res.listlen)-size);
-     size:=size+getmemsize(res.listlen);
-     ReallocMem(res.listlen,sizeof(natuint)*res.listcount);
-     res.listpos:=Pointer(Pointer(res.listpos)-size);
-     size:=size+getmemsize(res.listpos);
-     ReallocMem(res.listpos,sizeof(natuint)*res.listcount);
-     for m:=1 to res.listcount-1 do (res.liststr+m-1)^:=PWideChar(Pointer((res.liststr+m-1)^)-size);
-     k:=j+1; spos:=i; slen:=1;
-     while((maskstr+k+slen-1)^='?') do inc(slen);
-     (res.liststr+res.listcount-1)^:=Wstrcopy(orgstr,spos,slen);
-     (res.listlen+res.listcount-1)^:=spos;
-     (res.listpos+res.listcount-1)^:=slen;
-     i:=spos+slen; j:=k;
-    end
-   else if((maskstr+j-1)^=(orgstr+i-1)^) then
-    begin
-     inc(i); inc(j);
-    end
-   else break;
-  end;
- if(i<=len1) and (j<=len2) then
-  begin
-   res.liststr:=nil; res.listcount:=0;
-  end;
- PWCharGetWildCard:=res;
-end; 
-function sys_parameter_construct(original_parameter_items:Psys_parameter_item;original_parameter_number:natuint):sys_parameter;[public,alias:'sys_parameter_construct'];
-var i,size,totalsize:natuint;
-    res:sys_parameter;
-begin
- res.param_size:=allocmem(sizeof(natuint)*original_parameter_number);
- res.param_count:=original_parameter_number; size:=0; totalsize:=0;
- res.param_content:=nil;
- for i:=1 to original_parameter_number do
-  begin
-   size:=(original_parameter_items+i-1)^.item_size;
-   ReallocMem(res.param_content,totalsize+size);
-   Move((original_parameter_items+i-1)^.item_content^,(res.param_content+totalsize)^,size);
-   totalsize:=totalsize+size;
-   (res.param_size+i-1)^:=size;
-  end;
- sys_parameter_construct:=res;
-end;
-function sys_parameter_and_function_construct(parameter:sys_parameter;func:sys_parameter_function;result_size:natuint):sys_parameter_function_and_parameter;[public,alias:'sys_parameter_and_function_construct'];
-var res:sys_parameter_function_and_parameter;
-begin
- res.parameter_function:=func;
- res.parameter_parameter:=parameter;
- res.parameter_result_size:=result_size;
- res.parameter_disposed:=false;
- sys_parameter_and_function_construct:=res;
-end;
-function sys_parameter_function_execute(func:sys_parameter_function_and_parameter):Pointer;[public,alias:'sys_parameter_function_execute'];
-var ptr:PByte;
-begin
- if(func.parameter_result_size>0) then
-  begin
-   ptr:=func.parameter_function.func(@func.parameter_parameter);
-   sys_parameter_function_execute:=ptr;
-  end
- else if(func.parameter_result_size=0) then
-  begin
-   func.parameter_function.proc(@func.parameter_parameter);
-   sys_parameter_function_execute:=nil;
-  end;
-end;
-procedure sys_parameter_and_function_free(var func:sys_parameter_function_and_parameter);[public,alias:'sys_parameter_and_function_free'];
-begin
- freemem(func.parameter_parameter.param_content); 
- freemem(func.parameter_parameter.param_size); 
- func.parameter_parameter.param_count:=0; 
- func.parameter_disposed:=true;
 end;
 procedure randomize(seed_data:Pointer;seed_data_size:natuint);[public,alias:'randomize'];
 var i:natuint;

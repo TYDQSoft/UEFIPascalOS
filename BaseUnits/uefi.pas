@@ -2156,6 +2156,29 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                              EnableDisableAP:efi_mp_services_enable_disable_ap;
                              WhoAmI:efi_mp_services_whoami;
                              end;
+    efi_pci_configuration_space=packed record
+                                VendorId:word;
+                                DeviceId:word;
+                                Command:word;
+                                Status:word;
+                                RevisionID:byte;
+                                ClassCode:array[1..3] of byte;
+                                CacheLineSize:byte;
+                                LatencyTimer:byte;
+                                HeaderType:byte;
+                                BIST:byte;
+                                BAR:array[1..6] of dword;
+                                CISPtr:dword;
+                                SubSystemVendorID:word;
+                                SubSystemID:word;
+                                ExpansionRomBar:dword;
+                                Reserved1:array[1..3] of byte;
+                                Reserved2:dword;
+                                InterruptLine:byte;
+                                InterruptPin:byte;
+                                MinGnt:byte;
+                                MaxGnt:byte;
+                                end;
 {User Defined Types}
     efi_file_system_list=record
                          file_system_content:^Pefi_simple_file_system_protocol;
@@ -2186,11 +2209,11 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                           memory_start:Pointer;
                           memory_size:natuint;
                           end;
-    efi_acpi_table_list=record
-                        version:^boolean;
-                        content:^Pointer;
-                        count:natuint;
-                        end;
+    efi_pci_list=record
+                 item:^Pefi_pci_io_protocol;
+                 space:^efi_pci_configuration_space;
+                 count:natuint;
+                 end;
 {User Defined End}
 const efi_system_table_signature:qword=$5453595320494249;
       efi_system_table_revision:array[1..14] of dword=((2 shl 16) or 100,(2 shl 16) or 90,(2 shl 16) or 80,(2 shl 16) or 70,(2 shl 16) or 60,(2 shl 16) or 50,(2 shl 16) or 40,(2 shl 16) or 31,(2 shl 16) or 30,(2 shl 16) or 20,(2 shl 16) or 10,(2 shl 16) or 0,(1 shl 16) or 10,(1 shl 16) or 2);
@@ -2792,6 +2815,7 @@ const efi_system_table_signature:qword=$5453595320494249;
       
 function bis_get_siginfo_count(bisdataPtr:Pefi_bis_data):dword;
 function bis_get_siginfo_array(bisdataPtr:Pefi_bis_data):Pefi_bis_signature_info; 
+function efi_pci_address(bus:byte;dev:byte;func:byte;reg:byte):natuint;
 procedure efi_initialize(InputImageHandle:efi_handle;InputSystemTable:Pefi_system_table);
 function efi_allocmem(size:natuint):Pointer;
 procedure efi_move(Source:Pointer;Dest:Pointer;Size:natuint);
@@ -2801,18 +2825,22 @@ procedure efi_show_error(status:efi_status);
 function efi_get_platform:byte;
 procedure efi_console_clear_screen;
 procedure efi_console_output_string(outputstring:PWideChar);
-procedure efi_console_output_number(number:natint);
-procedure efi_console_output_hex(hex:natuint);
+procedure efi_console_output_number(number:natint;endline:boolean);
+procedure efi_console_output_extended(number:extended;endline:boolean;Reserveddecimal:byte);
+procedure efi_console_output_hex(number:natuint;endline:boolean);
+procedure efi_console_output_string_with_colour(Outputstring:PWideChar;backgroundcolour:byte;textcolour:byte);
+procedure efi_console_output_number_with_colour(number:natint;endline:boolean;bckcolour:byte;texcolour:byte);
+procedure efi_console_output_extended_with_colour(number:extended;endline:boolean;Reserveddecimal:byte;bckcolour:byte;texcolour:byte);
+procedure efi_console_output_hex_with_colour(number:natuint;endline:boolean;bckcolour:byte;texcolour:byte);
 procedure efi_set_watchdog_timer_to_null;
 procedure efi_console_read_string(var ReadString:PWideChar);
+procedure efi_console_read_string_with_colour(var ReadString:PWideChar;backgroundcolour:byte;textcolour:byte);
 procedure efi_console_read_password_string(var ReadString:PWideChar);
 procedure efi_console_enable_mouse;
 procedure efi_console_set_global_colour(backgroundcolour:byte;textcolour:byte);
 procedure efi_console_set_cursor_position(column,row:natuint);
 procedure efi_console_get_cursor_position(var column,row:natuint);
 procedure efi_console_get_max_row_and_max_column;
-procedure efi_console_output_string_with_colour(Outputstring:PWideChar;backgroundcolour:byte;textcolour:byte);
-procedure efi_console_read_string_with_colour(var ReadString:PWideChar;backgroundcolour:byte;textcolour:byte);
 function efi_list_all_file_system(isreadonly:byte):efi_file_system_list;
 function efi_list_all_file_system_ext:efi_file_system_list_ext;
 procedure efi_console_initialize(bck_colour,text_colour:byte;blinkmiliseconds:qword);
@@ -2823,8 +2851,8 @@ function efi_loader_get_memory_map:efi_memory_map;
 function efi_loader_handle_memory_map(memorymap:efi_memory_map):efi_memory_map_simple;
 function efi_loader_find_suitable_memory_map(var smm:efi_memory_map_simple;size:natuint):efi_memory_map_result;
 procedure efi_loader_exit_boot_services(memorymap:efi_memory_map);
-function efi_get_acpi_table_list:efi_acpi_table_list;
-procedure efi_free_acpi_table_list(var tablelist:efi_acpi_table_list);
+function efi_pci_initialize:efi_pci_list;
+procedure efi_pci_free(var list:efi_pci_list);
 
 var maxcolumn:Natuint=80;
     maxrow:Natuint=25;
@@ -2847,6 +2875,10 @@ end;
 function bis_get_siginfo_array(bisdataPtr:Pefi_bis_data):Pefi_bis_signature_info;[public,alias:'BIS_GET_SIGINFO_ARRAY'];
 begin
  bis_get_siginfo_array:=Pefi_bis_signature_info(bisdataPtr^.Data);
+end;
+function efi_pci_address(bus:byte;dev:byte;func:byte;reg:byte):natuint;
+begin
+ efi_pci_address:=bus shl 24+dev shl 16+func shl 8+reg;
 end;
 function efi_guid_compare(guid1,guid2:efi_guid):boolean;[public,alias:'EFI_GUID_COMPARE'];
 var res:boolean;
@@ -3027,6 +3059,147 @@ begin
   end;
  efi_console_set_cursor_position(currentcolumn,currentrow);
 end;
+procedure efi_console_output_number(number:natint;endline:boolean);[public,alias:'EFI_CONSOLE_OUTPUT_NUMBER'];
+const decstr:PWideChar='0123456789';
+var outstr:PWideChar;
+    orgnum:natuint;
+    multiplenum:natuint;
+    numlength:byte;
+    isnegative:boolean;
+    i,j,start:natuint;
+begin
+ {Check the number is negative or not}
+ outstr:=efi_allocmem(128);
+ if(number>=0) then
+  begin
+   isnegative:=false; start:=1;
+  end
+ else
+  begin
+   isnegative:=true; orgnum:=-number;
+   outstr^:='-'; start:=2;
+  end;
+ {Translate the number to PWideChar}
+ multiplenum:=1; numlength:=0;
+ while(orgnum>=multiplenum) do 
+  begin
+   multiplenum:=multiplenum*10; inc(numlength);
+  end;
+ multiplenum:=multiplenum div 10;
+ for i:=start to start+numlength-1 do (outstr+i-1)^:='0';
+ i:=start;
+ while(multiplenum>0)do
+  begin
+   (outstr+i-1)^:=(decstr+optimize_integer_divide(orgnum,multiplenum))^;
+   orgnum:=optimize_integer_modulo(orgnum,multiplenum);
+   multiplenum:=multiplenum div 10;
+   inc(i);
+  end;
+ (outstr+start+numlength-1)^:=#0;
+ {Output the number(decimal)}
+ if(numlength=0) then efi_console_output_string('0') else efi_console_output_string(outstr);
+ if(endline) then efi_console_output_string(#10);
+ efi_freemem(outstr);
+end;
+procedure efi_console_output_extended(number:extended;endline:boolean;Reserveddecimal:byte);[public,alias:'EFI_CONSOLE_OUTPUT_EXTENDED'];
+const exstr:PWideChar='0123456789';
+var i,j:Natuint;
+    intpart,decpart:Natuint;
+    intlength,declength:byte;
+    multiplenum:Natuint;
+    isnegative,haveint,havedec:boolean;
+    partstr1,partstr2:PWideChar;
+begin
+ haveint:=false; havedec:=false;
+ {Divide the integer part and float part of the extended number}
+ if(number<0) then
+  begin
+   isnegative:=true;
+   intpart:=floor(-number); decpart:=Round(frac(-number)*IntPower(10,Reserveddecimal));
+  end
+ else
+  begin
+   isnegative:=false;
+   intpart:=floor(number); decpart:=Round(frac(number)*IntPower(10,Reserveddecimal));
+  end;
+ {Initialize the integer part}
+ partstr1:=efi_allocmem(128); i:=1; multiplenum:=1; intlength:=0;
+ while(intpart>=multiplenum) do 
+  begin
+   multiplenum:=multiplenum*10; inc(intlength);
+  end;
+ multiplenum:=multiplenum div 10;
+ for i:=1 to intlength do (partstr1+i-1)^:='0';
+ i:=1;
+ while(multiplenum>0)do
+  begin
+   (partstr1+i-1)^:=(exstr+optimize_integer_divide(intpart,multiplenum))^;
+   intpart:=optimize_integer_modulo(intpart,multiplenum);
+   multiplenum:=multiplenum div 10;
+   inc(i);
+  end;
+ (partstr1+intlength)^:=#0;
+ {Initialize the decimal part}
+ partstr2:=efi_allocmem(128); i:=1; multiplenum:=1; declength:=0;
+ while(decpart>=multiplenum) do 
+  begin
+   multiplenum:=multiplenum*10; inc(declength);
+  end;
+ multiplenum:=multiplenum div 10;
+ for i:=1 to declength do (partstr2+i-1)^:='0';
+ i:=1;
+ while(multiplenum>0)do
+  begin
+   (partstr2+i-1)^:=(exstr+optimize_integer_divide(decpart,multiplenum))^;
+   decpart:=optimize_integer_modulo(decpart,multiplenum);
+   multiplenum:=multiplenum div 10;
+   inc(i);
+  end;
+ (partstr2+declength)^:=#0;
+ {Output the extended number}
+ if(isnegative) then efi_console_output_string('-');
+ if(haveint=false) then efi_console_output_string('0') else efi_console_output_string(partstr1);
+ if(havedec=true) then
+  begin
+   efi_console_output_string('.'); efi_console_output_string(partstr2);
+  end;
+ efi_freemem(partstr1); efi_freemem(partstr2);
+ if(endline) then efi_console_output_string(#10);
+end;
+procedure efi_console_output_hex(number:natuint;endline:boolean);[public,alias:'EFI_CONSOLE_OUTPUT_HEX'];
+const hexstr:PWideChar='0123456789ABCDEF';
+var outstr:PWideChar;
+    orgnum:natuint;
+    multiplenum:natuint;
+    hexlength:byte;
+    i,j:Natuint;
+begin
+ {It must be a positive number,so do not check negative}
+ i:=1; orgnum:=number; outstr:=efi_allocmem(128);
+ {Translate the number to hex}
+ multiplenum:=1; hexlength:=0;
+ while(orgnum>=multiplenum)do
+  begin
+   if(multiplenum shl 4=0) then break;
+   multiplenum:=multiplenum shl 4;
+   inc(hexlength);
+  end;
+ multiplenum:=multiplenum shr 4;
+ for i:=1 to hexlength do (outstr+i-1)^:='0';
+ i:=1;
+ while(multiplenum>0)do
+  begin
+   (outstr+i-1)^:=(hexstr+optimize_integer_divide(orgnum,multiplenum))^;
+   orgnum:=optimize_integer_modulo(orgnum,multiplenum);
+   multiplenum:=multiplenum shr 4;
+   inc(i);
+  end;
+ (outstr+hexlength)^:=#0;
+ {Output the hex}
+ if(number=0) then efi_console_output_string('0') else efi_console_output_string(outstr);
+ if(endline) then efi_console_output_string(#10);
+ efi_freemem(outstr);
+end;
 procedure efi_console_output_string_with_colour(Outputstring:PWideChar;backgroundcolour:byte;textcolour:byte);[public,alias:'EFI_CONSOLE_OUTPUT_STRING_WITH_COLOUR'];
 var mychar:array[1..2] of WideChar;
     i,len:Natuint;
@@ -3084,6 +3257,151 @@ begin
  efi_console_set_cursor_position(currentcolumn,currentrow);
  GlobalSystemTable^.ConOut^.SetAttribute(GlobalSystemTable^.ConOut,consolebck shl 4+consoletex);
 end;
+procedure efi_console_output_number_with_colour(number:natint;endline:boolean;bckcolour:byte;texcolour:byte);[public,alias:'EFI_CONSOLE_OUTPUT_NUMBER_WITH_COLOUR'];
+const decstr:PWideChar='0123456789';
+var outstr:PWideChar;
+    orgnum:natuint;
+    multiplenum:natuint;
+    numlength:byte;
+    isnegative:boolean;
+    i,j,start:natuint;
+begin
+ {Check the number is negative or not}
+ outstr:=efi_allocmem(128);
+ if(number>=0) then
+  begin
+   isnegative:=false; start:=1;
+  end
+ else
+  begin
+   isnegative:=true; orgnum:=-number;
+   outstr^:='-'; start:=2;
+  end;
+ {Translate the number to PWideChar}
+ multiplenum:=1; numlength:=0;
+ while(orgnum>=multiplenum) do 
+  begin
+   multiplenum:=multiplenum*10; inc(numlength);
+  end;
+ multiplenum:=multiplenum div 10;
+ for i:=start to start+numlength-1 do (outstr+i-1)^:='0';
+ i:=start;
+ while(multiplenum>0)do
+  begin
+   (outstr+i-1)^:=(decstr+optimize_integer_divide(orgnum,multiplenum))^;
+   orgnum:=optimize_integer_modulo(orgnum,multiplenum);
+   multiplenum:=multiplenum div 10;
+   inc(i);
+  end;
+ (outstr+start+numlength-1)^:=#0;
+ {Output the number(decimal)}
+ if(number=0) then efi_console_output_string_with_colour('0',bckcolour,texcolour)
+ else efi_console_output_string_with_colour(outstr,bckcolour,texcolour);
+ if(endline) then 
+ efi_console_output_string_with_colour(#10,bckcolour,texcolour);
+ efi_freemem(outstr);
+end;
+procedure efi_console_output_extended_with_colour(number:extended;endline:boolean;Reserveddecimal:byte;bckcolour:byte;texcolour:byte);[public,alias:'EFI_CONSOLE_OUTPUT_EXTENDED_WITH_COLOUR'];
+const exstr:PWideChar='0123456789';
+var i,j:Natuint;
+    intpart,decpart:Natuint;
+    intlength,declength:byte;
+    multiplenum:Natuint;
+    isnegative,haveint,havedec:boolean;
+    partstr1,partstr2:PWideChar;
+begin
+ haveint:=false; havedec:=false;
+ {Divide the integer part and float part of the extended number}
+ if(number<0) then
+  begin
+   isnegative:=true;
+   intpart:=floor(-number); decpart:=Round(frac(-number)*IntPower(10,Reserveddecimal));
+  end
+ else
+  begin
+   isnegative:=false;
+   intpart:=floor(number); decpart:=Round(frac(number)*IntPower(10,Reserveddecimal));
+  end;
+ {Initialize the integer part}
+ partstr1:=efi_allocmem(128); i:=1; multiplenum:=1; intlength:=0;
+ while(intpart>=multiplenum) do 
+  begin
+   multiplenum:=multiplenum*10; inc(intlength);
+  end;
+ multiplenum:=multiplenum div 10;
+ for i:=1 to intlength do (partstr1+i-1)^:='0';
+ i:=1;
+ while(multiplenum>0)do
+  begin
+   (partstr1+i-1)^:=(exstr+optimize_integer_divide(intpart,multiplenum))^;
+   intpart:=optimize_integer_modulo(intpart,multiplenum);
+   multiplenum:=multiplenum div 10;
+   inc(i);
+  end;
+ (partstr1+intlength)^:=#0;
+ {Initialize the decimal part}
+ partstr2:=efi_allocmem(128); i:=1; multiplenum:=1; declength:=0;
+ while(decpart>=multiplenum) do 
+  begin
+   multiplenum:=multiplenum*10; inc(declength);
+  end;
+ multiplenum:=multiplenum div 10;
+ for i:=1 to declength do (partstr2+i-1)^:='0';
+ i:=1;
+ while(multiplenum>0)do
+  begin
+   (partstr2+i-1)^:=(exstr+optimize_integer_divide(decpart,multiplenum))^;
+   decpart:=optimize_integer_modulo(decpart,multiplenum);
+   multiplenum:=multiplenum div 10;
+   inc(i);
+  end;
+ (partstr2+declength)^:=#0;
+ {Output the extended number}
+ if(isnegative) then efi_console_output_string_with_colour('-',bckcolour,texcolour);
+ if(haveint=false) then efi_console_output_string_with_colour('0',bckcolour,texcolour) 
+ else efi_console_output_string_with_colour(partstr1,bckcolour,texcolour);
+ if(havedec=true) then
+  begin
+   efi_console_output_string_with_colour('.',bckcolour,texcolour); efi_console_output_string_with_colour(partstr2,bckcolour,texcolour);
+  end;
+ efi_freemem(partstr1); efi_freemem(partstr2);
+ if(endline) then efi_console_output_string_with_colour(#10,bckcolour,texcolour);
+end;
+procedure efi_console_output_hex_with_colour(number:natuint;endline:boolean;bckcolour:byte;texcolour:byte);[public,alias:'EFI_CONSOLE_OUTPUT_HEX_WITH_COLOUR'];
+const hexstr:PWideChar='0123456789ABCDEF';
+var outstr:PWideChar;
+    orgnum:natuint;
+    multiplenum:natuint;
+    hexlength:byte;
+    i,j:Natuint;
+begin
+ {It must be a positive number,so do not check negative}
+ i:=1; orgnum:=number; outstr:=efi_allocmem(128);
+ {Translate the number to hex}
+ multiplenum:=1; hexlength:=0;
+ while(orgnum>=multiplenum)do
+  begin
+   if(multiplenum shl 4=0) then break;
+   multiplenum:=multiplenum shl 4;
+   inc(hexlength);
+  end;
+ multiplenum:=multiplenum shr 4;
+ for i:=1 to hexlength do (outstr+i-1)^:='0';
+ i:=1;
+ while(multiplenum>0)do
+  begin
+   (outstr+i-1)^:=(hexstr+optimize_integer_divide(orgnum,multiplenum))^;
+   orgnum:=optimize_integer_modulo(orgnum,multiplenum);
+   multiplenum:=multiplenum shr 4;
+   inc(i);
+  end;
+ (outstr+hexlength)^:=#0;
+ {Output the hex}
+ if(number=0) then efi_console_output_string_with_colour('0',bckcolour,texcolour) 
+ else efi_console_output_string_with_colour(outstr,bckcolour,texcolour);
+ if(endline) then efi_console_output_string_with_colour(#10,bckcolour,texcolour);
+ efi_freemem(outstr);
+end;
 procedure efi_set_watchdog_timer_to_null;[public,alias:'EFI_SET_WATCHDOG_TIMER_TO_NULL'];
 begin
  GlobalSystemTable^.bootservices^.SetWatchDogTimer(0,0,0,nil);
@@ -3139,48 +3457,6 @@ begin
       end;
      if(currentrow>=maxrow) then efi_console_clear_screen;
      GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,@(ReadString+i-1)^);
-    end
-   else dec(i);
-   efi_console_set_cursor_position(currentcolumn,currentrow);
-  end;
-end;
-procedure efi_console_read_password_string(var ReadString:PWideChar);[public,alias:'EFI_CONSOLE_READ_PASSWORD_STRING'];
-var key:efi_input_key;
-    waitidx,i,j:natuint;
-    procstring:PWideChar;
-begin
- if(ReadString<>nil) then efi_freemem(ReadString);
- Readstring:=efi_allocmem(sizeof(WideChar)); i:=0;
- while (True) do
-  begin
-   inc(i);
-   procstring:=efi_allocmem(sizeof(WideChar)*(i+1));
-   efi_move(ReadString,procstring,sizeof(WideChar)*(i+1));
-   efi_freemem(ReadString); ReadString:=procstring;
-   GlobalSystemTable^.BootServices^.WaitForEvent(1,@GlobalSystemTable^.ConIn^.WaitForKey,waitidx);
-   GlobalSystemTable^.ConIn^.ReadKeyStroke(GlobalSystemTable^.ConIn,key);
-   if(key.ScanCode=0) then (ReadString+i-1)^:=key.UnicodeChar else (ReadString+i-1)^:=#0;
-   if((ReadString+i-1)^=#10) or ((ReadString+i-1)^=#13) then
-    begin
-     (ReadString+i-1)^:=#0; 
-     GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,#13#10);
-     currentcolumn:=0; inc(currentrow);
-     if(currentrow>=maxrow) then efi_console_clear_screen;
-     break;
-    end
-   else if((ReadString+i-1)^=#8) then
-    begin
-     if(i>0) then
-      begin 
-       (ReadString+i-1)^:=#0; dec(i);  
-       if(i>0) then
-        begin
-         (ReadString+i-1)^:=#0; dec(i);
-        end;
-      end;
-    end
-   else if((ReadString+i-1)^<>#0) then
-    begin
     end
    else dec(i);
    efi_console_set_cursor_position(currentcolumn,currentrow);
@@ -3244,56 +3520,47 @@ begin
   end;
  GlobalSystemTable^.ConOut^.SetAttribute(GlobalSystemTable^.ConOut,consolebck shl 4+consoletex);
 end;
-procedure efi_console_output_number(number:natint);[public,alias:'EFI_CONSOLE_OUTPUT_NUMBER'];
-const numchar:PWideChar='0123456789';
-var num,procnum,index1,index2:natuint;
-    negative:boolean;
-    numstr:PWideChar;
+procedure efi_console_read_password_string(var ReadString:PWideChar);[public,alias:'EFI_CONSOLE_READ_PASSWORD_STRING'];
+var key:efi_input_key;
+    waitidx,i,j:natuint;
+    procstring:PWideChar;
 begin
- if(number<0) then negative:=true else negative:=false;
- num:=abs(number); procnum:=1; index1:=1;
- while(procnum*10<=num) do 
+ if(ReadString<>nil) then efi_freemem(ReadString);
+ Readstring:=efi_allocmem(sizeof(WideChar)); i:=0;
+ while (True) do
   begin
-   inc(index1);
-   procnum:=procnum*10;
+   inc(i);
+   procstring:=efi_allocmem(sizeof(WideChar)*(i+1));
+   efi_move(ReadString,procstring,sizeof(WideChar)*(i+1));
+   efi_freemem(ReadString); ReadString:=procstring;
+   GlobalSystemTable^.BootServices^.WaitForEvent(1,@GlobalSystemTable^.ConIn^.WaitForKey,waitidx);
+   GlobalSystemTable^.ConIn^.ReadKeyStroke(GlobalSystemTable^.ConIn,key);
+   if(key.ScanCode=0) then (ReadString+i-1)^:=key.UnicodeChar else (ReadString+i-1)^:=#0;
+   if((ReadString+i-1)^=#10) or ((ReadString+i-1)^=#13) then
+    begin
+     (ReadString+i-1)^:=#0; 
+     GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,#13#10);
+     currentcolumn:=0; inc(currentrow);
+     if(currentrow>=maxrow) then efi_console_clear_screen;
+     break;
+    end
+   else if((ReadString+i-1)^=#8) then
+    begin
+     if(i>0) then
+      begin 
+       (ReadString+i-1)^:=#0; dec(i);  
+       if(i>0) then
+        begin
+         (ReadString+i-1)^:=#0; dec(i);
+        end;
+      end;
+    end
+   else if((ReadString+i-1)^<>#0) then
+    begin
+    end
+   else dec(i);
+   efi_console_set_cursor_position(currentcolumn,currentrow);
   end;
- numstr:=efi_allocmem((index1+1)*sizeof(WideChar));
- index2:=1;
- while(procnum>=1) do
-  begin
-   (numstr+index2-1)^:=(numchar+optimize_integer_divide(num,procnum))^;
-   num:=optimize_integer_modulo(num,procnum);
-   procnum:=procnum div 10;
-   inc(index2);
-  end;
- (numstr+index2-1)^:=#0;
- if(negative) then efi_console_output_string('-');
- efi_console_output_string(numstr);
- efi_freemem(numstr);
-end;
-procedure efi_console_output_hex(hex:natuint);[public,alias:'EFI_CONSOLE_OUTPUT_HEX'];
-const numchar:PWideChar='0123456789ABCDEF';
-var num,procnum,index1,index2:natuint;
-    numstr:PWideChar;
-begin
- num:=hex; procnum:=1; index1:=1;
- while(procnum shl 4<=num) do 
-  begin
-   inc(index1);
-   procnum:=procnum shl 4;
-  end;
- numstr:=efi_allocmem((index1+1)*sizeof(WideChar));
- index2:=1;
- while(procnum>=1) do
-  begin
-   (numstr+index2-1)^:=(numchar+optimize_integer_divide(num,procnum))^;
-   num:=optimize_integer_modulo(num,procnum);
-   procnum:=procnum shr 4;
-   inc(index2);
-  end;
- (numstr+index2-1)^:=#0;
- efi_console_output_string(numstr);
- efi_freemem(numstr);
 end;
 procedure efi_console_enable_mouse;[public,alias:'EFI_CONSOLE_ENABLE_MOUSE'];
 begin
@@ -3582,29 +3849,30 @@ procedure efi_loader_exit_boot_services(memorymap:efi_memory_map);[public,alias:
 begin
  GlobalSystemTable^.BootServices^.ExitBootServices(ParentImageHandle,memorymap.memory_key);
 end;
-function efi_get_acpi_table_list:efi_acpi_table_list;[public,alias:'EFI_GET_ACPI_TABLE_LIST'];
-var res:efi_acpi_table_list;
-    i:natuint;
-    ctable:efi_configuration_table;
+function efi_pci_initialize:efi_pci_list;[public,alias:'EFI_PCI_INITIALIZE'];
+var i:Natuint;
+    ptr:Pefi_handle;
+    ptrnum:Natuint;
+    res:efi_pci_list; 
 begin
- res.version:=efi_allocmem(GlobalSystemTable^.NumberOfTableEntries);
- res.content:=efi_allocmem(GlobalSystemTable^.NumberOfTableEntries*sizeof(Pointer));
- res.count:=0;
- for i:=1 to GlobalSystemTable^.NumberOfTableEntries do
+ GlobalSystemTable^.BootServices^.LocateHandleBuffer(ByProtocol,@efi_pci_io_protocol_guid,nil,ptrnum,ptr);
+ res.item:=efi_allocmem(sizeof(Pefi_pci_io_protocol)*ptrnum); 
+ res.space:=efi_allocmem(sizeof(efi_pci_configuration_space)*ptrnum);
+ res.count:=ptrnum;
+ for i:=1 to res.count do
   begin
-   ctable:=(GlobalSystemTable^.ConfigurationTable+i-1)^;
-   if(efi_guid_compare(ctable.VendorGuid,efi_acpi_20_table_guid)) or (efi_guid_compare(ctable.VendorGuid,acpi_table_guid)) then
-    begin
-     inc(res.count); 
-     (res.version+res.count-1)^:=efi_guid_compare(ctable.VendorGuid,efi_acpi_20_table_guid);
-     (res.content+res.count-1)^:=ctable.VendorTable; 
-    end;
+   GlobalSystemTable^.BootServices^.HandleProtocol((ptr+i-1)^,@efi_graphics_output_protocol_guid,(res.item+i-1)^);
+   ((res.item+i-1)^)^.Pci.efiRead((res.item+i-1)^,efiPciIOWidthUint32,sizeof(efi_pci_configuration_space) div 4,(res.space+i-1)^);
   end;
- efi_get_acpi_table_list:=res;
+ efi_pci_initialize:=res;
 end;
-procedure efi_free_acpi_table_list(var tablelist:efi_acpi_table_list);[public,alias:'EFI_FREE_ACPI_TABLE_LIST'];
+procedure efi_pci_get_device_info(list:efi_pci_list);[public,alias:'EFI_PCI_GET_DEVICE_INFO'];
 begin
- efi_freemem(tablelist.content); efi_freemem(tablelist.version); tablelist.count:=0;
+
+end;
+procedure efi_pci_free(var list:efi_pci_list);[public,alias:'EFI_PCI_FREE'];
+begin
+ efi_freemem(list.item); efi_freemem(list.space); list.count:=0;
 end;
 
 end.
