@@ -6,7 +6,6 @@ Source Code of UEFI Pascal OS(For x64,aarch64,loongarch64,riscv64 architecture)
 3.run bash build.sh to compile code to CD image with your host architecture.   
 4.If you want to have cross-compiled architecture's image,run build.sh aarch64(for example when your host is x64,you can input loongarch64/riscv64 as a replacement) to compile the CD image for other architecture.  
 5.If you have custom binutils,you can run bash build.sh ARCH BINUTILSDIR to compile with your custom binutils.  
-
 ## Tips to use
-This system is only tested on x64 architecture.My host cannot test riscv64 architecture due to riscv64 virtual machine performance is too bad.  
-Other two architecture will be tested later.  
+This system is tested in x64,ARM64,riscv64,loongarch64 architecture,but it is just like a bare metal program these days.  
+Device driver seems hard to me,however I will consume many times to overcome it.
