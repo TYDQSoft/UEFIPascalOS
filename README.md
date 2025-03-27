@@ -1,5 +1,7 @@
 # UEFIPascalOS
 Source Code of UEFI Pascal OS(For x64,aarch64,loongarch64,riscv64 architecture)  
+## Tips before use
+These days this OS is problematic,if you want to test,your should edit the source code.  
 ## How to use it
 1.Get the fpc(free pascal compiler) source code from gitlab.  
 2.Compile the fpc source code using fpc installed from linux package manager.    
