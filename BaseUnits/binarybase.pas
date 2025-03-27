@@ -536,6 +536,8 @@ type elf32_header=packed record
                   elf64_section_header_number:word;
                   elf64_section_header_string_table_index:word;
                   end;
+    Pelf32_header=^elf32_header;
+    Pelf64_header=^elf64_header;
     elf32_section_header=packed record
                          section_header_name:dword;
                          section_header_type:dword;
@@ -625,6 +627,8 @@ type elf32_header=packed record
                          program_memory_size:qword;
                          program_align:qword;
                          end;
+    Pelf32_program_header=^elf32_program_header;
+    Pelf64_program_header=^elf64_program_header;
     elf32_dynamic_union=packed record
                         case Boolean of
                         True:(dynamic_value:dword;);
