@@ -77,7 +77,7 @@ begin
  else 
  res.name:=WStrCreate('Unrecognized Device');
  res.index:=0;
- if(iolist<>nil) then
+ if(iolist<>nil) and (iocount<>0) then
   begin
    res.io:=allocmem(iocount*sizeof(device_io_info));
    Move(iolist^,res.io^,sizeof(device_io_info)*iocount);
@@ -103,7 +103,6 @@ begin
 end;
 procedure device_list_add_item(var list:device_object_list;item:device_object);[public,alias:'device_list_add_item'];
 var i,j:natuint; 
-    bool:boolean;
 begin
  i:=1;
  while(i<=list.maxindex)do
@@ -116,6 +115,7 @@ begin
   begin
    inc(list.count);
    list.item:=allocmem(sizeof(device_object));
+   list.item^.name:=allocmem(Wstrlen(item.name)*sizeof(WideChar)+sizeof(WideChar));
    Move(item.name^,list.item^.name^,Wstrlen(item.name)*sizeof(WideChar)+sizeof(WideChar));
    list.item^.info:=item.info;
    list.item^.index:=i;
@@ -127,6 +127,7 @@ begin
   begin
    inc(list.count);
    ReallocMem(list.item,sizeof(device_object)*list.count);
+   (list.item+list.count-1)^.name:=allocmem(Wstrlen(item.name)*sizeof(WideChar)+sizeof(WideChar));
    Move(item.name^,(list.item+list.count-1)^.name^,Wstrlen(item.name)*sizeof(WideChar)+sizeof(WideChar));
    (list.item+list.count-1)^.info:=item.info;
    (list.item+list.count-1)^.index:=i;
@@ -142,6 +143,7 @@ begin
  item:=(list.item+position-1)^;
  if(item.index=list.maxindex) then 
   begin
+   dec(list.maxindex);
    while(device_list_search_for_index(list,list.maxindex)) do dec(list.maxindex);
   end;
  FreeMem(item.name); FreeMem(item.io);

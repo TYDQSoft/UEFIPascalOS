@@ -146,7 +146,9 @@ type
 
 const passwdstr:PChar='rbflMNldcanDUmuuov2CLochbexUVOVdFyuM5sdhxl6tsNMb3kGpMYfq6unhLkLJVHN16dNfGrF0HUyiuJMux9jR29SC9F0MrlJmksMwps5oipJIIwFa7HNixo0oWR9NHpc1sJRpdlXbRIqBZwo7TKSAtXRLLYAXsMwLfZCQsVBDbhm2XAMtomD8hu2DC3KOBW0HNSw2VVDiIKL2xfAOlzhx0EKCULVsdbuDpKi8oxZyFbrMh4DBcFJPtCWlTqFgASL9i7ZxL3R8I0Xoa10llEBt4xy4Be5Oph6KPsifZtc0sDbuxDZjJ85aw1XmNCIof73eBYUFyuoId9TPxAfVeVdrBUfPvxcqliMO82T08lEoXPftR54siClSdSV4PTsjoNZKvIf4j0z4ntESeh2Qq6smyE1pgAQjfY0YG8kvD4mo4AkTUHs3YkvbhCNySrv9f0XEP6Lp35sdlBHG85WCSk15uB6WxaJx9Wke8kRZckuEFSMyV2AjBfrwqGa5R3Rr';
       passwdstroffset:array[1..5,1..11] of shortint=((-1,-3,-4,-7,4,3,9,11,13,-9,2),(-2,-3,-4,-6,4,3,9,13,13,-9,2),(-4,-7,-4,-7,4,3,4,11,21,-9,2),(-2,-3,-4,-7,4,5,9,11,13,-9,4),(-3,-9,-4,-7,4,3,15,11,13,-9,13));
-      pi:extended=3.141592654;
+      pi:extended=3.1415926535;
+      maxextended:extended=1.7E308;
+      minextended:extended=-1.7E308;
 procedure fpc_specific_handler;compilerproc;
 procedure fpc_handleerror;compilerproc;
 procedure fpc_lib_exit;compilerproc;
@@ -193,14 +195,30 @@ function banker_round(x:extended):natint;
 function sqr(x:natuint):natuint;
 function sqr(x:natint):natint;
 function sqr(x:extended):extended;
-function sqrt(x:natuint):natuint;
+function degtorad(x:extended):extended;
+function radtodeg(x:extended):extended;
+function sqrt(x:Natuint):Natuint;
 function sqrt(x:extended):extended;
-function log2(x:extended):extended;
+function factorial(x:natuint):extended;
+function intpower(base:extended;exponent:natint):extended;
 function ln(x:extended):extended;
-function log10(x:extended):extended;
-function IntPower(base:extended;exponent:Natint):extended;
-function Power(base:extended;exponent:extended):extended;
-function exp(exponent:extended):extended;
+function log2(x:extended):extended;
+function lg(x:extended):extended;
+function log(base,x:extended):extended;
+function exp(x:extended):extended;
+function power(base:extended;exponent:extended):extended;
+function sin(x:extended):extended;
+function cos(x:extended):extended;
+function tan(x:extended):extended;
+function cot(x:extended):extended;
+function sec(x:extended):extended;
+function csc(x:extended):extended;
+function arcsin(x:extended):extended;
+function arccos(x:extended):extended;
+function arctan(x:extended):extended;
+function arccot(x:extended):extended;
+function arcsec(x:extended):extended;
+function arccsc(x:extended):extended;
 function strlen(str:Pchar):natuint;
 function wstrlen(str:PWideChar):natuint;
 procedure strinit(var str:PChar;size:natuint);
@@ -618,7 +636,8 @@ procedure heap_move_mem(heap:heap_record;src,dest:Pointer);
 var start1,start2:Pqword;
     size1,size2,i:natuint;
 begin
- if(src=nil) or (dest=nil) then exit;
+ if(src=nil) or (src<heap.mem_start) or (src>=heap.mem_end-heap.item_max_pos*sizeof(heap_item)) 
+ or(dest=nil) or (dest<heap.mem_start) or (dest>=heap.mem_end-heap.item_max_pos*sizeof(heap_item)) then exit;
  start1:=heap_get_mem_start(heap,src);
  start2:=heap_get_mem_start(heap,dest);
  size1:=heap_get_mem_size(heap,src);
@@ -657,11 +676,17 @@ begin
 end;
 procedure universial_move(const src;var dest;Size:natuint);
 var i:Natuint;
+    q1,q2:Pqword;
     d1,d2:Pdword;
     w1,w2:Pword;
     b1,b2:Pbyte;
 begin
- if(Size-Size shr 2 shl 2=0) then
+ if(Size-Size shr 3 shl 3=0) then
+  begin
+   q1:=Pqword(@src); q2:=Pqword(@dest);
+   for i:=1 to Size shr 3 do (q2+i-1)^:=(q1+i-1)^;
+  end
+ else if(Size-Size shr 2 shl 2=0) then
   begin
    d1:=Pdword(@src); d2:=Pdword(@dest);
    for i:=1 to Size shr 2 do (d2+i-1)^:=(d1+i-1)^;
@@ -696,7 +721,7 @@ begin
    tempnum:=tempnum shr 1;
    inc(i);
   end;
- compheap:=universial_heap_initialize(start,start+totalsize-1,i);
+ compheap:=universial_heap_initialize(start,start+totalsize,i);
 end;
 function fpc_getmem(size:Natuint):Pointer;compilerproc;[public,alias:'FPC_GETMEM'];
 begin
@@ -731,7 +756,7 @@ begin
    tempnum:=tempnum shr 1;
    inc(i);
   end;
- sysheap:=universial_heap_initialize(start,start+totalsize-1,i);
+ sysheap:=universial_heap_initialize(start,start+totalsize,i);
 end;
 function getmem(size:natuint):Pointer;[public,alias:'getmem'];
 begin
@@ -766,7 +791,7 @@ begin
    tempnum:=tempnum shr 1;
    inc(i);
   end;
- exeheap:=universial_heap_initialize(start,start+totalsize-1,i);
+ exeheap:=universial_heap_initialize(start,start+totalsize,i);
 end;
 function exeheap_getmem(size:natuint):Pointer;[public,alias:'exeheap_getmem'];
 begin
@@ -961,89 +986,234 @@ function sqr(x:extended):extended;[public,alias:'sqr_extended'];
 begin
  sqr:=x*x;
 end;
-function sqrt(x:natuint):natuint;
+function degtorad(x:extended):extended;
+begin
+ degtorad:=(x/180)*pi;
+end;
+function radtodeg(x:extended):extended;
+begin
+ radtodeg:=(x/pi)*180;
+end;
+function sqrt(x:Natuint):Natuint;
 var i:Natuint;
 begin
- i:=0;
- while(i*i<x)do inc(i);
- sqrt:=i;
+ if(x=0) then sqrt:=0
+ else
+  begin
+   i:=1;
+   while(i*i<=x)do inc(i);
+   sqrt:=i-1;
+  end;
 end;
 function sqrt(x:extended):extended;
+var base,step:extended;
+    i:byte;
 begin
- sqrt:=Power(x,0.5);
+ base:=0; step:=1; i:=1;
+ while(i<=10)do
+  begin
+   while(base*base<=x)do base:=base+step;
+   base:=base-step; step:=step/10; inc(i);
+  end;
+ sqrt:=base;
+end;
+function sqrt(x:extended;precision:byte):extended;
+var base,step:extended;
+    i:byte;
+begin
+ base:=0; step:=1; i:=1;
+ while(i<=precision)do
+  begin
+   while(base*base<=x)do base:=base+step;
+   base:=base-step; step:=step/10; inc(i);
+  end;
+ sqrt:=base;
 end;
 function factorial(x:natuint):extended;
-var i:Natuint;
-    tempnum:extended;
+var res:extended;
+    i:natuint;
 begin
- tempnum:=1;
- for i:=1 to x do tempnum:=tempnum*i;
- factorial:=tempnum;
+ i:=1; res:=1;
+ while(i<=x)do
+  begin
+   res:=res*i; inc(i);
+  end;
+ factorial:=res;
+end;
+function intpower(base:extended;exponent:natint):extended;
+var res:extended;
+    i:natint;
+begin
+ if(exponent>0) then
+  begin
+   res:=1;
+   for i:=1 to exponent do res:=res*base;
+   intpower:=res;
+  end
+ else if(exponent=0) then intpower:=1
+ else if(exponent<0) then
+  begin
+   res:=1;
+   for i:=-1 downto exponent do res:=res*base;
+   intpower:=1/res;
+  end;
+end;
+function ln(x:extended):extended;
+const ln2:extended=0.6931471806;
+var a,n,res:extended;
+    i:byte;
+begin
+ if(x<=0) then exit(0);
+ n:=1;
+ while(n<=x)do n:=n*16;
+ a:=x/n; res:=0;
+ for i:=1 to 10 do
+  begin
+   if(i-i shr 1 shl 1=0) then res:=res-(1/i)*IntPower(a-1,i)
+   else res:=res+(1/i)*IntPower(a-1,i);
+  end;
+ ln:=res+4*n*ln2;
 end;
 function log2(x:extended):extended;
 begin
- log2:=ln(x)/ln(10);
+ log2:=ln(x)/ln(2);
 end;
-function ln(x:extended):extended;
-var i:Natuint;
-    tempnum:extended;
+function lg(x:extended):extended;
 begin
- i:=1; tempnum:=0;
- while(i<=10)do
+ lg:=ln(x)/ln(10);
+end;
+function log(base,x:extended):extended;
+begin
+ if(base<0) then exit(0);
+ log:=ln(x)/ln(base);
+end;
+function exp(x:extended):extended;
+var i:byte;
+    res:extended;
+begin
+ res:=0;
+ for i:=1 to 10 do res:=res+intpower(x,i-1)/factorial(i-1);
+end;
+function power(base:extended;exponent:extended):extended;
+var i:byte;
+    res:extended;
+begin
+ res:=0;
+ for i:=1 to 10 do res:=res+intpower(exponent*ln(base),i-1)/factorial(i-1);
+ power:=res;
+end;
+function get_radian_offset(x:extended):extended;
+var tempval:extended;
+begin
+ tempval:=x;
+ while(tempval<0) or (tempval>pi*2) do
   begin
-   if(i mod 2=0) then tempnum:=tempnum-IntPower(x-1,i)/i else tempnum:=tempnum+IntPower(x-1,i)/i;
-   inc(i);
+   if(tempval<0) then tempval:=tempval+pi*2
+   else tempval:=tempval-pi*2;
   end;
- ln:=tempnum;
+ get_radian_offset:=tempval;
 end;
-function log10(x:extended):extended;
+function sin(x:extended):extended;
+var tempfloat,res:extended;
+    i:byte;
 begin
- log10:=ln(x)/ln(10);
-end;
-function logn(n:extended;x:extended):extended;
-begin
- logn:=ln(x)/ln(n);
-end;
-function IntPower(base:extended;exponent:Natint):extended;
-var i:Natint;
-    tempnum:extended;
-begin
- tempnum:=1;
- if(exponent>0) then
+ tempfloat:=get_radian_offset(x); res:=0;
+ for i:=1 to 10 do
   begin
-   for i:=1 to exponent do tempnum:=tempnum*base;
-  end
- else if(exponent=0) then IntPower:=1
- else 
-  begin
-   for i:=-1 downto exponent do tempnum:=tempnum/base;
+   if(i-i shr 1 shl 1=0) then
+   res:=res-IntPower(x,2*i-1)/Factorial(2*i-1)
+   else
+   res:=res+IntPower(x,2*i-1)/Factorial(2*i-1);
   end;
- IntPower:=tempnum;
+ sin:=res;
 end;
-function Power(base:extended;exponent:extended):extended;
-var i:natuint;
-    tempnum:extended;
+function cos(x:extended):extended;
+var tempfloat,res:extended;
+    i:byte;
 begin
- tempnum:=1; i:=1;
- while(i<=10)do
+ tempfloat:=get_radian_offset(x); res:=0;
+ for i:=1 to 10 do
   begin
-   tempnum:=tempnum+IntPower(exponent*ln(base),i-1)/factorial(i-1);
-   inc(i);
+   if(i-i shr 1 shl 1=0) then
+   res:=res-IntPower(x,2*i-2)/Factorial(2*i-2)
+   else
+   res:=res+IntPower(x,2*i-2)/Factorial(2*i-2);
   end;
- Power:=tempnum;
+ cos:=res;
 end;
-function exp(exponent:extended):extended;
-var i:Natint;
-    tempnum:extended;
+function tan(x:extended):extended;
+var sinval,cosval:extended;
 begin
- i:=1; tempnum:=0;
- while(i<=10)do
-  begin
-   tempnum:=tempnum+IntPower(exponent,i-1)/factorial(i-1);
-   inc(i);
-  end;
- exp:=tempnum;
+ sinval:=sin(x); cosval:=cos(x);
+ if(cosval=0) then tan:=maxextended else tan:=sinval/cosval;
 end;
+function cot(x:extended):extended;
+var sinval,cosval:extended;
+begin
+ sinval:=sin(x); cosval:=cos(x);
+ if(cosval=0) then cot:=maxextended else cot:=sinval/cosval;
+end;
+function sec(x:extended):extended;
+var cosval:extended;
+begin
+ cosval:=cos(x);
+ if(cosval=0) then sec:=maxextended else sec:=1/cosval;
+end;
+function csc(x:extended):extended;
+var sinval:extended;
+begin
+ sinval:=sin(x);
+ if(sinval=0) then csc:=maxextended else csc:=1/sinval;
+end;
+function arcsin(x:extended):extended;
+var res,b1,b2:extended;
+    n,m:byte;
+begin
+ if(x<-1) or (x>1) then exit(maxextended);
+ res:=0;
+ for n:=1 to 10 do
+  begin
+   b1:=1; b2:=1;
+   for m:=1 to n-1 do
+    begin
+     b1:=b1*(2*m-1); b2:=b2*(2*m);
+    end;
+   res:=res+b1/b2*IntPower(x,2*n-1)/(2*n-1);
+  end;
+ arcsin:=res;
+end;
+function arccos(x:extended):extended;
+begin
+ if(x<-1) or (x>1) then exit(maxextended);
+ arccos:=pi/2-arcsin(x);
+end;
+function arctan(x:extended):extended;
+var n:byte;
+    res:extended;
+begin
+ res:=0;
+ for n:=1 to 10 do
+  begin
+   if(n-n shr 1 shl 1=0) then
+   res:=res-IntPower(x,2*n-1)/(2*n-1)
+   else
+   res:=res+IntPower(x,2*n-1)/(2*n-1);
+  end;
+ arctan:=res;
+end;
+function arccot(x:extended):extended;
+begin
+ arccot:=pi/2-arctan(x);
+end;
+function arcsec(x:extended):extended;
+begin
+ arcsec:=arccos(1/x);
+end;
+function arccsc(x:extended):extended;
+begin
+ arccsc:=arcsin(1/x);
+end;
+           
 function strlen(str:Pchar):natuint;[public,alias:'strlen'];
 var res:natuint;
 begin

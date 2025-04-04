@@ -3234,8 +3234,8 @@ begin
 end;
 procedure efi_console_clear_screen;[public,alias:'EFI_CONSOLE_CLEAR_SCREEN'];
 begin
- //GlobalSystemTable^.ConOut^.ClearScreen(GlobalSystemTable^.ConOut);
- //currentcolumn:=0; currentrow:=0;
+ GlobalSystemTable^.ConOut^.ClearScreen(GlobalSystemTable^.ConOut);
+ currentcolumn:=0; currentrow:=0;
 end;
 function efi_get_platform:byte;[public,alias:'EFI_GET_PLATFORM'];
 begin
