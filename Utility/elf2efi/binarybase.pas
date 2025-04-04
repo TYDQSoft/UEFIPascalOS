@@ -1033,7 +1033,7 @@ end;
 procedure pe_move_dos_code_to_dos_stub(const Source;var dest);
 var i:byte;
 begin
- for i:=1 to $40 do PByte(@dest+i-1)^:=PByte(@source+i-1)^;
+ for i:=1 to 8 do Pqword(@dest+(i-1) shl 3)^:=Pqword(@source+(i-1) shl 3)^;
 end;
 
 end.
