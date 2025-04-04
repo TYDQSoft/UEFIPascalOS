@@ -7,17 +7,29 @@ uses uefi,binarybase,graphics,device;
 var os_devlist:device_object_list;
 
 procedure kernel_main;[public,alias:'kernel_main'];
-var ptr:Pgraph_item;
+var ptr1,ptr2,ptr3,ptr4:Pointer;
 begin
- ptr:=graph_heap_allocmem(1,1,graph_heap.screen_width,graph_heap.screen_height,true);
- graph_heap_draw_block(ptr,1,1,graph_heap.screen_width,graph_heap.screen_height,graph_yellow);
- graph_heap_output_screen;
- graph_heap_freemem(ptr);
+ ptr4:=graph_heap_allocmem(gheap.screen_width,gheap.screen_height,1,1,true);
+ ptr1:=graph_heap_allocmem(640,480,1,1,true);
+ ptr2:=graph_heap_allocmem(960,720,641,481,true);
+ ptr3:=graph_heap_allocmem(640,480,1281,961,true);
+ graph_heap_draw_block(ptr4,1,1,gheap.screen_width,gheap.screen_height,graph_color_red);
+ graph_heap_draw_eclipse(ptr1,1,1,240,360,graph_color_yellow);
+ graph_heap_draw_fanshape(ptr2,480,360,300,60,120,graph_color_green);
+ graph_heap_draw_block(ptr3,200,1,240,480,graph_color_blue);
+ if(gheap.screen_attribute.virtiogpu=false) then graph_heap_output_screen 
+ else graph_heap_output_screen_using_virtio_gpu;
+ graph_heap_freemem(ptr2);
+ graph_heap_freemem(ptr1);
+ graph_heap_freemem(ptr4);
+ graph_heap_freemem(ptr3); 
 end;
 function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif}[public,alias:'_start'];
+    {For UEFI Memory}
 var memmap:efi_memory_map;
     smemmap:efi_memory_map_simple;
     memres:efi_memory_map_result;
+    {For Graphics}
     graphlist:efi_graphics_list;
     graphaddress:natuint=0;
     graphwidth,graphheight:dword;
@@ -35,6 +47,7 @@ begin
  {Initialize the uefi loader}
  efi_console_initialize(efi_bck_black,efi_lightgrey,0);
  efi_console_output_string('Welcome to TYDQ bootloader!'#10);
+ graphaddress:=0;
  {Initialize the PCI device list}
  efi_console_output_string('Device initializing......'#10);
  devlist:=efi_device_list_initialize;
@@ -45,7 +58,7 @@ begin
  graphwidth:=(graphlist.graphics_item^)^.Mode^.Info^.HorizontalResolution;
  graphheight:=(graphlist.graphics_item^)^.Mode^.Info^.VerticalResolution;
  if((graphlist.graphics_item^)^.Mode^.Info^.PixelFormat=PixelRedGreenBlueReserved8BitPerColor) then graphcolortype:=1 else graphcolortype:=0;
- if(graphaddress=0) or (graphwidth=0) or (graphheight=0) then 
+ if(graphwidth=0) or (graphheight=0) then 
   begin
    efi_console_output_string('Graphics initialization failed.'#10);
    while True do;
@@ -61,7 +74,7 @@ begin
    efi_console_output_string('Compiler Heap Error!'#10);
    while True do;
   end;
- compheap_initialize(Natuint(memres.memory_start),memres.memory_size,128);
+ compheap_initialize(Natuint(memres.memory_start),memres.memory_size,16);
  {Set the system heap}
  memres:=efi_loader_find_suitable_memory_map(smemmap,smemmap.memory_total_size shr 1);
  if(memres.memory_size=0) then
@@ -69,7 +82,7 @@ begin
    efi_console_output_string('System Heap Error!'#10);
    while True do;
   end;
- sysheap_initialize(Natuint(memres.memory_start),memres.memory_size,128);
+ sysheap_initialize(Natuint(memres.memory_start),memres.memory_size,16);
  {Set the executable heap}
  memres:=efi_loader_find_suitable_memory_map(smemmap,smemmap.memory_total_size shr 3);
  if(memres.memory_size=0) then
@@ -77,7 +90,7 @@ begin
    efi_console_output_string('Executable Heap Error!'#10);
    while True do;
   end;
- exeheap_initialize(Natuint(memres.memory_start),memres.memory_size,128);
+ exeheap_initialize(Natuint(memres.memory_start),memres.memory_size,16);
  {Set the graphics heap}
  memres:=efi_loader_find_suitable_memory_map(smemmap,smemmap.memory_total_size shr 2); 
  if(memres.memory_size=0) then
@@ -85,7 +98,11 @@ begin
    efi_console_output_string('Graphics Heap Error!'#10);
    while True do;
   end;
- graph_heap_initialize(Natuint(memres.memory_start),memres.memory_size,4096,graphwidth,graphheight,graphaddress,graphcolortype);
+ if(graphaddress=0) then
+ graph_heap_initialize(memres.memory_start,memres.memory_size,8,graphwidth,graphheight,true,graphcolortype,nil)
+ else
+ graph_heap_initialize(memres.memory_start,memres.memory_size,8,graphwidth,graphheight,false,graphcolortype,
+ Pointer(graphaddress));
  {Convert the PCI device list to OS's device list}
  i:=1;
  os_devlist:=device_list_initialize;
@@ -108,7 +125,7 @@ begin
       end;
      inc(j);
     end;
-   if(iocount=0) then
+   if(iocount=0) or (iolist=nil) then
     begin
      inc(i); continue;
     end
@@ -127,7 +144,6 @@ begin
    inc(i);
   end;
  efi_Console_output_string('All Device initialized!'#10);
- while True do;
  {Clear the list of memory map}
  efi_freemem(memmap.memory_descriptor);
  efi_freemem(smemmap.memory_start);
