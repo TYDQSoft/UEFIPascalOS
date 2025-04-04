@@ -11,3 +11,5 @@ These days this OS is problematic,if you want to test,your should edit the sourc
 ## Tips to use
 This system is tested in x64,ARM64,riscv64,loongarch64 architecture,but it is just like a bare metal program these days.  
 Device driver seems hard to me,however I will consume many times to overcome it.
+## Clause I've use
+BSD-4.0 Clause
