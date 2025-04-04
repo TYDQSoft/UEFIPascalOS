@@ -83,7 +83,7 @@
 	 OCNAME="loongarch64-linux-gnu-"
 	 BITS="64"
 	 CCISONAME="loongarch64"
-	 CCISONAMEL="LOONGARCH64"
+	 CCISONAMEL="LOONGARCH64" 
 	elif [ "$CROSSARCH" = "i386" ]; then
 	 CCARCH="386"
 	 CCARCHNAME="i386"
@@ -137,9 +137,14 @@
 	Utility/genfs/genfs create Binaries/fat.img fat32 64MB
 	Utility/genfs/genfs add Binaries/fat.img Binaries/Kernel/*.efi /EFI/BOOT/BOOT$CCISONAMEL.EFI
 	rm -rf Utility/genfs/*.o Utility/genfs/*.ppu
-	mkdir Binaries/iso
-	cp Binaries/fat.img Binaries/iso
-	xorriso -as mkisofs -R -f -e fat.img -no-emul-boot -o Binaries/cdimage$CCISONAME.iso Binaries/iso
-	rm -rf Binaries/System Binaries/fat.img Binaries/iso
+	/home/tydq/source/compiler/ppc$CARCH -n -O3 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Fu/home/tydq/source/compiler/$CARCHNAME/units/$CARCHNAME-linux -Fu/home/tydq/source/rtl/units/$CARCHNAME-linux -dcpu$BITS -Cg Utility/geniso/geniso.pas
+	rm -rf Utility/geniso/*.o Utility/geniso/*.ppu
+	Utility/geniso/geniso Binaries/cdimage$CCISONAME.iso Binaries/fat.img eltorito fat.img
+	#mkdir Binaries/iso
+	#cp Binaries/fat.img Binaries/iso
+	#xorriso -as mkisofs -R -f -e fat.img -no-emul-boot -o Binaries/cdimage$CCISONAME.iso Binaries/iso
+	rm -rf Binaries/System Binaries/iso
+	rm -rf Binaries/fat.img
 	rm -rf Utility/elf2efi/elf2efi 
 	rm -rf Utility/genfs/genfs
+	rm -rf Utility/geniso/geniso
