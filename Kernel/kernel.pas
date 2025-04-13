@@ -2,12 +2,21 @@ program kernel;
 
 {$MODE FPC}
 
-uses uefi,binarybase,graphics,device;
-    
-var os_devlist:device_object_list;
+uses uefi,binarybase,graphics,device,acpi,kernelbase;
 
+function kernel_timer(param:Pointer):Pointer;
+var ptr:Pointer;
+    xpos,ypos:Integer;
+begin
+ ptr:=PPointer(param)^;
+ xpos:=graph_heap_get_x_position(ptr); ypos:=graph_heap_get_y_position(ptr);
+ graph_heap_edit_canva(ptr,xpos+160,ypos+160,true);
+ graph_heap_output_screen;
+ kernel_timer:=nil;
+end;
 procedure kernel_main;[public,alias:'kernel_main'];
 var ptr1,ptr2,ptr3,ptr4:Pointer;
+    request:acpi_request;
 begin
  ptr4:=graph_heap_allocmem(gheap.screen_width,gheap.screen_height,1,1,true);
  ptr1:=graph_heap_allocmem(640,480,1,1,true);
@@ -17,8 +26,17 @@ begin
  graph_heap_draw_eclipse(ptr1,1,1,240,360,graph_color_yellow);
  graph_heap_draw_fanshape(ptr2,480,360,300,60,120,graph_color_green);
  graph_heap_draw_block(ptr3,200,1,240,480,graph_color_blue);
- if(gheap.screen_attribute.virtiogpu=false) then graph_heap_output_screen 
- else graph_heap_output_screen_using_virtio_gpu;
+ graph_heap_output_screen;
+ kernel_handle_function_init(@kernel_timer);
+ kernel_handle_function_add_param(Pointer(ptr1));
+ request.requestrootclass:=acpi_request_x86_local_apic;
+ request.requestsubclass:=acpi_request_x86_local_apic_timer;
+ request.requestAPICIndex:=1;
+ request.requestTimer:=10;
+ request.requestTimerStatus:=0;
+ request.requestNumber:=33;
+ acpi_cpu_request_interrupt(os_cpuinfo,request);
+ while True do;
  graph_heap_freemem(ptr2);
  graph_heap_freemem(ptr1);
  graph_heap_freemem(ptr4);
@@ -54,14 +72,27 @@ begin
  {Obtain the graph list}
  graphlist:=efi_graphics_initialize;
  efi_graphics_get_maxwidth_maxheight_and_maxdepth(graphlist,1);
- graphaddress:=(graphlist.graphics_item^)^.Mode^.FrameBufferBase;
- graphwidth:=(graphlist.graphics_item^)^.Mode^.Info^.HorizontalResolution;
- graphheight:=(graphlist.graphics_item^)^.Mode^.Info^.VerticalResolution;
- if((graphlist.graphics_item^)^.Mode^.Info^.PixelFormat=PixelRedGreenBlueReserved8BitPerColor) then graphcolortype:=1 else graphcolortype:=0;
- if(graphwidth=0) or (graphheight=0) then 
+ if(graphlist.graphics_count>0) then
   begin
-   efi_console_output_string('Graphics initialization failed.'#10);
-   while True do;
+   efi_console_output_string('GPU initializing......'#10);
+   {If the graphlist have graph item,then normally initialize}
+   graphaddress:=(graphlist.graphics_item^)^.Mode^.FrameBufferBase;
+   graphwidth:=(graphlist.graphics_item^)^.Mode^.Info^.HorizontalResolution;
+   graphheight:=(graphlist.graphics_item^)^.Mode^.Info^.VerticalResolution;
+   if((graphlist.graphics_item^)^.Mode^.Info^.PixelFormat=PixelRedGreenBlueReserved8BitPerColor) then 
+   graphcolortype:=1 
+   else 
+   graphcolortype:=0;
+   if(graphwidth=0) or (graphheight=0) then 
+    begin
+     efi_console_output_string('Graphics initialization failed.'#10); while True do;
+    end;
+  end
+ else
+  begin
+   {else initialize empty}
+   graphaddress:=0; graphwidth:=0; graphheight:=0; graphcolortype:=0;
+   efi_console_output_string('Graphics initialization failed.'#10); while True do;
   end;
  {Initialize the memory map of UEFI}
  efi_console_output_string('Memory initializing......'#10);
@@ -128,10 +159,6 @@ begin
    if(iocount=0) or (iolist=nil) then
     begin
      inc(i); continue;
-    end
-   else
-    begin
-     efi_console_output_string('Vaild MMIO Device!'#10);
     end;
    {Create the device object}
    devobj:=device_list_construct_device_object(tempdevitem.ClassCode[1],tempdevitem.ClassCode[2],tempdevitem.ClassCode[3],
@@ -140,7 +167,7 @@ begin
    device_list_add_item(os_devlist,devobj);
    {Free the solo device object}
    FreeMem(iolist); iocount:=0;
-   FreeMem(devobj.name); FreeMem(devobj.io); devobj.iocount:=0;
+   FreeMem(devobj.io); devobj.iocount:=0;
    inc(i);
   end;
  efi_Console_output_string('All Device initialized!'#10);
@@ -150,12 +177,23 @@ begin
  efi_freemem(smemmap.memory_size);
  efi_graphics_free(graphlist);
  efi_device_list_free(devlist);
+ {Generate the cpu info}
+ efi_console_output_string('Get the Processor information......'#10);
+ os_cpuinfo:=efi_get_cpu_info_from_acpi_table;
+ efi_console_output_string('Processor information got!'#10);
  {Exit boot services}
  efi_console_output_string('Exit the Boot Services......'#10);
  efi_loader_exit_boot_services(memmap);
+ {Enable the FPU in loongarch(LoongArch Only)}
+ {$IFDEF CPULOONGARCH64}
+ asm
+  li.w        $t0, 0x1
+  csrxchg     $t0, $t0, 0x2
+ end;
+ {$ENDIF}
  {Enter the kernel}
+ kernel_initialize;
  kernel_main;
- while True do;
  efi_main:=efi_success;
 end;
 
