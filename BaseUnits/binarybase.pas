@@ -1,8 +1,12 @@
 unit binarybase;
 
+{$mode FPC}
+
 interface
 
-const elf_file_identify:array[1..4] of char=(#$7F,'E','L','F');
+type Integer=-$7FFFFFFF..$7FFFFFFF;
+
+const elf_file_identify:array[1..4] of byte=($7F,Byte('E'),Byte('L'),Byte('F'));
       elf_class_pos=5;
       elf_data_pos=6;
       elf_version_pos=7;
@@ -503,6 +507,11 @@ const elf_file_identify:array[1..4] of char=(#$7F,'E','L','F');
       {For LoongArch}
       pe_image_rel_base_loongarch32_mark_la=8;
       pe_image_rel_base_loongarch64_mark_la=8;
+      {For DOS Stub Code}
+      pe_dos_code:array[1..$40] of byte=($0E,$1F,$BA,$0E,$00,$B4,$09,$CD,$21,
+      $B8,$01,$4C,$CD,$21,$54,$68,$69,$73,$20,$70,$72,$6F,$67,$72,$61,$6D,$20,$63,$61,$6E,$6E,$6F,
+      $74,$20,$62,$65,$20,$72,$75,$6E,$20,$69,$6E,$20,$44,$4F,$53,$20,$6D,$6F,$64,$65,$2E,$0D,
+      $0D,$0A,$24,$00,$00,$00,$00,$00,$00,$00);
       
 type elf32_header=packed record 
                   elf32_identify:array[1..16] of byte;
@@ -536,8 +545,11 @@ type elf32_header=packed record
                   elf64_section_header_number:word;
                   elf64_section_header_string_table_index:word;
                   end;
-    Pelf32_header=^elf32_header;
-    Pelf64_header=^elf64_header;
+    elf_header=packed record
+               case Boolean of
+               True:(head32:elf32_header;);
+               False:(head64:elf64_header;);
+               end;
     elf32_section_header=packed record
                          section_header_name:dword;
                          section_header_type:dword;
@@ -562,6 +574,12 @@ type elf32_header=packed record
                          section_header_address_align:qword;
                          section_header_entry_size:qword;
                          end;
+    elf_section_header=packed record
+                       case Boolean of
+                       True:(sec32:elf32_section_header;);
+                       False:(sec64:elf64_section_header;);
+                       end;
+    Pelf_section_header=^elf_section_header;
     elf32_compression_header=packed record
                              compression_header_type:dword;
                              compression_header_size:dword;
@@ -573,6 +591,12 @@ type elf32_header=packed record
                              compression_header_size:qword;
                              compression_header_address_align:qword;
                              end;
+    elf_compression_header=packed record
+                           case Boolean of
+                           True:(c32:elf32_compression_header;);
+                           False:(c64:elf64_compression_header;);
+                           end;
+    Pelf_compression_header=^elf_compression_header;
     elf32_symbol_header=packed record
                         symbol_table_name:dword;
                         symbol_table_value:dword;
@@ -589,6 +613,12 @@ type elf32_header=packed record
                         symbol_table_value:qword;
                         symbol_table_size:qword;
                         end;
+    elf_symbol_header=packed record
+                      case Boolean of
+                      True:(sym32:elf32_symbol_header;);
+                      False:(sym64:elf64_symbol_header;);
+                      end;
+    Pelf_symbol_header=^elf_symbol_header;
     elf32_rel=packed record
               rel_offset:dword;
               rel_info:dword;
@@ -598,6 +628,26 @@ type elf32_header=packed record
                rela_info:dword;
                rela_addend:integer;
                end;
+    Pelf32_rel=^elf32_rel;
+    Pelf32_rela=^elf32_rela;
+    elf32_rel_item=packed record
+                   rel:Pelf32_rel;
+                   count:dword;
+                   end;
+    Pelf32_rel_item=^elf32_rel_item;
+    elf32_rel_list=packed record
+                   item:Pelf32_rel_item;
+                   count:dword;
+                   end;
+    elf32_rela_item=packed record
+                    rela:Pelf32_rela;
+                    count:dword;
+                    end;
+    Pelf32_rela_item=^elf32_rela_item;
+    elf32_rela_list=packed record
+                    item:Pelf32_rela_item;
+                    count:dword;
+                    end;
     elf64_rel=packed record
               rel_offset:qword;
               rel_info:qword;
@@ -607,6 +657,36 @@ type elf32_header=packed record
                rela_info:qword;
                rela_addend:int64;
                end;
+    Pelf64_rel=^elf64_rel;
+    Pelf64_rela=^elf64_rela;
+    elf64_rel_item=packed record
+                   rel:Pelf64_rel;
+                   count:qword;
+                   end;
+    Pelf64_rel_item=^elf64_rel_item;
+    elf64_rel_list=packed record
+                   item:Pelf64_rel_item;
+                   count:qword;
+                   end;
+    elf64_rela_item=packed record
+                    rela:Pelf64_rela;
+                    count:qword;
+                    end;
+    Pelf64_rela_item=^elf64_rela_item;
+    elf64_rela_list=packed record
+                    item:Pelf64_rela_item;
+                    count:qword;
+                    end;
+    elf_rel_list=packed record
+                 case Boolean of
+                 True:(list32:elf32_rel_list;);
+                 False:(list64:elf64_rel_list;);
+                 end;
+    elf_rela_list=packed record
+                  case Boolean of
+                  True:(list32:elf32_rela_list;);
+                  False:(list64:elf64_rela_list;);
+                  end;
     elf32_program_header=packed record
                          program_type:dword;
                          program_offset:dword;
@@ -629,6 +709,12 @@ type elf32_header=packed record
                          end;
     Pelf32_program_header=^elf32_program_header;
     Pelf64_program_header=^elf64_program_header;
+    elf_program_header=packed record
+                       case Boolean of
+                       True:(pro32:elf32_program_header;);
+                       False:(pro64:elf64_program_header;);
+                       end;
+    Pelf_program_header=^elf_program_header;
     elf32_dynamic_union=packed record
                         case Boolean of
                         True:(dynamic_value:dword;);
@@ -647,6 +733,26 @@ type elf32_header=packed record
                   dynamic_tag:int64;
                   dynamic_union:elf64_dynamic_union;
                   end;
+    elf_dynamic=packed record
+                case Boolean of
+                True:(dyn32:elf32_dynamic;);
+                False:(dyn64:elf64_dynamic;);
+                end;
+    Pelf_dynamic=^elf_dynamic;
+    elf_content=packed record
+                case Byte of
+                0:(ptr1:PByte;);
+                1:(ptr2:Pword;);
+                2:(ptr4:Pdword;);
+                end;
+    Pelf_content=^elf_content;
+    elf_file=packed record
+             bit:byte;
+             header:elf_header;
+             secheader:Pelf_section_header;
+             seccontent:Pelf_content;
+             proheader:Pelf_program_header;
+             end;
     pe_image_dos_header=packed record
                         magic_number:word;
                         bytes_on_last_page_of_file:word;
@@ -770,6 +876,7 @@ type elf32_header=packed record
                              NumberOfLineNumbers:word;
                              Characteristics:dword;
                              end;
+     Ppe_image_section_header=^pe_image_section_header;
      pe_dummy_union_name=packed record
                          case Boolean of
                          True:(Characteristics:dword);
@@ -795,10 +902,48 @@ type elf32_header=packed record
                          Offset:0..4095;
                          peType:0..15;
                          end;
-     pe_image_base_relocation=record
+     Ppe_image_type_offset=^pe_image_type_offset;
+     pe_image_base_relocation=packed record
                               VirtualAddress:dword;
                               SizeOfBlock:dword;
                               end;
+     Ppe_image_base_relocation=^pe_image_base_relocation;
+     pe_base_relocation_item=packed record
+                             base:pe_image_base_relocation;
+                             reloc:Ppe_image_type_offset;
+                             count:word;
+                             end;
+     Ppe_base_relocation_item=^pe_base_relocation_item;
+     pe_base_relocation_list=packed record
+                             item:Ppe_base_relocation_item;
+                             count:word;
+                             end;
+     pe_content=packed record
+                case Byte of
+                0:(ptr1:PByte;);
+                1:(ptr2:Pword;);
+                2:(ptr4:Pdword;);
+                end;
+     Ppe_content=^pe_content;
+     pe_file=packed record
+             bit:byte;
+             dosheader:pe_image_dos_header;
+             dosstub:Pbyte;
+             dosstubsize:byte;
+             imageheader:pe_image_header;
+             secheaderaddress:qword;
+             secheader:Ppe_image_section_header;
+             seccontentaddress:qword;
+             seccontent:Ppe_content;
+             peSize:dword;
+             end;
+
+function elf_least_byte_to_most_byte(lsb:word):word;
+function elf_least_byte_to_most_byte(lsb:dword):dword;
+function elf_least_byte_to_most_byte(lsb:qword):qword;
+function elf_most_byte_to_least_byte(msb:word):word;
+function elf_most_byte_to_least_byte(msb:dword):dword;
+function elf_most_byte_to_least_byte(msb:qword):qword;
 function elf_symbol_table_bind(i:byte):byte;
 function elf_symbol_table_type(i:byte):byte;
 function elf_symbol_table_info(b,t:byte):byte;
@@ -809,7 +954,43 @@ function elf32_relocation_info(s,t:dword):dword;
 function elf64_relocation_symbol(i:qword):qword;
 function elf64_relocation_type(i:qword):qword;
 function elf64_relocation_info(s,t:qword):qword;
+procedure pe_move_dos_code_to_dos_stub(const Source;var dest);
+
 implementation
+function elf_least_byte_to_most_byte(lsb:word):word;
+begin
+ elf_least_byte_to_most_byte:=(lsb shr 8) and $00FF+(lsb shl 8) and $FF00;
+end;
+function elf_least_byte_to_most_byte(lsb:dword):dword;
+begin
+ elf_least_byte_to_most_byte:=(lsb shr 24) and $000000FF+(lsb shr 8) and $0000FF00+
+ (lsb shl 8) and $00FF0000+(lsb shl 24) and $FF000000;
+end;
+function elf_least_byte_to_most_byte(lsb:qword):qword;
+begin
+ elf_least_byte_to_most_byte:=(lsb shr 56) and $00000000000000FF
+ +(lsb shr 40) and $000000000000FF00+(lsb shr 24) and $0000000000FF0000
+ +(lsb shr 8) and $00000000FF000000+(lsb shl 8) and $000000FF00000000
+ +(lsb shl 24) and $0000FF0000000000+(lsb shl 40) and $00FF000000000000
+ +(lsb shl 56) and $FF00000000000000;
+end;
+function elf_most_byte_to_least_byte(msb:word):word;
+begin
+ elf_most_byte_to_least_byte:=(msb shr 8) and $00FF+(msb shl 8) and $FF00;
+end;
+function elf_most_byte_to_least_byte(msb:dword):dword;
+begin
+ elf_most_byte_to_least_byte:=(msb shr 24) and $000000FF+(msb shr 8) and $0000FF00+
+ (msb shl 8) and $00FF0000+(msb shl 24) and $FF000000;
+end;
+function elf_most_byte_to_least_byte(msb:qword):qword;
+begin
+ elf_most_byte_to_least_byte:=(msb shr 56) and $00000000000000FF
+ +(msb shr 40) and $000000000000FF00+(msb shr 24) and $0000000000FF0000
+ +(msb shr 8) and $00000000FF000000+(msb shl 8) and $000000FF00000000
+ +(msb shl 24) and $0000FF0000000000+(msb shl 40) and $00FF000000000000
+ +(msb shl 56) and $FF00000000000000;
+end;
 function elf_symbol_table_bind(i:byte):byte;
 begin
  elf_symbol_table_bind:=i shr 4;
@@ -849,6 +1030,11 @@ end;
 function elf64_relocation_info(s,t:qword):qword;
 begin 
  elf64_relocation_info:=s shl 32+t and $FFFFFFFF;
+end;
+procedure pe_move_dos_code_to_dos_stub(const Source;var dest);
+var i:byte;
+begin
+ for i:=1 to 8 do Pqword(@dest+(i-1) shl 3)^:=Pqword(@source+(i-1) shl 3)^;
 end;
 
 end.

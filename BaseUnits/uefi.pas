@@ -4,6 +4,8 @@ unit uefi;
 
 interface
 
+uses acpi;
+
 const efi_usb_max_bulk_buffer_num=10;
       efi_usb_max_iso_buffer_num=7;
       efi_usb_max_iso_buffer_num1=2;
@@ -26,223 +28,6 @@ const efi_usb_max_bulk_buffer_num=10;
       efi_bluetooth_config_remote_device_state_connected=$1;
       efi_bluetooth_config_remote_device_state_paired=$2;
       bluetooth_hci_link_key_size=16;
-      {Refer to PCI Specification,These are base class code}
-      efi_class_old_device:byte=$0;
-      efi_class_mass_storage_controller:byte=$1;
-      efi_class_network_controller:byte=$2;
-      efi_class_display_controller:byte=$3;
-      efi_class_multimedia_device:byte=$4;
-      efi_class_memory_controller:byte=$5;
-      efi_class_bridge_device:byte=$6;
-      efi_class_simple_communication_controller:byte=$7;
-      efi_class_base_system_peripheral:byte=$8;
-      efi_class_input_device:byte=$9;
-      efi_class_docking_station:byte=$A;
-      efi_class_processor:byte=$B;
-      efi_class_serial_bus_controller:byte=$C;
-      efi_class_wireless_controller:byte=$D;
-      efi_class_intelligent_io_controller:byte=$E;
-      efi_class_satellite_communication_controller:byte=$F;
-      efi_class_encryption_or_decryption_controller:byte=$10;
-      efi_class_data_acquisition_and_signal_processing_controller:byte=$11;
-      efi_class_processing_accelerator:byte=$12;
-      efi_class_non_essential_instrumentation:byte=$13;
-      efi_class_device_does_not_fit_in_any_defined_classes:byte=$FF;
-      {These are sub class code and programming interface mode}
-      efi_sub_class_non_vga_compatible_device:byte=$0;
-      efi_sub_class_vga_compatible_device:byte=$1;
-      efi_sub_class_scsi_controller_or_storage_device:byte=$0;
-      efi_programming_interface_scsi_controller_vendor_specific:byte=$0;
-      efi_programming_interface_scsi_storage_device:byte=$11;
-      efi_programming_interface_scsi_controller:byte=$12;
-      efi_programming_interface_scsi_storage_device_and_controller:byte=$13;
-      efi_programming_interface_scsi_storage_device_using_nvme:byte=$21;
-      efi_sub_class_ide_controller:byte=$1;
-      efi_sub_class_floppy_disk_controller:byte=$2;
-      efi_sub_class_ipi_bus_controller:byte=$3;
-      efi_sub_class_raid_controller:byte=$4;
-      efi_sub_class_ata_controller:byte=$5;
-      efi_programming_interface_ata_controller_single_stepping:byte=$20;
-      efi_programming_interface_ata_controller_continuous:byte=$30;
-      efi_sub_class_serial_ata_controller:byte=$6;
-      efi_programming_interface_serial_ata_controller_vendor_specific:byte=$0;
-      efi_programming_interface_serial_ata_controller_ahci_interface:byte=$1;
-      efi_programming_interface_serial_storage_bus_interface:byte=$2;
-      efi_sub_class_scsi_controller:byte=$7;
-      efi_programming_interface_sas_controller:byte=$0;
-      efi_programming_interface_scsi_controller_obsolete:byte=$1;
-      efi_sub_class_nvm_controller:byte=$8;
-      efi_programming_interface_nvm_vendor_specific:byte=$0;
-      efi_programming_interface_nvm_nvmhci_interface:byte=$1;
-      efi_programming_interface_nvme_io_controller:byte=$2;
-      efi_programming_interface_nvme_administrative_controller:byte=$3;
-      efi_sub_class_ufs_controller:byte=$09;
-      efi_programming_interface_ufs_vendor_specific:byte=$0;
-      efi_programming_interface_ufshci:byte=$1;
-      efi_sub_class_other_mass_storage_controller:byte=$80;
-      efi_sub_class_ethernet_controller:byte=$0;
-      efi_sub_class_token_ring_controller:byte=$1;
-      efi_sub_class_fddi_controller:byte=$2;
-      efi_sub_class_atm_controller:byte=$3;
-      efi_sub_class_isdn_controller:byte=$4;
-      efi_sub_class_worldfip_controller:byte=$5;
-      efi_sub_class_picmg_multi_computing:byte=$6;
-      efi_sub_class_infiniband_controller:byte=$7;
-      efi_sub_class_host_fabric_controller:byte=$8;
-      efi_sub_class_other_network_controller:byte=$80;
-      efi_sub_class_compatible_controller:byte=$0;
-      efi_programming_interface_vga_compatible_controller:byte=$0;
-      efi_programming_interface_8514_compatible_controller:byte=$1;
-      efi_sub_class_xga_controller:byte=$1;
-      efi_sub_class_3d_controller:byte=$2;
-      efi_sub_class_other_display_controller:byte=$80;
-      efi_sub_class_video_device:byte=$0;
-      efi_sub_class_audio_device:byte=$1;
-      efi_sub_class_computer_telephony_device:byte=$2;
-      efi_sub_class_hd_audio:byte=$3;
-      efi_programming_interface_hd_audio:byte=$00;
-      efi_programming_interface_hd_audio_with_vendor_specific:byte=$80;
-      efi_sub_class_other_multimedia_device:byte=$80;
-      efi_sub_class_ram:byte=$00;
-      efi_sub_class_flash:byte=$01;
-      efi_sub_class_other_memory_controller:byte=$02;
-      efi_sub_class_host_bridge:byte=$00;
-      efi_sub_class_isa_bridge:byte=$01;
-      efi_sub_class_eisa_bridge:byte=$02;
-      efi_sub_class_mca_bridge:byte=$03;
-      efi_sub_class_pci_bridge:byte=$04;
-      efi_programming_interface_pci_to_pci_bridge:byte=$00;
-      efi_programming_interface_substractive_decode_pci_to_pci_bridge:byte=$01;
-      efi_sub_class_pcmica_bridge:byte=$05;
-      efi_sub_class_nubus_bridge:byte=$06;
-      efi_sub_class_cardbus_bridge:byte=$07;
-      efi_sub_class_raceway_bridge:byte=$08;
-      efi_sub_class_semi_transparent_pci_to_pci_bridge:byte=$09;
-      efi_programming_interface_primany_pci_bus:byte=$40;
-      efi_programming_interface_secondary_pci_bus:byte=$80;
-      efi_sub_class_infiniband_to_pci_host_bridge:byte=$0A;
-      efi_sub_class_advanced_switching_to_pci_host_bridge:byte=$0B;
-      efi_programming_interface_advanced_switching_to_pci_host_bridge_custom_interface:byte=$00;
-      efi_programming_interface_advanced_switching_to_pci_host_bridge_asi_sig_defined_interface:byte=$01;
-      efi_sub_class_other_bridge_device:byte=$80;
-      efi_sub_class_compatible_serial_controller:byte=$00;
-      efi_programming_interface_generic_xt_compatible_serial_controller:byte=$00;
-      efi_programming_interface_16450_compatible_serial_controller:byte=$01;
-      efi_programming_interface_16550_compatible_serial_controller:byte=$02;
-      efi_programming_interface_16650_compatible_serial_controller:byte=$03;
-      efi_programming_interface_16750_compatible_serial_controller:byte=$04;
-      efi_programming_interface_16850_compatible_serial_controller:byte=$05;
-      efi_programming_interface_16950_compatible_serial_controller:byte=$06;
-      efi_sub_class_port:byte=$01;
-      efi_programming_interface_parallel_port:byte=$00;
-      efi_programming_interface_bi_directional_parallel_port:byte=$01;
-      efi_programming_interface_ecp_compliant_parallel_port:byte=$02;
-      efi_programming_interface_ieee1284_controller:byte=$02;
-      efi_programming_interface_ieee1284_target_device:byte=$03;
-      efi_sub_class_multiport_serial_controller:byte=$02;
-      efi_sub_class_modem:byte=$03;
-      efi_programming_interface_generic_modem:byte=$00;
-      efi_programming_interface_hayes_compatible_modem_16450_compatible:byte=$01;
-      efi_programming_interface_hayes_compatible_modem_16550_compatible:byte=$02;
-      efi_programming_interface_hayes_compatible_modem_16650_compatible:byte=$03;
-      efi_programming_interface_hayes_compatible_modem_16750_compatible:byte=$04;
-      efi_sub_class_gpib_controller:byte=$04;
-      efi_sub_class_smart_card:byte=$05;
-      efi_sub_class_other_communication_controller:byte=$80;
-      efi_sub_class_pic:byte=$00;
-      efi_programming_interface_generic_8259_pic:byte=$00;
-      efi_programming_interface_isa_pic:byte=$01;
-      efi_programming_interface_eisa_pic:byte=$02;
-      efi_programming_interface_io_apic_interrupt_controller:byte=$10;
-      efi_programming_interface_iox_apic_interrupt_controller:byte=$20;
-      efi_sub_class_dma:byte=$01;
-      efi_programming_interface_generic_8237_dma_controller:byte=$00;
-      efi_programming_interface_isa_dma_controller:byte=$01;
-      efi_programming_interface_eisa_dma_controller:byte=$02;
-      efi_sub_class_timer:byte=$02;
-      efi_programming_interface_generic_8254_system_timer:byte=$00;
-      efi_programming_interface_isa_system_timer:byte=$01;
-      efi_programming_interface_eisa_system_timer:byte=$02;
-      efi_programming_interface_high_performance_event_timer:byte=$03;
-      efi_sub_class_rtc_controller:byte=$03;
-      efi_programming_interface_generic_rtc_controller:byte=$00;
-      efi_programming_interface_isa_rtc_controller:byte=$01;
-      efi_sub_class_hot_plug_controller:byte=$04;
-      efi_sub_class_sd_host_controller:byte=$05;
-      efi_sub_class_iommu:byte=$06;
-      efi_sub_class_root_complex_event_collector:byte=$07;
-      efi_sub_class_other_system_peripheral:byte=$80;
-      efi_sub_class_keyboard_controller:byte=$00;
-      efi_sub_class_digitizer:byte=$01;
-      efi_sub_class_mouse_controller:byte=$02;
-      efi_sub_class_scanner_controller:byte=$03;
-      efi_sub_class_gameport_controller:byte=$04;
-      efi_programming_interface_generic_gameport_controller:byte=$00;
-      efi_programming_interface_non_generic_gameport_controller:byte=$01;
-      efi_sub_class_other_input_controller:byte=$80;
-      efi_sub_class_docking_station:byte=$00;
-      efi_sub_class_other_type_of_docking_station:byte=$80;
-      efi_sub_class_386:byte=$00;
-      efi_sub_class_486:byte=$01;
-      efi_sub_class_pentium:byte=$02;
-      efi_sub_class_alpha:byte=$10;
-      efi_sub_class_powerpc:byte=$20;
-      efi_sub_class_mips:byte=$30;
-      efi_sub_class_co_processor:byte=$40;
-      efi_sub_class_other_processors:byte=$80;
-      efi_sub_class_ieee_1394:byte=$00;
-      efi_programming_interface_ieee_1394_firewire:byte=$00;
-      efi_programming_interface_ieee_1394_following_1394_openhci_specification:byte=$10;
-      efi_sub_class_access_bus:byte=$01;
-      efi_sub_class_ssa:byte=$02;
-      efi_sub_class_usb_device:byte=$03;
-      efi_programming_interface_usb_following_uhcb:byte=$00;
-      efi_programming_interface_usb_following_ohcb:byte=$10;
-      efi_programming_interface_usb_2_host_controller:byte=$20;
-      efi_programming_interface_usb_following_xhci:byte=$30;
-      efi_programming_interface_usb_with_no_specific_programming_interface:byte=$80;
-      efi_programming_interface_usb_device_not_host_controller:byte=$FE;
-      efi_sub_class_fibre_channel:byte=$04;
-      efi_sub_class_smbus:byte=$05;
-      efi_sub_class_infiniband_deprecated:byte=$06;
-      efi_sub_class_ipmi:byte=$07;
-      efi_programming_interface_ipmi_smic_interface:byte=$00;
-      efi_programming_interface_ipmi_keyboard_controller_style_interface:byte=$01;
-      efi_programming_interface_ipmi_block_transfer_interface:byte=$02;
-      efi_sub_class_sercos_interface_standard:byte=$08;
-      efi_sub_class_canbus:byte=$09;
-      efi_sub_class_mipi_i3c_host_controller_interface:byte=$0A;
-      efi_sub_class_other_serial_bus_controllers:byte=$80;
-      efi_sub_class_irda_compatible_controller:byte=$00;
-      efi_sub_class_radio_controller:byte=$01;
-      efi_programming_interface_consumer_ir_controller:byte=$00;
-      efi_programming_interface_uwb_radio_controller:byte=$01;
-      efi_sub_class_rf_controller:byte=$10;
-      efi_sub_class_bluetooth:byte=$11;
-      efi_sub_class_broadband:byte=$12;
-      efi_sub_class_ethernet_5ghz:byte=$20;
-      efi_sub_class_ethernet_24ghz:byte=$21;
-      efi_sub_class_cellular_controller_modem:byte=$40;
-      efi_sub_class_cellular_controller_modem_plus:byte=$41;
-      efi_sub_class_other_type_of_wireless_controller:byte=$80;
-      efi_sub_class_intelligent_controller:byte=$00;
-      efi_programming_interface_i2o_spec:byte=$00;
-      efi_programming_interface_message_fifo:byte=$01;
-      efi_sub_class_tv:byte=$00;
-      efi_sub_class_audio:byte=$01;
-      efi_sub_class_voice:byte=$02;
-      efi_sub_class_data:byte=$03;
-      efi_sub_class_other_satellite_communication_controller:byte=$80;
-      efi_sub_class_network_and_computing_encryption_and_decryption_controller:byte=$00;
-      efi_sub_class_entertainment_encryption_and_decryption_controller:byte=$10;
-      efi_sub_class_other_encryption_and_decryption_controller:byte=$80;
-      efi_sub_class_dpio_modules:byte=$00;
-      efi_sub_class_performance_counters:byte=$01;
-      efi_sub_class_communication_synchronization_plus_time_and_frequency_test_or_measurement:byte=$10;
-      efi_sub_class_management_card:byte=$20;
-      efi_sub_class_other_data_acquisition_or_signal_processing_controllers:byte=$80;
-      efi_sub_class_processing_accelerator:byte=$00;
-      efi_sub_class_non_essential_instrumental_function:byte=$00;
 {$ifdef cpux86_64}
  {$PACKRECORDS 8}
 {$endif cpux86_64}
@@ -2373,64 +2158,92 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                              EnableDisableAP:efi_mp_services_enable_disable_ap;
                              WhoAmI:efi_mp_services_whoami;
                              end;
+    Pefi_smbios_protocol=^efi_smbios_protocol;
+    efi_smbios_type=byte;
+    Pefi_smbios_type=^efi_smbios_type;
+    efi_smbios_handle=word;
+    efi_smbios_table_header=record
+                            efiType:efi_smbios_type;
+                            Length:byte;
+                            Handle:efi_smbios_handle;
+                            end;
+    Pefi_smbios_table_header=^efi_smbios_table_header;
+    PPefi_smbios_table_header=^Pefi_smbios_table_header;
+    efi_smbios_string=Pchar;
+    efi_smbios_add=function (const This:Pefi_smbios_protocol;ProducerHandle:efi_handle;var SmbiosHandle:efi_smbios_handle;efiRecord:efi_smbios_table_header):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif}
+    efi_smbios_update_string=function (const This:Pefi_smbios_protocol;SmbiosHandle:efi_handle;StringNumber:byte;efiString:efi_smbios_string):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif}
+    efi_smbios_remove=function (const This:Pefi_smbios_protocol;SmbiosHandle:efi_handle):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif}
+    efi_smbios_get_next=function (const This:Pefi_smbios_protocol;var SmbiosHandle:efi_smbios_handle;SmbiosType:Pefi_smbios_type;var efiRecord:Pefi_smbios_table_header;var ProducerHandle:efi_handle):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif}
+    efi_smbios_protocol=record
+                        Add:efi_smbios_add;
+                        UpdateString:efi_smbios_update_string;
+                        Remove:efi_smbios_remove;
+                        GetNext:efi_smbios_get_next;
+                        MajorVersion:byte;
+                        MinorVersion:byte;
+                        end;
     efi_pci_configuration_space_type0=packed record
+                                      {Header Region}
                                       VendorId:word;
                                       DeviceId:word;
-                                      Status:word;
                                       Command:word;
+                                      Status:word;
+                                      RevisionId:byte;
                                       ClassCode:array[1..3] of byte;
-                                      RevisionID:byte;
+                                      CacheLineSize:byte;
+                                      LatencyTimer:byte;
                                       HeaderType:byte;
                                       BIST:byte;
-                                      LatencyTimer:byte;
-                                      CacheLineSize:byte;
+                                      {Device Region}
                                       BAR:array[1..6] of dword;
                                       CISPtr:dword;
                                       SubSystemVendorID:word;
                                       SubSystemID:word;
-                                      ExpansionRomBar:dword;
-                                      Reserved1:array[1..3] of byte;
+                                      ExpansionRomBaseAddress:dword;
                                       CapabilityPointer:byte;
+                                      Reserved1:array[1..3] of byte;
                                       Reserved2:dword;
-                                      MaxGnt:byte;
-                                      MinGnt:byte;
-                                      InterruptPin:byte;
                                       InterruptLine:byte;
+                                      InterruptPin:byte;
+                                      MinGnt:byte;
+                                      MaxGnt:byte;
                                       end;
     Pefi_pci_configuration_space_type0=^efi_pci_configuration_space_type0;
     efi_pci_configuration_space_type1=packed record
+                                      {Header Region}
                                       VendorId:word;
                                       DeviceId:word;
-                                      Status:word;
                                       Command:word;
+                                      Status:word;
+                                      RevisionId:byte;
                                       ClassCode:array[1..3] of byte;
-                                      RevisionID:byte;
+                                      CacheLineSize:byte;
+                                      LatencyTimer:byte;
                                       HeaderType:byte;
                                       BIST:byte;
-                                      LatencyTimer:byte;
-                                      CacheLineSize:byte;
+                                      {Device Region}
                                       BAR:array[1..2] of dword;
+                                      PrimaryBusNumber:byte;
+                                      SecondaryBusNumber:byte;
+                                      SubordinateBusNumber:byte;
                                       SecondaryLatencyTimer:byte;
-                                      SubordinateTimer:byte;
-                                      SecondaryBus:byte;
-                                      PrimaryBus:byte;
-                                      SecondaryStatus:byte;
-                                      IOlimit:byte;
                                       IOBase:byte;
-                                      NonPrefetchableMemoryLimit:word;
-                                      NonPrefetchableMemoryBase:word;
+                                      IOLimit:byte;
+                                      SecondaryStatus:word;
+                                      MemoryBase:word;
+                                      MemoryLimit:word;
+                                      PrefetchableMemoryBase:word;
                                       PrefetchableMemoryLimit:word;
-                                      PrefetchableMemoryBase:word; 
-                                      PrefetchableMemoryBaseUpper32bits:word;
-                                      PrefetchableMemoryLimitUpper32bits:word;
-                                      IOLimitUpper16bits:word;
+                                      PrefectableBaseUpper32bits:dword;
+                                      PrefectableLimitUpper32bits:dword;
                                       IOBaseUpper16bits:word;
-                                      Reserved:array[1..3] of byte;
+                                      IOLimitUpper16bits:word;
                                       CapabilityPointer:byte;
+                                      Reserved1:array[1..3] of byte;
                                       ExpansionROMBaseAddress:dword;
-                                      BridgeControl:word;
-                                      InterruptPin:byte;
                                       InterruptLine:byte;
+                                      InterruptPin:byte;
+                                      BridgeControl:word;
                                       end;
     Pefi_pci_configuration_space_type1=^efi_pci_configuration_space_type1;
     efi_pci_configuration_space=packed record
@@ -2476,13 +2289,17 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                     pci:^efi_pci_configuration_space;
                     pcicount:Natuint;
                     end;
+    efi_smbios_list=packed record
+                    item:^Pointer;
+                    count:Natuint;
+                    end;
 {User Defined End}
 const efi_system_table_signature:qword=$5453595320494249;
       efi_system_table_revision:array[1..14] of dword=((2 shl 16) or 100,(2 shl 16) or 90,(2 shl 16) or 80,(2 shl 16) or 70,(2 shl 16) or 60,(2 shl 16) or 50,(2 shl 16) or 40,(2 shl 16) or 31,(2 shl 16) or 30,(2 shl 16) or 20,(2 shl 16) or 10,(2 shl 16) or 0,(1 shl 16) or 10,(1 shl 16) or 2);
       unused_entry_guid:efi_guid=(data1:$00000000;data2:$0000;data3:$0000;data4:($00,$00,$00,$00,$00,$00,$00,$00));
       efi_system_partition_guid:efi_guid=(data1:$C12A7328;data2:$F81F;data3:$11D2;data4:($BA,$4B,$00,$A0,$C9,$3E,$C9,$3B));
       partition_containing_a_legacy_mbr_guid:efi_guid=(data1:$024DEE41;data2:$33E7;data3:$11D3;data4:($9D,$69,$00,$08,$C7,$81,$F3,$9F));
-      efi_acpi_20_table_guid:efi_guid=(data1:$8868E871;data2:$E4F1;data3:$11D3;data4:($BC,$22,$00,$80,$C7,$3C,$88,$81));
+      acpi_20_table_guid:efi_guid=(data1:$8868E871;data2:$E4F1;data3:$11D3;data4:($BC,$22,$00,$80,$C7,$3C,$88,$81));
       acpi_table_guid:efi_guid=(data1:$EB9D2D30;data2:$2D88;data3:$11D3;data4:($9A,$16,$00,$90,$27,$3F,$C1,$D4));
       sal_system_table_guid:efi_guid=(data1:$EB9D2D32;data2:$2D88;data3:$11D3;data4:($9A,$16,$00,$90,$27,$3F,$C1,$4D));
       smbios_table_guid:efi_guid=(data1:$EB9D2D31;data2:$2D88;data3:$11D3;data4:($9A,$16,$00,$90,$27,$3F,$C1,$4D));
@@ -2582,6 +2399,7 @@ const efi_system_table_signature:qword=$5453595320494249;
       efi_bluetooth_config_protocol_guid:efi_guid=(data1:$62960CF3;data2:$40FF;data3:$4263;data4:($A7,$7C,$D7,$DE,$BD,$19,$1B,$4B));
       efi_bluetooth_attribute_protocol_guid:efi_guid=(data1:$898890E9;data2:$84B2;data3:$4F3A;data4:($8C,$58,$D8,$57,$78,$13,$E0,$AC));
       efi_mp_services_protocol_guid:efi_guid=(data1:$3FDDA605;data2:$A76E;data3:$4F46;data4:($AD,$29,$12,$F4,$53,$1B,$3D,$08));
+      efi_smbios_protocol_guid:efi_guid=(data1:$03583FF6;data2:$CB36;data3:$4940;data4:($94,$7E,$B9,$B3,$9F,$4A,$FA,$F7));
       efi_success=0;
       efi_load_error=1;
       efi_invaild_parameter=2;
@@ -3115,6 +2933,9 @@ function efi_loader_find_suitable_memory_map(var smm:efi_memory_map_simple;size:
 procedure efi_loader_exit_boot_services(memorymap:efi_memory_map);
 function efi_device_list_initialize:efi_device_list;
 procedure efi_device_list_free(var list:efi_device_list);
+function efi_smbios_list_initialize:efi_smbios_list;
+procedure efi_smbios_list_free(var res:efi_smbios_list);
+function efi_get_cpu_info_from_acpi_table:acpi_cpu_info;
 
 var maxcolumn:Natuint=80;
     maxrow:Natuint=25;
@@ -4005,9 +3826,7 @@ begin
  for i:=0 to maxmode-1 do
   begin
    status:=ptr^.SetMode(ptr,i);
-   if((ptr^.Mode^.Info^.PixelFormat=PixelBlueGreenRedReserved8BitPerColor) or 
-   (ptr^.Mode^.Info^.PixelFormat=PixelRedGreenBlueReserved8BitPerColor)) and 
-   (ptr^.Mode^.Info^.HorizontalResolution*ptr^.Mode^.Info^.VerticalResolution*4>screensize) 
+   if(ptr^.Mode^.Info^.HorizontalResolution*ptr^.Mode^.Info^.VerticalResolution*4>screensize) 
    and (status=efi_success) then 
     begin
      graphicsindex:=i; screensize:=ptr^.Mode^.Info^.HorizontalResolution*ptr^.Mode^.Info^.VerticalResolution*4;
@@ -4132,7 +3951,7 @@ begin
   begin
    GlobalSystemTable^.BootServices^.HandleProtocol((ptr+i-1)^,@efi_pci_io_protocol_guid,tempitem);
    tempitem^.pci.efiRead(tempitem,EfiPciIoWidthUint32,0,sizeof(efi_pci_configuration_space_type0) shr 2,content);
-   for j:=1 to 3 do (res.pci+i-1)^.classcode[j]:=Pefi_pci_configuration_space_type0(@content)^.classcode[j];
+   for j:=1 to 3 do (res.pci+i-1)^.classcode[j]:=Pefi_pci_configuration_space_type0(@content)^.classcode[4-j];
    (res.pci+i-1)^.Manufracturer:=Pefi_pci_configuration_space_type0(@content)^.VendorId;
    (res.pci+i-1)^.Device:=Pefi_pci_configuration_space_type0(@content)^.DeviceId;
    j:=1;
@@ -4172,6 +3991,55 @@ end;
 procedure efi_device_list_free(var list:efi_device_list);[public,alias:'EFI_DEVICE_LIST_FREE'];
 begin
  efi_freemem(list.pci); list.pcicount:=0;
+end;
+function efi_smbios_list_initialize:efi_smbios_list;[public,alias:'EFI_SMBIOS_LIST_INITIALIZE'];
+var ptr:Pefi_smbios_protocol;
+    CurrentHandle:efi_handle;
+    i:word;
+    bool:boolean;
+    res:efi_smbios_list;
+    efitype:Pefi_smbios_type=nil;
+    efiRec:Pefi_smbios_table_header=nil;
+begin
+ GlobalSystemTable^.BootServices^.LocateProtocol(@efi_smbios_protocol_guid,nil,ptr);
+ res.item:=efi_allocmem(sizeof(Pointer)*65535);
+ res.count:=0;
+ i:=$FFFE; bool:=true; CurrentHandle:=nil;
+ while(bool)do
+  begin
+   ptr^.GetNext(ptr,i,efitype,efiRec,currentHandle);
+   inc(res.count);
+   (res.item+i-1)^:=efiRec;
+   if(i=$FFFE) then bool:=false;
+  end;
+ efi_smbios_list_initialize:=res;
+end;
+procedure efi_smbios_parse_smbios_list(res:efi_smbios_list);[public,alias:'EFI_PARSE_SMBIOS_LIST'];
+begin
+end;
+procedure efi_smbios_list_free(var res:efi_smbios_list);[public,alias:'EFI_SMBIOS_LIST_FREE'];
+begin
+ efi_freemem(res.item); res.count:=0;
+end;
+function efi_get_cpu_info_from_acpi_table:acpi_cpu_info;[public,alias:'EFI_GET_CPU_INFO_FROM_ACPI_TABLE'];
+var i:natuint;
+    res:acpi_cpu_info;
+begin
+ i:=1;
+ while(i<=GlobalSystemTable^.NumberOfTableEntries)do
+  begin
+   if(efi_guid_compare((GlobalSystemTable^.ConfigurationTable+i-1)^.VendorGUID,acpi_20_table_guid)) then
+    begin
+     res:=acpi_get_cpu_info_from_acpi_table((GlobalSystemTable^.ConfigurationTable+i-1)^.VendorTable); break;
+    end
+   else if(efi_guid_compare((GlobalSystemTable^.ConfigurationTable+i-1)^.VendorGUID,acpi_table_guid)) then
+    begin
+     res:=acpi_get_cpu_info_from_acpi_table((GlobalSystemTable^.ConfigurationTable+i-1)^.VendorTable); break;
+    end;
+   inc(i);
+  end;
+ if(i>GlobalSystemTable^.NumberOfTableEntries) then res.architecture:=$FF;
+ efi_get_cpu_info_from_acpi_table:=res;
 end;
 
 end.

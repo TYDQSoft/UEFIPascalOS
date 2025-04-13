@@ -6,21 +6,6 @@ type graph_point=packed record
                  xpos,ypos:dword;
                  end;
      Pgraph_point=^graph_point;
-     graph_char=packed record
-                content:WideChar;
-                charwidth,charheight:dword;
-                end;
-     Pgraph_char=^graph_char;
-     graph_string=packed record
-                  content:PWideChar;
-                  charwidth,charheight:dword;
-                  end;
-     Pgraph_string=^graph_string;
-     graph_unisometric_string=packed record
-                              content:^graph_string;
-                              count:natuint;
-                              end;
-     Pgraph_unisometric_string=^graph_unisometric_string;
      graph_item=bitpacked record
                 haveprev:boolean;
                 allocated:0..63;
@@ -32,6 +17,7 @@ type graph_point=packed record
                   Index:Natuint;
                   xpos,ypos:Integer;
                   width,height:Dword;
+                  Padding:array[1..3] of byte;
                   end;
      Pgraph_header=^graph_header;
      graph_color=packed record
@@ -49,17 +35,13 @@ type graph_point=packed record
                         1:(RGBRed:byte;RGBGreen:byte;RGBBlue:byte;RGBReserved:byte;);
                         end;
      Pgraph_output_color=^graph_output_color;
-     graph_screen_attribute=packed record
-                            virtiogpu:boolean;
-                            colortype:0..127;
-                            end;
      graph_heap=packed record
                 mem_start:Pointer;
                 mem_end:Pointer;
                 mem_block_power:byte;
                 item_max_pos:natuint;
                 item_max_index:natuint;
-                screen_attribute:graph_screen_attribute;
+                screen_attribute:byte;
                 screen_width,screen_height:dword;
                 screen_init_address:^graph_color;
                 screen_output_address:^graph_output_color;
@@ -91,7 +73,6 @@ var gheap:graph_heap;
 
 function graph_color_generate(Red:byte;Green:byte;Blue:byte;Alpha:byte):graph_color;
 function graph_color_mixed(color1,color2:graph_color):graph_color;
-function graph_color_get_inverse(color:graph_color):graph_color;
 function graph_color_get_lightness(color:graph_color):byte;
 function graph_color_get_inverse(color:graph_color):graph_color;
 procedure graph_heap_initialize(startaddr:Pointer;size:Natuint;blockpower:byte;width,height:dword;
@@ -99,7 +80,6 @@ isvirtio:boolean;colortype:byte;outputaddr:Pointer);
 function graph_heap_getmem(width,height:dword;xpos,ypos:Integer;visible:boolean):Pointer;
 function graph_heap_getmemsize(ptr:Pointer):natuint;
 function graph_heap_allocmem(width,height:dword;xpos,ypos:Integer;visible:boolean):Pointer;
-procedure graph_heap_edit_header(ptr:Pointer;newwidth,newheight:Dword;newxpos,newypos:Integer;visible:boolean);
 procedure graph_heap_freemem(var ptr:Pointer);
 procedure graph_heap_reallocmem(var ptr:Pointer;newwidth,newheight:dword;newxpos,newypos:Integer;
 visible:boolean);
@@ -110,8 +90,13 @@ procedure graph_heap_draw_fanshape(ptr:Pointer;xpos,ypos:Integer;radius:dword;
 anglestart,angleend:extended;color:graph_color);
 procedure graph_heap_draw_eclipse(ptr:Pointer;xpos,ypos:Integer;width,height:Dword;Color:graph_color);
 procedure graph_heap_clear_canva(ptr:Pointer);
+procedure graph_heap_edit_canva(ptr:Pointer;newxpos,newypos:Integer;visible:boolean);
+function graph_heap_get_x_position(ptr:Pointer):Integer;
+function graph_heap_get_y_position(ptr:Pointer):Integer;
+function graph_heap_get_width(ptr:Pointer):Dword;
+function graph_heap_get_height(ptr:Pointer):Dword;
+function graph_heap_get_visible(ptr:Pointer):boolean;
 procedure graph_heap_output_screen;
-procedure graph_heap_output_screen_using_virtio_gpu;
 
 implementation
 
@@ -166,18 +151,6 @@ begin
  res.Red:=$FF-color.Red; res.Green:=$FF-color.Green; res.Blue:=$FF-color.Blue; res.Alpha:=color.Alpha;
  graph_color_get_inverse:=res;
 end;
-function graph_generate_graph_char(character:WideChar;charw,charh:dword):graph_char;
-var res:graph_char;
-begin
- res.content:=character; res.charwidth:=charw; res.charheight:=charh;
- graph_generate_graph_char:=res;
-end; 
-function graph_generate_graph_string(str:PWideChar;charw,charh:dword):graph_string;
-var res:graph_char;
-begin
- res.content:=Wstrcreate(str); res.charwidth:=charw; res.charheight:=charh;
- graph_generate_graph_char:=res;
-end; 
 procedure graph_heap_initialize(startaddr:Pointer;size:Natuint;blockpower:byte;width,height:dword;
 isvirtio:boolean;colortype:byte;outputaddr:Pointer);
 var tempsize:natuint;
@@ -185,8 +158,7 @@ begin
  gheap.mem_start:=startaddr;
  gheap.screen_width:=width;
  gheap.screen_height:=height;
- gheap.screen_attribute.virtiogpu:=isvirtio;
- gheap.screen_attribute.colortype:=colortype;
+ gheap.screen_attribute:=colortype;
  tempsize:=size-width*height*sizeof(graph_color);
  gheap.screen_output_address:=outputaddr;
  gheap.screen_init_address:=startaddr+tempsize;
@@ -648,48 +620,200 @@ end;
 procedure graph_heap_clear_canva(ptr:Pointer);
 var head:graph_header;
     screenpos:Natuint;
+    i,j:dword;
 begin
  head:=graph_heap_get_header(ptr); screenpos:=0;
  for i:=1 to head.width do
   for j:=1 to head.height do
    begin
-    Pgraph_color(ptr+screenpos shl 2)^:=graph_color_zero;
+    Pgraph_color(ptr+screenpos shl 2)^:=graph_color_none;
     inc(screenpos);
    end;
 end;
-procedure graph_heap_draw_line(ptr:Pointer;xstart,ystart,xend,yend:Integer;Color:graph_color);
+procedure graph_heap_edit_canva(ptr:Pointer;newxpos,newypos:Integer;visible:boolean);
+var head:graph_header;
 begin
-
+ head:=graph_heap_get_header(ptr);
+ graph_heap_edit_header(ptr,head.width,head.height,newxpos,newypos,visible);
 end;
-procedure graph_heap_draw_line(ptr:Pointer;startpos,endpos:graph_point;Color:graph_color);
+function graph_heap_get_x_position(ptr:Pointer):Integer;
+var head:graph_header;
 begin
-
+ head:=graph_heap_get_header(ptr); graph_heap_get_x_position:=head.xpos;
+end;
+function graph_heap_get_y_position(ptr:Pointer):Integer;
+var head:graph_header;
+begin
+ head:=graph_heap_get_header(ptr); graph_heap_get_y_position:=head.ypos;
+end;
+function graph_heap_get_width(ptr:Pointer):Dword;
+var head:graph_header;
+begin
+ head:=graph_heap_get_header(ptr); graph_heap_get_width:=head.width;
+end;
+function graph_heap_get_height(ptr:Pointer):Dword;
+var head:graph_header;
+begin
+ head:=graph_heap_get_header(ptr); graph_heap_get_height:=head.height;
+end;
+function graph_heap_get_visible(ptr:Pointer):boolean;
+var head:graph_header;
+begin
+ head:=graph_heap_get_header(ptr); graph_heap_get_visible:=head.visible;
+end;
+procedure graph_heap_draw_line(ptr:Pointer;xstart,ystart,xend,yend:Integer;
+thickness:dword;Color:graph_color);
+var head:graph_header;
+    distance:extended;
+    a,b,c:extended;
+    x1,y1,x2,y2:Integer;
+    i,j:Integer;
+    screenpos:Natuint;
+begin
+ head:=graph_heap_get_header(ptr); screenpos:=0;
+ if(xstart<=xend) then
+  begin
+   x1:=xstart; x2:=xend;
+  end
+ else
+  begin
+   x1:=xend; x2:=xstart;
+  end;
+ if(ystart<=yend) then
+  begin
+   y1:=ystart; y2:=yend;
+  end
+ else
+  begin
+   y1:=yend; y2:=ystart;
+  end;
+ b:=1; a:=(y2-y1)/(x1-x2); c:=0-a*x1-b*y1;
+ for i:=x1 to x2 do
+  for j:=y1 to y2 do
+   begin
+    if(i<=0) or (j<=0) or (i>head.width) or (j>head.height) then continue;
+    distance:=abs(a*i+b*j+c)/sqrt(sqr(a)+sqr(b));
+    if(distance<=thickness/2) then
+     begin
+      screenpos:=(j-1)*head.width+i-1; Pgraph_color(ptr+screenpos shl 2)^:=color;
+     end;
+   end;
+end;
+procedure graph_heap_draw_line(ptr:Pointer;startpos,endpos:graph_point;
+thickness:dword;Color:graph_color);
+var head:graph_header;
+    distance:extended;
+    a,b,c:extended;
+    x1,y1,x2,y2:Integer;
+    i,j:Integer;
+    screenpos:Natuint;
+begin
+ head:=graph_heap_get_header(ptr); screenpos:=0;
+ if(startpos.xpos<=endpos.xpos) then
+  begin
+   x1:=startpos.xpos; x2:=endpos.xpos;
+  end
+ else
+  begin
+   x1:=endpos.xpos; x2:=startpos.xpos;
+  end;
+ if(startpos.ypos<=endpos.ypos) then
+  begin
+   y1:=startpos.ypos; y2:=endpos.ypos;
+  end
+ else
+  begin
+   y1:=endpos.ypos; y2:=startpos.ypos;
+  end;
+ b:=1; a:=(y2-y1)/(x1-x2); c:=0-a*x1-b*y1;
+ for i:=x1 to x2 do
+  for j:=y1 to y2 do
+   begin
+    if(i<=0) or (j<=0) or (i>head.width) or (j>head.height) then continue;
+    distance:=abs(a*i+b*j+c)/sqrt(sqr(a)+sqr(b));
+    if(distance<=thickness/2) then
+     begin
+      screenpos:=(j-1)*head.width+i-1; Pgraph_color(ptr+screenpos shl 2)^:=color;
+     end;
+   end;
 end;
 procedure graph_heap_draw_triangle(ptr:Pointer;p1x,p1y,p2x,p2y,p3x,p3y:Integer;color:graph_color);
+var head:graph_header;
+    x1,y1,x2,y2:Integer;
+    st,s1,s2,s3:extended;
+    screenpos:Natuint;
+    i,j:Integer;
 begin
-
+ head:=graph_heap_get_header(ptr); screenpos:=0;
+ x1:=$7FFFFFFF;
+ if(p1x<x1) then x1:=p1x;
+ if(p2x<x1) then x1:=p2x;
+ if(p3x<x1) then x1:=p3x;
+ x2:=-$7FFFFFFF;
+ if(p1x>x2) then x2:=p1x;
+ if(p2x>x2) then x2:=p2x;
+ if(p3x>x2) then x2:=p3x;
+ y1:=$7FFFFFFF;
+ if(p1y<y1) then y1:=p1y;
+ if(p2y<y1) then y1:=p2y;
+ if(p3y<y1) then y1:=p3y;
+ y2:=-$7FFFFFFF;
+ if(p1y>y2) then y2:=p1y;
+ if(p2y>y2) then y2:=p2y;
+ if(p3y>y2) then y2:=p3y;
+ st:=0.5*abs((p3x-p1x)*(p2y-p1y)+(p2x-p1x)*(p1y-p3y));
+ for i:=x1 to x2 do
+  for j:=y1 to y2 do
+   begin
+    if(i<=0) or (j<=0) or (i>head.width) or (j>head.height) then continue;
+    s1:=0.5*abs((i-p1x)*(p2y-p1y)+(p2x-p1x)*(p1y-j));
+    s2:=0.5*abs((i-p1x)*(p3y-p1y)+(p3x-p1x)*(p1y-j));
+    s3:=0.5*abs((i-p2x)*(p3y-p2y)+(p3x-p2x)*(p2y-j));
+    if(s1+s2+s3<=st) then
+     begin
+      screenpos:=(j-1)*head.width+i-1; Pgraph_color(ptr+screenpos shl 2)^:=color;
+     end;
+   end;
 end;
 procedure graph_heap_draw_triangle(ptr:Pointer;p1,p2,p3:graph_point;color:graph_color);
+var head:graph_header;
+    x1,y1,x2,y2:Integer;
+    st,s1,s2,s3:extended;
+    screenpos:Natuint;
+    i,j:Integer;
 begin
-
+ head:=graph_heap_get_header(ptr); screenpos:=0;
+ x1:=$7FFFFFFF;
+ if(p1.xpos<x1) then x1:=p1.xpos;
+ if(p2.xpos<x1) then x1:=p2.xpos;
+ if(p3.xpos<x1) then x1:=p3.xpos;
+ x2:=-$7FFFFFFF;
+ if(p1.xpos>x2) then x2:=p1.xpos;
+ if(p2.xpos>x2) then x2:=p2.xpos;
+ if(p3.xpos>x2) then x2:=p3.xpos;
+ y1:=$7FFFFFFF;
+ if(p1.ypos<y1) then y1:=p1.ypos;
+ if(p2.ypos<y1) then y1:=p2.ypos;
+ if(p3.ypos<y1) then y1:=p3.ypos;
+ y2:=-$7FFFFFFF;
+ if(p1.ypos>y2) then y2:=p1.ypos;
+ if(p2.ypos>y2) then y2:=p2.ypos;
+ if(p3.ypos>y2) then y2:=p3.ypos;
+ st:=0.5*abs((p3.xpos-p1.xpos)*(p2.ypos-p1.ypos)+(p2.xpos-p1.xpos)*(p1.ypos-p3.ypos));
+ for i:=x1 to x2 do
+  for j:=y1 to y2 do
+   begin
+    if(i<=0) or (j<=0) or (i>head.width) or (j>head.height) then continue;
+    s1:=0.5*abs((i-p1.xpos)*(p2.ypos-p1.ypos)+(p2.xpos-p1.xpos)*(p1.ypos-j));
+    s2:=0.5*abs((i-p1.xpos)*(p3.ypos-p1.ypos)+(p3.xpos-p1.xpos)*(p1.ypos-j));
+    s3:=0.5*abs((i-p2.xpos)*(p3.ypos-p2.ypos)+(p3.xpos-p1.xpos)*(p2.ypos-j));
+    if(s1+s2+s3<=st) then
+     begin
+      screenpos:=(j-1)*head.width+i-1; Pgraph_color(ptr+screenpos shl 2)^:=color;
+     end;
+   end;
 end;
 procedure graph_heap_draw_polygon(ptr:Pointer;p:Pgraph_point;pcount:natuint;color:graph_color);
-begin
-
-end;
-procedure graph_heap_draw_character(ptr:Pointer;character:graph_char;px,py:Integer;color:graph_color);
-begin
-
-end;
-procedure graph_heap_draw_character(ptr:Pointer;character:graph_char;point:graph_point;color:graph_color);
-begin
-
-end;
-procedure graph_heap_draw_string(ptr:Pointer;str:graph_string;px,py:Integer;color:graph_color);
-begin
-
-end;
-procedure graph_heap_draw_string(ptr:Pointer;str:graph_string;point:graph_point;color:graph_color);
 begin
 
 end;
@@ -701,7 +825,6 @@ var i,j,k:natuint;
     header:graph_header;
     exist:boolean;
 begin
- if(gheap.screen_attribute.virtiogpu) then exit;
  {Initialize the Screen}
  screenpos:=0;
  for i:=1 to gheap.screen_width do
@@ -743,7 +866,7 @@ begin
  for i:=1 to gheap.screen_width do
   for j:=1 to gheap.screen_height do
    begin
-    if(gheap.screen_attribute.colortype=graph_color_type_bgr) then
+    if(gheap.screen_attribute=graph_color_type_bgr) then
      begin
       Pgraph_output_color(gheap.screen_output_address+screenpos)^.BGRRed:=
       Pgraph_color(gheap.screen_init_address+screenpos)^.Red;
@@ -766,10 +889,7 @@ begin
     inc(screenpos,1);
    end;
 end;
-procedure graph_heap_output_screen_using_virtio_gpu;
-begin
-
-end;
 
 end.
+
 

@@ -36,6 +36,7 @@ type
   Pboolean=^boolean;
   Pint64=^int64;
   Puint64=^uint64;
+  Pextended=^extended;
   {$IFDEF CPU32}
   NatUint=dword;
   PNatUint=^dword;
@@ -126,11 +127,19 @@ type
       time_hi_and_version: word;
       // The high field of the timestamp multiplexed with the version number
       clock_seq_hi_and_reserved: byte;
-      // The high field of the clock sequence multiplexed with the variant
+      // The high field of the clock sequence multiplexed with the sys_variant
       clock_seq_low: byte; // The low field of the clock sequence
       node: array [0 .. 5] of byte; // The spatially unique node identifier
     );
   end;
+  sys_variant=packed record
+              vartype:byte;
+              case Byte of
+              0:(varnatuint:Natuint;);
+              1:(varnatint:Natint;);
+              2:(varextended:extended;);
+              3:(varpointer:Pointer;);
+              end; 
   heap_item=bitpacked record
             haveprev:boolean;
             allocated:0..63;
@@ -144,11 +153,14 @@ type
               item_max_pos:natuint;
               end;
 
-const passwdstr:PChar='rbflMNldcanDUmuuov2CLochbexUVOVdFyuM5sdhxl6tsNMb3kGpMYfq6unhLkLJVHN16dNfGrF0HUyiuJMux9jR29SC9F0MrlJmksMwps5oipJIIwFa7HNixo0oWR9NHpc1sJRpdlXbRIqBZwo7TKSAtXRLLYAXsMwLfZCQsVBDbhm2XAMtomD8hu2DC3KOBW0HNSw2VVDiIKL2xfAOlzhx0EKCULVsdbuDpKi8oxZyFbrMh4DBcFJPtCWlTqFgASL9i7ZxL3R8I0Xoa10llEBt4xy4Be5Oph6KPsifZtc0sDbuxDZjJ85aw1XmNCIof73eBYUFyuoId9TPxAfVeVdrBUfPvxcqliMO82T08lEoXPftR54siClSdSV4PTsjoNZKvIf4j0z4ntESeh2Qq6smyE1pgAQjfY0YG8kvD4mo4AkTUHs3YkvbhCNySrv9f0XEP6Lp35sdlBHG85WCSk15uB6WxaJx9Wke8kRZckuEFSMyV2AjBfrwqGa5R3Rr';
-      passwdstroffset:array[1..5,1..11] of shortint=((-1,-3,-4,-7,4,3,9,11,13,-9,2),(-2,-3,-4,-6,4,3,9,13,13,-9,2),(-4,-7,-4,-7,4,3,4,11,21,-9,2),(-2,-3,-4,-7,4,5,9,11,13,-9,4),(-3,-9,-4,-7,4,3,15,11,13,-9,13));
-      pi:extended=3.1415926535;
+const pi:extended=3.1415926535;
       maxextended:extended=1.7E308;
       minextended:extended=-1.7E308;
+      sys_variant_type_natuint=1;
+      sys_variant_type_natint=2;
+      sys_variant_type_extended=3;
+      sys_variant_type_pointer=4;
+
 procedure fpc_specific_handler;compilerproc;
 procedure fpc_handleerror;compilerproc;
 procedure fpc_lib_exit;compilerproc;
@@ -159,6 +171,10 @@ procedure fpc_do_exit;compilerproc;
 procedure fpc_div_by_zero;compilerproc;
 procedure fpc_setjmp;compilerproc;
 procedure fpc_pushexceptaddr;compilerproc;
+operator := (x:natuint)res:sys_variant;
+operator := (x:natint)res:sys_variant;
+operator := (x:extended)res:sys_variant;
+operator := (x:pointer)res:sys_variant;
 function fpc_qword_to_double(q:qword):double;compilerproc;
 function fpc_int64_to_double(i:int64):double;compilerproc;
 function optimize_integer_divide(a,b:natuint):natuint;
@@ -184,6 +200,12 @@ function exeheap_allocmem(size:natuint):Pointer;
 procedure exeheap_freemem(var ptr:Pointer);
 procedure exeheap_reallocmem(var ptr:Pointer;size:natuint);
 procedure exeheap_move(const Source;var Dest;Size:natuint);
+function be_to_le_word(num:word):word;
+function be_to_le_dword(num:dword):dword;
+function be_to_le_qword(num:qword):qword;
+function le_to_be_word(num:word):word;
+function le_to_be_dword(num:dword):dword;
+function le_to_be_qword(num:qword):qword;
 function abs(x:natint):natint;
 function abs(x:extended):extended;
 function frac(x:extended):extended;
@@ -272,8 +294,6 @@ function random(maxnum:extended):extended;
 function random_range(left,right:extended):extended;
 function irandom(maxnum:natuint):natint;
 function irandom_range(left,right:natint):natint;
-function PChar_encrypt_to_password(str:Pchar;index:natuint):PWideChar;
-function PWChar_encrypt_to_password(str:PWideChar;index:natuint):PWideChar;
 
 var totalmemorysize:natuint;
     compheap,sysheap,exeheap:heap_record;
@@ -318,6 +338,26 @@ end;
 function fpc_int64_to_double(i:int64):double;compilerproc;[public,alias:'FPC_INT64_TO_DOUBLE'];
 begin
  fpc_int64_to_double:=dword(i and $ffffffff)+longint(i shr 32)*double(4294967296.0);
+end;
+operator := (x:natuint)res:sys_variant;
+begin
+ res.vartype:=sys_variant_type_natuint;
+ res.varnatuint:=x;
+end;
+operator := (x:natint)res:sys_variant;
+begin
+ res.vartype:=sys_variant_type_natint;
+ res.varnatint:=x;
+end;
+operator := (x:extended)res:sys_variant;
+begin
+ res.vartype:=sys_variant_type_extended;
+ res.varextended:=x;
+end;
+operator := (x:pointer)res:sys_variant;
+begin
+ res.vartype:=sys_variant_type_pointer;
+ res.varpointer:=x;
 end;
 function optimize_integer_divide(a,b:natuint):natuint;[public,alias:'optimize_integer_divide'];
 var procnum1,procnum2,degree,res:natuint;
@@ -817,6 +857,38 @@ procedure exeheap_move(const Source;var Dest;Size:natuint);[public,alias:'exehea
 begin
  universial_move(source,dest,size);
 end;
+function be_to_le_word(num:word):word;
+begin
+ be_to_le_word:=((num shr 8) and $FF) or ((num shl 8) and $FF00);
+end;
+function be_to_le_dword(num:dword):dword;
+begin
+ be_to_le_dword:=((num shr 24) and $FF) or ((num shr 8) and $FF00)
+         or((num shl 8) and $FF0000) or ((num shl 24) and $FF000000);
+end;
+function be_to_le_qword(num:qword):qword;
+begin
+ be_to_le_qword:=((num shr 56) and $FF) or ((num shr 40) and $FF00)
+         or((num shr 24) and $FF0000) or ((num shr 8) and $FF000000)
+         or((num shl 8) and $FF00000000) or ((num shl 24) and $FF0000000000)
+         or((num shl 40) and $FF000000000000) or ((num shl 56) and $FF00000000000000);
+end;
+function le_to_be_word(num:word):word;
+begin
+ le_to_be_word:=((num shr 8) and $FF) or ((num shl 8) and $FF00);
+end;
+function le_to_be_dword(num:dword):dword;
+begin
+ le_to_be_dword:=((num shr 24) and $FF) or ((num shr 8) and $FF00)
+         or((num shl 8) and $FF0000) or ((num shl 24) and $FF000000);
+end;
+function le_to_be_qword(num:qword):qword;
+begin
+ le_to_be_qword:=((num shr 56) and $FF) or ((num shr 40) and $FF00)
+         or((num shr 24) and $FF0000) or ((num shr 8) and $FF000000)
+         or((num shl 8) and $FF00000000) or ((num shl 24) and $FF0000000000)
+         or((num shl 40) and $FF000000000000) or ((num shl 56) and $FF00000000000000);
+end;  
 function abs(x:natint):natint;[public,alias:'abs_natint'];
 begin
  if(x>0) then abs:=x else abs:=-x;
@@ -2157,41 +2229,6 @@ function irandom_range(left,right:natint):natint;[public,alias:'irandom_range'];
 begin
  irandom_range:=floor(left+(right-left)*(ranseed/maxnatuint)*0.54);
  ranseed:=ranseed*2+7;
-end;
-function PChar_encrypt_to_password(str:Pchar;index:natuint):PWideChar;[public,alias:'PChar_encrypt_to_password'];
-var res:PWideChar;
-    mybyte,mybyte1,mybyte2:byte;
-    i,passwdindex1,passwdindex2,len:natuint;
-begin
- passwdindex1:=(index*4+3) mod 5+1; len:=strlen(str); Wstrinit(res,len);
- for i:=1 to index do
-  begin
-   passwdindex2:=(i*3+7) mod 11+1;
-   mybyte:=Byte((str+i-1)^);
-   mybyte1:=(Byte((passwdstr+mybyte*2)^)+passwdstroffset[passwdindex1,passwdindex2]+256) mod 256;
-   mybyte2:=(Byte((passwdstr+mybyte*2+1)^)+passwdstroffset[passwdindex1,passwdindex2]+256) mod 256;
-   (res+i-1)^:=WideChar(mybyte1*255+mybyte2);
-  end;
- (res+len)^:=#0;
-end;
-function PWChar_encrypt_to_password(str:PWideChar;index:natuint):PWideChar;[public,alias:'PWChar_to_encrypt_to_password'];
-var res:PWideChar;
-    mybyte,mysubbyte1,mysubbyte2,mybyte1,mybyte2,mybyte3,mybyte4:word;
-    i,passwdindex1,passwdindex2,len:natuint;
-begin
- passwdindex1:=(index*4+3) mod 5+1; len:=Wstrlen(str); Wstrinit(res,len*2);
- for i:=1 to index do
-  begin
-   passwdindex2:=(i*3+7) mod 11+1;
-   mybyte:=word((str+i-1)^); mysubbyte1:=mybyte shr 8; mysubbyte2:=mybyte-mybyte shr 8 shl 8;
-   mybyte1:=(Byte((passwdstr+mysubbyte1*2)^)+passwdstroffset[passwdindex1,passwdindex2]+256) mod 256;
-   mybyte2:=(Byte((passwdstr+mysubbyte1*2+1)^)+passwdstroffset[passwdindex1,passwdindex2]+256) mod 256;
-   mybyte3:=(Byte((passwdstr+mysubbyte2*2)^)+passwdstroffset[passwdindex1,passwdindex2]+256) mod 256;
-   mybyte4:=(Byte((passwdstr+mysubbyte2*2+1)^)+passwdstroffset[passwdindex1,passwdindex2]+256) mod 256;
-   (res+i*2-2)^:=WideChar(mybyte1*256+mybyte2);
-   (res+i*2-1)^:=WideChar(mybyte3*256+mybyte4);
-  end;
- (res+len*2)^:=#0;
 end;
 
 end.
