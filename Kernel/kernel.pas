@@ -11,12 +11,14 @@ begin
  ptr:=PPointer(param)^;
  xpos:=graph_heap_get_x_position(ptr); ypos:=graph_heap_get_y_position(ptr);
  graph_heap_edit_canva(ptr,xpos+160,ypos+160,true);
+ graph_heap_draw_eclipse(ptr,1,1,240,360,graph_color_skyblue);
  graph_heap_output_screen;
  kernel_timer:=nil;
 end;
 procedure kernel_main;[public,alias:'kernel_main'];
 var ptr1,ptr2,ptr3,ptr4:Pointer;
     request:acpi_request;
+    i:byte;
 begin
  ptr4:=graph_heap_allocmem(gheap.screen_width,gheap.screen_height,1,1,true);
  ptr1:=graph_heap_allocmem(640,480,1,1,true);
@@ -28,14 +30,17 @@ begin
  graph_heap_draw_block(ptr3,200,1,240,480,graph_color_blue);
  graph_heap_output_screen;
  kernel_handle_function_init(@kernel_timer);
- kernel_handle_function_add_param(Pointer(ptr1));
+ kernel_handle_function_add_param(ptr1);
  request.requestrootclass:=acpi_request_x86_local_apic;
  request.requestsubclass:=acpi_request_x86_local_apic_timer;
  request.requestAPICIndex:=1;
- request.requestTimer:=10;
+ request.requestTimer:=20;
  request.requestTimerStatus:=0;
  request.requestNumber:=33;
  acpi_cpu_request_interrupt(os_cpuinfo,request);
+ asm
+  int $20
+ end;
  while True do;
  graph_heap_freemem(ptr2);
  graph_heap_freemem(ptr1);
@@ -182,6 +187,7 @@ begin
  os_cpuinfo:=efi_get_cpu_info_from_acpi_table;
  efi_console_output_string('Processor information got!'#10);
  {Exit boot services}
+ efi_console_output_number(kernel_get_architecture,true);
  efi_console_output_string('Exit the Boot Services......'#10);
  efi_loader_exit_boot_services(memmap);
  {Enable the FPU in loongarch(LoongArch Only)}
