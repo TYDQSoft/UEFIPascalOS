@@ -3,13 +3,13 @@ unit kernelbase;
 interface
 
 type x86_gdt_descriptor=packed record
-                        Offset:dword;
                         Size:word;
+                        Offset:dword;
                         end;
      Px86_gdt_descriptor=^x86_gdt_descriptor;
      x64_gdt_descriptor=packed record
-                        Offset:qword;
                         Size:word;
+                        Offset:qword;
                         end;
      Px64_gdt_descriptor=^x64_gdt_descriptor;
      ia_gdt_access_byte_normal=bitpacked record
@@ -42,7 +42,7 @@ type x86_gdt_descriptor=packed record
                              Basehigh:byte;
                              end;
      Px86_gdt_descriptor_gate=^x86_gdt_descriptor_gate;
-     x64_gdt_descriptor_gate=packed record
+     x64_gdt_descriptor_gate=bitpacked record
                              limitlow:word;
                              baselow:word;
                              basemid:byte;
@@ -55,13 +55,13 @@ type x86_gdt_descriptor=packed record
                              end;
      Px64_gdt_descriptor_gate=^x64_gdt_descriptor_gate;
      x86_idt_descriptor=packed record
-                        Offset:dword;
                         Size:word;
+                        Offset:dword;
                         end;
      Px86_idt_descriptor=^x86_idt_descriptor;
      x64_idt_descriptor=packed record
-                        Offset:qword;
                         Size:word;
+                        Offset:qword;
                         end;
      Px64_idt_descriptor=^x64_idt_descriptor;
      ia_segment_descriptor=bitpacked record
@@ -120,19 +120,19 @@ var hfunc:kernel_handler_function;
 
 {$IF Defined(cpui386)}
 var gdt:x86_gdt_descriptor;
-    gdtentry:array[1..6] of x86_gdt_descriptor_gate;
+    gdtentry:array[1..5] of x86_gdt_descriptor_gate;
     idt:x86_idt_descriptor;
     idtentry:array[1..256] of x86_idt_descriptor_gate;
 {$ELSEIF Defined(cpux86_64) or Defined(cpuia64)}
 var gdt:x64_gdt_descriptor;
-    gdtentry:array[1..6] of x64_gdt_descriptor_gate;
+    gdtentry:array[1..5] of x64_gdt_descriptor_gate;
     idt:x64_idt_descriptor;
     idtentry:array[1..256] of x64_idt_descriptor_gate;
 {$ENDIF}
 
+function kernel_get_architecture:byte;
 procedure kernel_handle_function_init(func:kernel_handler_function_execute);
 procedure kernel_handle_function_add_param(newparam:sys_variant);
-procedure kernel_handle_function_execute_function;
 procedure kernel_handle_function_free;
 procedure kernel_initialize;
 
@@ -185,6 +185,10 @@ begin
  FreeMem(hfunc.funcparam); FreeMem(hfunc.funcresult);
  hfunc.funcparamsize:=0;
 end;
+function kernel_timer(param:Pointer):Pointer;
+begin
+
+end;
 function kernel_get_architecture:byte;
 begin
  {$IF Defined(cpui386)}
@@ -210,263 +214,157 @@ end;
 {$IF Defined(cpui386)}
 procedure kernel_idt_handler_empty;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_division_by_zero;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_debug_exception;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_NMI_Interrupt;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_BreakPoint;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_OverFlow;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_Bound_Range_Exceed;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_Invaild_Opcode;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_Device_Not_Available;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_Double_Fault;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_Coprocessor_Segment_overrun;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_Invaild_TSS;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_Segment_Not_Present;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_Stack_Segment_Fault;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_General_Protection;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_Page_Fault;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_FPU_Math_Error;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_Alignment_Check;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_Machine_check;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_SIMD_Floating_Point;
 begin
- asm
-  iret
- end;
+ 
 end;
 procedure kernel_idt_handler_Virtualization_Exception;
 begin
- asm
-  iret
- end;
+ 
 end;
 {$ELSEIF Defined(cpux86_64) or Defined(cpuia64)}
 procedure kernel_idt_handler_empty;
 begin
- asm
-  iretq
- end;
 end;
-procedure kernel_idt_handler_division_by_zero;
-begin
- asm
-  iretq
- end;
+procedure kernel_idt_handler_division_by_zero;assembler;
+asm
+ hlt
 end;
 procedure kernel_idt_handler_debug_exception;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_NMI_Interrupt;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_BreakPoint;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_OverFlow;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_Bound_Range_Exceed;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_Invaild_Opcode;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_Device_Not_Available;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_Double_Fault;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_Coprocessor_Segment_overrun;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_Invaild_TSS;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_Segment_Not_Present;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_Stack_Segment_Fault;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_General_Protection;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_Page_Fault;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_FPU_Math_Error;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_Alignment_Check;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_Machine_check;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_SIMD_Floating_Point;
 begin
- asm
-  iretq
- end;
 end;
 procedure kernel_idt_handler_Virtualization_Exception;
 begin
- asm
-  iretq
- end;
 end;
-procedure kernel_idt_handler_timer;
-begin
- kernel_handle_function_execute_function;
- asm
-  iretq
- end;
+//call kernel_handle_function_execute_function
+procedure kernel_idt_handler_timer;assembler;
+asm
+ iretq
 end;
 {$ENDIF}
 {$IF Defined(cpui386)}
@@ -484,6 +382,7 @@ end;
 procedure kernel_idt_set_entry(index:word;address:dword;GateType:byte;PrivilegeLevel:byte);
 begin
  idtentry[index].DescriptorPrivilegeLevel:=PrivilegeLevel;
+ idtentry[index].Present:=1;
  idtentry[index].SegmentSelector.Index:=1;
  idtentry[index].SegmentSelector.TableIndicator:=0;
  idtentry[index].SegmentSelector.RequestPrivilegeLevel:=0;
@@ -495,27 +394,26 @@ begin
  if(address=0) then idtentry[index].Present:=0 else idtentry[index].Present:=1;
 end;
 procedure kernel_gdt_initialize;
-var tempgdt:x86_gdt_descriptor;
+var tempptr:Px86_gdt_descriptor;
 begin
- gdt.Offset:=Dword(@gdtentry);
- gdt.Size:=sizeof(gdtentry);
+ gdt.Offset:=dword(@gdtentry);
+ gdt.Size:=sizeof(gdtentry)-1;
  kernel_gdt_set_entry(1,0,0,$0,$0);
- kernel_gdt_set_entry(2,0,$FFFFF,$9A,$C);
+ kernel_gdt_set_entry(2,0,$FFFFF,$9A,$A);
  kernel_gdt_set_entry(3,0,$FFFFF,$92,$C);
- kernel_gdt_set_entry(4,0,$FFFFF,$FA,$C);
+ kernel_gdt_set_entry(4,0,$FFFFF,$FA,$A);
  kernel_gdt_set_entry(5,0,$FFFFF,$F2,$C);
- kernel_gdt_set_entry(6,0,$FFFFF,$89,$0);
- tempgdt:=gdt;
+ tempptr:=@gdt;
  asm
-  lgdt tempgdt
+  lgdt tempptr
  end;
 end;
 procedure kernel_idt_initialize;
 var i:word;
-    tempidt:x86_idt_descriptor;
+    tempptr:Px86_idt_descriptor;
 begin
- idt.Offset:=Qword(@idtentry);
- idt.Size:=sizeof(idtentry);
+ idt.Offset:=dword(@idtentry);
+ idt.Size:=sizeof(idtentry)-1;
  i:=1;
  while(i<=256)do
   begin
@@ -547,9 +445,9 @@ begin
    end;
    inc(i);
   end;
- tempidt:=idt;
+ tempptr:=@idt;
  asm
-  lidt tempidt
+  lidt tempptr
  end;
 end;
 {$ELSEIF Defined(cpux86_64) or Defined(cpuia64)}
@@ -568,6 +466,7 @@ end;
 procedure kernel_idt_set_entry(index:word;address:qword;GateType:byte;PrivilegeLevel:byte);
 begin
  idtentry[index].DescriptorPrivilegeLevel:=PrivilegeLevel;
+ idtentry[index].Present:=1;
  idtentry[index].SegmentSelector.Index:=1;
  idtentry[index].SegmentSelector.TableIndicator:=0;
  idtentry[index].SegmentSelector.RequestPrivilegeLevel:=0;
@@ -582,27 +481,26 @@ begin
  if(address=0) then idtentry[index].Present:=0 else idtentry[index].Present:=1;
 end;
 procedure kernel_gdt_initialize;
-var tempgdt:x64_gdt_descriptor;
+var tempptr:Px64_gdt_descriptor;
 begin
  gdt.Offset:=Qword(@gdtentry);
- gdt.Size:=sizeof(gdtentry);
+ gdt.Size:=sizeof(gdtentry)-1;
  kernel_gdt_set_entry(1,0,0,$0,$0);
  kernel_gdt_set_entry(2,0,$FFFFF,$9A,$A);
  kernel_gdt_set_entry(3,0,$FFFFF,$92,$C);
  kernel_gdt_set_entry(4,0,$FFFFF,$FA,$A);
  kernel_gdt_set_entry(5,0,$FFFFF,$F2,$C);
- kernel_gdt_set_entry(6,0,$FFFFF,$89,$0);
- tempgdt:=gdt;
+ tempptr:=@gdt;
  asm
-  lgdt tempgdt
+  lgdt tempptr
  end;
 end;
 procedure kernel_idt_initialize;
 var i:word;
-    tempidt:x64_idt_descriptor;
+    tempptr:Px64_idt_descriptor;
 begin
  idt.Offset:=Qword(@idtentry);
- idt.Size:=sizeof(idtentry);
+ idt.Size:=sizeof(idtentry)-1;
  i:=1;
  while(i<=256)do
   begin
@@ -629,14 +527,14 @@ begin
    20:kernel_idt_set_entry(i,Qword(@kernel_idt_handler_SIMD_Floating_Point),$E,0);
    21:kernel_idt_set_entry(i,Qword(@kernel_idt_handler_Virtualization_Exception),$E,0);
    22..32:kernel_idt_set_entry(i,Qword(@kernel_idt_handler_empty),$E,0);
-   33:kernel_idt_set_entry(i,Qword(@kernel_idt_handler_timer),$E,0);
+   33:kernel_idt_set_entry(i,Qword(@kernel_idt_handler_timer),$E,3);
    34..256:kernel_idt_set_entry(i,Qword(@kernel_idt_handler_empty),$E,0);
    end;
    inc(i);
   end;
- tempidt:=idt;
+ tempptr:=@idt;
  asm
-  lidt tempidt
+  lidt tempptr
  end;
 end;
 {$ENDIF}
@@ -647,8 +545,16 @@ begin
  case arch of
  0,1,2:
  begin
+  {$IF Defined(cpui386) or Defined(cpux86_64) or Defined(cpuia64)}
+  asm
+   cli
+  end;
   kernel_gdt_initialize;
   kernel_idt_initialize;
+  asm
+   sti
+  end;
+  {$ENDIF}
  end;
  end;
 end;

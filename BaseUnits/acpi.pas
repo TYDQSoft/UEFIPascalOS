@@ -1988,7 +1988,7 @@ type acpi_uint96=array[1..3] of dword;
                                                 DivideValue1:0..3;
                                                 Reserved1:0..1;
                                                 DivideValue2:0..1;
-                                                Reserved2:0..268435455;
+                                                Reserved2:0..$FFFFFFF;
                                                 Reserved3:array[1..12] of byte;
                                                 end;
      acpi_cpu_x86_count_register=packed record
@@ -2019,23 +2019,58 @@ type acpi_uint96=array[1..3] of dword;
                                          Reserved:0..16777215;
                                          Reserved2:array[1..12] of byte;
                                          end;
-     acpi_cpu_x86_fixed_interrupt_register=packed record
+     acpi_cpu_x86_fixed_interrupt_register=bitpacked record
                                            Reserved:0..65535;
                                            Other:array[1..14] of byte;
                                            end;
+     acpi_cpu_x86_logical_destination_register=bitpacked record
+                                               Reserved1:0..$FFFFFF;
+                                               LogicalAPICID:0..$FF;
+                                               Reserved2:array[1..12] of byte;
+                                               end;
+     acpi_cpu_x86_destination_format_register=bitpacked record
+                                              Reserved1:0..$FFFFFFF;
+                                              Model:0..$F;
+                                              Reserved2:array[1..12] of byte;
+                                              end;
+     acpi_cpu_x86_arbitation_priority_register=bitpacked record
+                                               ArbitationPrioritySubClass:0..15;
+                                               ArbitationPriorityClass:0..15;
+                                               Reserved1:0..$FFFFFF;
+                                               Reserved2:array[1..12] of byte;
+                                               end;
+     acpi_cpu_x86_processor_priority_register=bitpacked record
+                                              ProcessorPrioritySubClass:0..15;
+                                              ProcessorPriorityClass:0..15;
+                                              Reserved1:0..$FFFFFF;
+                                              Reserved2:array[1..12] of byte;
+                                              end;
+     acpi_cpu_x86_eoi_register=bitpacked record
+                               Content:dword;
+                               Reserved:array[1..12] of byte;
+                               end;
+     acpi_cpu_x86_spurious_interrupt_vector_register=bitpacked record
+                                                     SpuriousVector:byte;
+                                                     EnableAPIC:0..1;
+                                                     FocusProcessorChecking:0..1;
+                                                     Reserved1:0..3;
+                                                     EOIBroadCastSuppression:0..1;
+                                                     Reserved2:0..$7FFFF;
+                                                     Reserved3:array[1..12] of byte;
+                                                     end;
      acpi_cpu_x86_local_apic=packed record
                              Reserved1:array[1..8] of dword;
                              LocalAPICIDRegister:acpi_cpu_x86_local_apic_id_register;
                              LocalAPICVersionRegister:acpi_cpu_x86_local_apic_version_register;
                              Reserved2:array[1..16] of dword;
                              TaskPriorityRegister:acpi_cpu_x86_task_priority_register;
-                             ArbitrationPriorityRegister:array[1..4] of dword;
-                             ProcessorPriorityRegister:array[1..4] of dword;
-                             EOIRegister:array[1..4] of dword;
+                             ArbitrationPriorityRegister:acpi_cpu_x86_arbitation_priority_register;
+                             ProcessorPriorityRegister:acpi_cpu_x86_processor_priority_register;
+                             EOIRegister:acpi_cpu_x86_eoi_register;
                              RemoteReadRegister:array[1..4] of dword;
-                             LogicalDestinationRegister:array[1..4] of dword;
-                             DestinationFormatRegister:array[1..4] of dword;
-                             SpuriousInterruptVectorRegister:array[1..4] of dword;
+                             LogicalDestinationRegister:acpi_cpu_x86_logical_destination_register;
+                             DestinationFormatRegister:acpi_cpu_x86_destination_format_register;
+                             SpuriousInterruptVectorRegister:acpi_cpu_x86_spurious_interrupt_vector_register;
                              ISR1,ISR2,ISR3,ISR4,ISR5,ISR6,ISR7,ISR8:acpi_cpu_x86_fixed_interrupt_register;
                              TMR1,TMR2,TMR3,TMR4,TMR5,TMR6,TMR7,TMR8:acpi_cpu_x86_fixed_interrupt_register;
                              IRR1,IRR2,IRR3,IRR4,IRR5,IRR6,IRR7,IRR8:acpi_cpu_x86_fixed_interrupt_register;
@@ -2103,8 +2138,13 @@ const acpi_persistent_memory_region_guid:acpi_guid=(data1:$66F0D379;data2:$B4F3;
       acpi_request_x86_local_apic_cmci:byte=4;
       acpi_request_x86_local_apic_thermal:byte=5;
       acpi_request_x86_local_apic_performance:byte=6;
+      acpi_request_x86_delivery_fixed=0;
+      acpi_request_x86_delivery_smi=2;
+      acpi_request_x86_delivery_nmi=4;
+      acpi_request_x86_delivery_init=5;
+      acpi_request_x86_delivery_external=7;
       acpi_request_x86_timer_one_shot=0;
-      acpi_request_x86_timer_periodic=1; 
+      acpi_request_x86_timer_periodic=1;
 
 var os_cpuinfo:acpi_cpu_info;
 
@@ -2634,32 +2674,36 @@ begin
      if(cpu.Processor.BaseInterruptOverrideAddress<>nil) then
      item.x86localapic:=cpu.Processor.BaseInterruptOverrideAddress
      else item.x86localapic:=cpu.Processor.BaseInterruptAddress;
-     if(request.requestsubclass=acpi_request_x86_local_apic_timer) then
+     if(item.x86localapic^.SpuriousInterruptVectorRegister.EnableAPIC=0) then
       begin
-       item.x86localapic^.ICR1.DestinationShortHand:=0;
-       item.x86localapic^.ICR2.DestinationField:=(cpu.Processor.LocalAPICId+request.requestAPICIndex-1)^;
+       item.x86localapic^.SpuriousInterruptVectorRegister.EnableAPIC:=1;
+       item.x86localapic^.SpuriousInterruptVectorRegister.SpuriousVector:=$FF;
        item.x86localapic^.DivideConfigurationRegisterForTimer.DivideValue1:=3;
        item.x86localapic^.DivideConfigurationRegisterForTimer.DivideValue2:=1;
+       item.x86localapic^.InitialCountRegisterForTimer.Count:=0;
+       item.x86localapic^.LVTTimerRegister.Mask:=1;
+      end;
+     if(request.requestsubclass=acpi_request_x86_local_apic_timer) then
+      begin
+       item.x86localapic^.ICR1.DestinationShortHand:=2;
+       item.x86localapic^.ICR2.DestinationField:=(cpu.Processor.LocalAPICId+request.requestAPICIndex-1)^;
        item.x86localapic^.InitialCountRegisterForTimer.Count:=request.requesttimer;
        item.x86localapic^.LVTTimerRegister.TimerMode:=request.requesttimerstatus;
-       item.x86localapic^.LVTTimerRegister.DeliveryStatus:=1;
        item.x86localapic^.LVTTimerRegister.Mask:=0;
        item.x86localapic^.LVTTimerRegister.Vector:=request.requestnumber-1;
       end
      else if(request.requestsubclass=acpi_request_x86_local_apic_error) then
       begin
-       item.x86localapic^.ICR1.DestinationShortHand:=0;
+       item.x86localapic^.ICR1.DestinationShortHand:=2;
        item.x86localapic^.ICR2.DestinationField:=(cpu.Processor.LocalAPICId+request.requestAPICIndex-1)^;
        item.x86localapic^.LVTErrorRegister.Mask:=0;
-       item.x86localapic^.LVTErrorRegister.DeliveryStatus:=1;
        item.x86localapic^.LVTErrorRegister.Vector:=request.requestnumber-1;
       end
      else if(request.requestsubclass=acpi_request_x86_local_apic_lint0) then
       begin
-       item.x86localapic^.ICR1.DestinationShortHand:=0;
+       item.x86localapic^.ICR1.DestinationShortHand:=2;
        item.x86localapic^.ICR2.DestinationField:=(cpu.Processor.LocalAPICId+request.requestAPICIndex-1)^;
        item.x86localapic^.LVTLInt0Register.Mask:=0;
-       item.x86localapic^.LVTLInt0Register.DeliveryStatus:=1;
        item.x86localapic^.LVTLInt0Register.InterruptInputPinPolarity:=1;
        item.x86localapic^.LVTLInt0Register.DeliveryMode:=request.requestDeliveryMode;
        item.x86localapic^.LVTLInt0Register.TriggerMode:=1;
@@ -2667,10 +2711,9 @@ begin
       end
      else if(request.requestsubclass=acpi_request_x86_local_apic_lint1) then
       begin
-       item.x86localapic^.ICR1.DestinationShortHand:=0;
+       item.x86localapic^.ICR1.DestinationShortHand:=2;
        item.x86localapic^.ICR2.DestinationField:=(cpu.Processor.LocalAPICId+request.requestAPICIndex-1)^;
        item.x86localapic^.LVTLInt1Register.Mask:=0;
-       item.x86localapic^.LVTLInt1Register.DeliveryStatus:=1;
        item.x86localapic^.LVTLInt1Register.InterruptInputPinPolarity:=1;
        item.x86localapic^.LVTLInt1Register.DeliveryMode:=request.requestDeliveryMode;
        item.x86localapic^.LVTLInt1Register.TriggerMode:=1;
@@ -2678,29 +2721,26 @@ begin
       end
      else if(request.requestsubclass=acpi_request_x86_local_apic_cmci) then
       begin
-       item.x86localapic^.ICR1.DestinationShortHand:=0;
+       item.x86localapic^.ICR1.DestinationShortHand:=2;
        item.x86localapic^.ICR2.DestinationField:=(cpu.Processor.LocalAPICId+request.requestAPICIndex-1)^;
        item.x86localapic^.LVTCMCIRegister.Mask:=0;
        item.x86localapic^.LVTCMCIRegister.DeliveryMode:=request.requestDeliveryMode;
-       item.x86localapic^.LVTCMCIRegister.DeliveryStatus:=1;
        item.x86localapic^.LVTCMCIRegister.Vector:=request.requestnumber-1;
       end
      else if(request.requestsubclass=acpi_request_x86_local_apic_thermal) then
       begin
-       item.x86localapic^.ICR1.DestinationShortHand:=0;
+       item.x86localapic^.ICR1.DestinationShortHand:=2;
        item.x86localapic^.ICR2.DestinationField:=(cpu.Processor.LocalAPICId+request.requestAPICIndex-1)^;
        item.x86localapic^.LVTThermalSensorRegister.DeliveryMode:=request.requestDeliveryMode;
-       item.x86localapic^.LVTThermalSensorRegister.DeliveryStatus:=1;
        item.x86localapic^.LVTThermalSensorRegister.Mask:=0;
        item.x86localapic^.LVTThermalSensorRegister.Vector:=request.requestnumber-1;
       end
      else if(request.requestsubclass=acpi_request_x86_local_apic_performance) then
       begin
-       item.x86localapic^.ICR1.DestinationShortHand:=0;
+       item.x86localapic^.ICR1.DestinationShortHand:=2;
        item.x86localapic^.ICR2.DestinationField:=(cpu.Processor.LocalAPICId+request.requestAPICIndex-1)^;
        item.x86localapic^.LVTPerformanceMonitoringCountersRegister.Mask:=0;
        item.x86localapic^.LVTPerformanceMonitoringCountersRegister.DeliveryMode:=request.requestDeliveryMode;
-       item.x86localapic^.LVTPerformanceMonitoringCountersRegister.DeliveryStatus:=1;
        item.x86localapic^.LVTPerformanceMonitoringCountersRegister.Vector:=request.requestnumber-1;
       end;
     end;
@@ -2720,3 +2760,4 @@ begin
 end;
 
 end.
+
