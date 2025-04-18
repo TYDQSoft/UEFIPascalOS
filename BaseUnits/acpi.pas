@@ -1,6 +1,7 @@
 unit acpi;
 
 interface
+
       {ACPI Header Signature}
 const acpi_rsdp_signature:array[1..8] of char=('R','S','D',' ','P','T','R',' ');
       acpi_rsdt_signature:array[1..4] of char=('R','S','D','T');
@@ -2056,7 +2057,7 @@ type acpi_uint96=array[1..3] of dword;
                                                      Reserved1:0..3;
                                                      EOIBroadCastSuppression:0..1;
                                                      Reserved2:0..$7FFFF;
-                                                     Reserved3:array[1..12] of byte;
+                                                     Reserved3:array[1..12] of byte; 
                                                      end;
      acpi_cpu_x86_local_apic=packed record
                              Reserved1:array[1..8] of dword;
@@ -2138,6 +2139,7 @@ const acpi_persistent_memory_region_guid:acpi_guid=(data1:$66F0D379;data2:$B4F3;
       acpi_request_x86_local_apic_cmci:byte=4;
       acpi_request_x86_local_apic_thermal:byte=5;
       acpi_request_x86_local_apic_performance:byte=6;
+      acpi_request_x86_local_apic_interprocessor:byte=7;
       acpi_request_x86_delivery_fixed=0;
       acpi_request_x86_delivery_smi=2;
       acpi_request_x86_delivery_nmi=4;
@@ -2149,7 +2151,7 @@ const acpi_persistent_memory_region_guid:acpi_guid=(data1:$66F0D379;data2:$B4F3;
 var os_cpuinfo:acpi_cpu_info;
 
 function acpi_get_cpu_info_from_acpi_table(ptr:Pointer):acpi_cpu_info;
-procedure acpi_cpu_request_interrupt(cpu:acpi_cpu_info;request:acpi_request);
+procedure acpi_cpu_request_interrupt(request:acpi_request);
 
 implementation
 
@@ -2173,6 +2175,8 @@ begin
  acpi_get_architecture:=acpi_loongarch32;
  {$ELSEIF Defined(cpuloongarch64)}
  acpi_get_architecture:=acpi_loongarch64;
+ {$ELSE}
+ acpi_get_architecture:=$FF;
  {$ENDIF}
 end;
 function acpi_check_signature(const originalsign;const comparesign;len:byte):boolean;
@@ -2469,7 +2473,9 @@ var offset,madtlength,madtstart:dword;
 begin
  if(madt=nil) then
   begin
-   res.architecture:=$FF; exit(res);
+   res.architecture:=$FF;  
+   for i:=1 to sizeof(res.Processor) do PByte(ptr+i-1)^:=0;
+   exit(res);
   end;
  madtlength:=madt^.hdr.length-sizeof(acpi_madt)+1;
  madtstart:=sizeof(acpi_madt)-1; offset:=madtstart;
@@ -2483,7 +2489,7 @@ begin
    if((ptr+offset)^=0) then
     begin
      inc(res.Processor.LocalAPICCount);
-     tempnum:=Pacpi_madt_processor_local_apic_structure(ptr)^.APICId;
+     tempnum:=Pacpi_madt_processor_local_apic_structure(ptr+offset)^.APICId;
      ReallocMem(res.Processor.LocalAPICId,res.Processor.LocalAPICCount);
      (res.Processor.LocalAPICId+res.Processor.LocalAPICCount-1)^:=tempnum;
      inc(offset,sizeof(acpi_madt_processor_local_apic_structure)); continue;
@@ -2491,7 +2497,7 @@ begin
    else if((ptr+offset)^=1) then
     begin
      inc(res.Processor.IOAPICCount);
-     tempptr:=Pointer(Pacpi_madt_io_apic_structure(ptr)^.IOAPICAddress);
+     tempptr:=Pointer(Pacpi_madt_io_apic_structure(ptr+offset)^.IOAPICAddress);
      ReallocMem(res.Processor.IOAPICAddress,sizeof(Pointer)*res.Processor.IOAPICCount);
      (res.Processor.IOAPICAddress+res.Processor.IOAPICCount-1)^:=tempptr;
      inc(offset,sizeof(acpi_madt_io_apic_structure)); continue;
@@ -2510,14 +2516,14 @@ begin
     end
    else if((ptr+offset)^=5) then
     begin
-     tempptr:=Pointer(Pacpi_madt_local_apic_address_override_structure(ptr)^.LocalAPICAddress);
+     tempptr:=Pointer(Pacpi_madt_local_apic_address_override_structure(ptr+offset)^.LocalAPICAddress);
      res.Processor.BaseInterruptOverrideAddress:=tempptr;
      inc(offset,sizeof(acpi_madt_local_apic_address_override_structure)); continue;
     end
    else if((ptr+offset)^=6) then
     begin
      inc(res.Processor.IOSAPICCount);
-     tempptr:=Pointer(Pacpi_madt_io_sapic_structure(ptr)^.IOSAPICAddress);
+     tempptr:=Pointer(Pacpi_madt_io_sapic_structure(ptr+offset)^.IOSAPICAddress);
      ReallocMem(res.Processor.IOSAPICAddress,sizeof(Pointer)*res.Processor.IOSAPICCount);
      (res.Processor.IOSAPICAddress+res.Processor.IOSAPICCount-1)^:=tempptr;
      inc(offset,sizeof(acpi_madt_io_sapic_structure)); continue;
@@ -2541,10 +2547,10 @@ begin
    else if((ptr+offset)^=$B) then
     begin
      inc(res.Processor.GICCCount);
-     tempptr:=Pointer(Pacpi_madt_gicc_structure(ptr)^.ParkedAddress);
+     tempptr:=Pointer(Pacpi_madt_gicc_structure(ptr+offset)^.ParkedAddress);
      ReallocMem(res.Processor.GICParkedAddress,sizeof(Pointer)*res.Processor.GICCCount);
      (res.Processor.GICParkedAddress+res.Processor.GICCCount-1)^:=tempptr;
-     tempptr:=Pointer(Pacpi_madt_gicc_structure(ptr)^.PhysicalBaseAddress);
+     tempptr:=Pointer(Pacpi_madt_gicc_structure(ptr+offset)^.PhysicalBaseAddress);
      ReallocMem(res.Processor.GICBaseAddress,sizeof(Pointer)*res.Processor.GICCCount);
      (res.Processor.GICBaseAddress+res.Processor.GICCCount-1)^:=tempptr;
      inc(offset,sizeof(acpi_madt_gicc_structure)); continue;
@@ -2552,7 +2558,7 @@ begin
    else if((ptr+offset)^=$C) then
     begin
      inc(res.Processor.GICDCount);
-     tempptr:=Pointer(Pacpi_madt_gicd_structure(ptr)^.PhysicalBaseAddress);
+     tempptr:=Pointer(Pacpi_madt_gicd_structure(ptr+offset)^.PhysicalBaseAddress);
      ReallocMem(res.Processor.GICDBaseAddress,sizeof(Pointer)*res.Processor.GICDCount);
      (res.Processor.GICDBaseAddress+res.Processor.GICCCount-1)^:=tempptr;
      inc(offset,sizeof(acpi_madt_gicd_structure)); continue;
@@ -2560,7 +2566,7 @@ begin
    else if((ptr+offset)^=$D) then
     begin
      inc(res.Processor.GICMSIFrameCount);
-     tempptr:=Pointer(Pacpi_madt_gic_msi_frame_structure(ptr)^.PhysicalBaseAddress);
+     tempptr:=Pointer(Pacpi_madt_gic_msi_frame_structure(ptr+offset)^.PhysicalBaseAddress);
      ReallocMem(res.Processor.GICMSIFrameBaseAddress,sizeof(Pointer)*res.Processor.GICDCount);
      (res.Processor.GICMSIFrameBaseAddress+res.Processor.GICMSIFrameCount-1)^:=tempptr;
      inc(offset,sizeof(acpi_madt_gic_msi_frame_structure)); continue;
@@ -2568,7 +2574,7 @@ begin
    else if((ptr+offset)^=$E) then
     begin
      inc(res.Processor.GICRCount);
-     tempptr:=Pointer(Pacpi_madt_gicr_structure(ptr)^.DiscoveryRangeBaseAddress);
+     tempptr:=Pointer(Pacpi_madt_gicr_structure(ptr+offset)^.DiscoveryRangeBaseAddress);
      tempnum:=Pacpi_madt_gicr_structure(ptr)^.DiscoveryRangeBaseLength;
      ReallocMem(res.Processor.GICRBaseAddress,sizeof(Pointer)*res.Processor.GICDCount);
      ReallocMem(res.Processor.GICRLength,sizeof(dword)*res.Processor.GICDCount);
@@ -2579,7 +2585,7 @@ begin
    else if((ptr+offset)^=$f) then
     begin
      inc(res.Processor.GICITSCount);
-     tempptr:=Pointer(Pacpi_madt_gic_its_structure(ptr)^.PhysicalBaseAddress);
+     tempptr:=Pointer(Pacpi_madt_gic_its_structure(ptr+offset)^.PhysicalBaseAddress);
      ReallocMem(res.Processor.GICITSBaseAddress,sizeof(Pointer)*res.Processor.GICITSCount);
      (res.Processor.GICITSBaseAddress+res.Processor.GICITSCount-1)^:=tempptr;
      inc(offset,sizeof(acpi_madt_gic_its_structure)); continue;
@@ -2595,10 +2601,10 @@ begin
    else if((ptr+offset)^=$12) then
     begin
      inc(res.Processor.LIOPICCount);
-     tempptr:=Pointer(Pacpi_madt_lio_pic_structure(ptr)^.BaseAddress);
+     tempptr:=Pointer(Pacpi_madt_lio_pic_structure(ptr+offset)^.BaseAddress);
      ReallocMem(res.Processor.LIOPICBaseAddress,sizeof(Pointer)*res.Processor.LIOPICCount);
      (res.Processor.LIOPICBaseAddress+res.Processor.LIOPICCount-1)^:=tempptr;
-     tempnum:=Pacpi_madt_lio_pic_structure(ptr)^.Size;
+     tempnum:=Pacpi_madt_lio_pic_structure(ptr+offset)^.Size;
      ReallocMem(res.Processor.LIOPICSize,sizeof(word)*res.Processor.LIOPICCount);
      (res.Processor.LIOPICSize+res.Processor.LIOPICCount-1)^:=tempnum;
      inc(offset,sizeof(acpi_madt_lio_pic_structure)); continue;
@@ -2606,10 +2612,10 @@ begin
    else if((ptr+offset)^=$13) then
     begin
      inc(res.Processor.HTPICCount);
-     tempptr:=Pointer(Pacpi_madt_ht_pic_structure(ptr)^.BaseAddress);
+     tempptr:=Pointer(Pacpi_madt_ht_pic_structure(ptr+offset)^.BaseAddress);
      ReallocMem(res.Processor.HTPICBaseAddress,sizeof(Pointer)*res.Processor.HTPICCount);
      (res.Processor.HTPICBaseAddress+res.Processor.HTPICCount-1)^:=tempptr;
-     tempnum:=Pacpi_madt_ht_pic_structure(ptr)^.Size;
+     tempnum:=Pacpi_madt_ht_pic_structure(ptr+offset)^.Size;
      ReallocMem(res.Processor.HTPICSize,sizeof(word)*res.Processor.HTPICCount);
      (res.Processor.HTPICSize+res.Processor.HTPICCount-1)^:=tempnum;
      inc(offset,sizeof(acpi_madt_ht_pic_structure)); continue;
@@ -2621,7 +2627,7 @@ begin
    else if((ptr+offset)^=$15) then
     begin
      inc(res.Processor.MessageCount);
-     tempptr:=Pointer(Pacpi_madt_msi_pic_structure(ptr)^.MessageAddress);
+     tempptr:=Pointer(Pacpi_madt_msi_pic_structure(ptr+offset)^.MessageAddress);
      ReallocMem(res.Processor.MessageBaseAddress,sizeof(Pointer)*res.Processor.MessageCount);
      (res.Processor.MessageBaseAddress+res.Processor.MessageCount-1)^:=tempptr;
      inc(offset,sizeof(acpi_madt_msi_pic_structure)); continue;
@@ -2629,7 +2635,7 @@ begin
    else if((ptr+offset)^=$16) then
     begin
      inc(res.Processor.BIOCount);
-     tempptr:=Pointer(Pacpi_madt_bio_pic_structure(ptr)^.BaseAddress);
+     tempptr:=Pointer(Pacpi_madt_bio_pic_structure(ptr+offset)^.BaseAddress);
      ReallocMem(res.Processor.BIOPICBaseAddress,sizeof(Pointer)*res.Processor.BIOCount);
      (res.Processor.BIOPICBaseAddress+res.Processor.HTPICCount-1)^:=tempptr;
      tempnum:=Pacpi_madt_bio_pic_structure(ptr)^.Size;
@@ -2640,7 +2646,7 @@ begin
    else if((ptr+offset)^=$17) then
     begin
      inc(res.Processor.LPCPICCount);
-     tempptr:=Pointer(Pacpi_madt_lpc_pic_structure(ptr)^.BaseAddress);
+     tempptr:=Pointer(Pacpi_madt_lpc_pic_structure(ptr+offset)^.BaseAddress);
      ReallocMem(res.Processor.lpcPICBaseAddress,sizeof(Pointer)*res.Processor.LPCPICCount);
      (res.Processor.lpcPICBaseAddress+res.Processor.HTPICCount-1)^:=tempptr;
      tempnum:=Pacpi_madt_lpc_pic_structure(ptr)^.Size;
@@ -2663,97 +2669,193 @@ begin
  acpi_tree_free(tree);
  acpi_get_cpu_info_from_acpi_table:=res;
 end;
-procedure acpi_cpu_request_interrupt(cpu:acpi_cpu_info;request:acpi_request);
+procedure acpi_cpu_request_interrupt(request:acpi_request);
 var item:acpi_processor_item;
+    writedata:dword;
 begin
- if(cpu.architecture=acpi_i386) or (cpu.architecture=acpi_x86_64)
- or(cpu.architecture=acpi_ia64) then
+ if(os_cpuinfo.architecture=acpi_i386) or (os_cpuinfo.architecture=acpi_x86_64)
+ or(os_cpuinfo.architecture=acpi_ia64) then
   begin
    if(request.requestrootclass=acpi_request_x86_local_apic) then
     begin
-     if(cpu.Processor.BaseInterruptOverrideAddress<>nil) then
-     item.x86localapic:=cpu.Processor.BaseInterruptOverrideAddress
-     else item.x86localapic:=cpu.Processor.BaseInterruptAddress;
-     if(item.x86localapic^.SpuriousInterruptVectorRegister.EnableAPIC=0) then
+     if(os_cpuinfo.Processor.BaseInterruptOverrideAddress<>nil) then
+     item.x86localapic:=os_cpuinfo.Processor.BaseInterruptOverrideAddress
+     else 
+     item.x86localapic:=os_cpuinfo.Processor.BaseInterruptAddress; 
+     if(item.x86localapic^.SpuriousInterruptVectorRegister.EnableAPIC=1) then
       begin
-       item.x86localapic^.SpuriousInterruptVectorRegister.EnableAPIC:=1;
-       item.x86localapic^.SpuriousInterruptVectorRegister.SpuriousVector:=$FF;
-       item.x86localapic^.DivideConfigurationRegisterForTimer.DivideValue1:=3;
-       item.x86localapic^.DivideConfigurationRegisterForTimer.DivideValue2:=1;
-       item.x86localapic^.InitialCountRegisterForTimer.Count:=0;
-       item.x86localapic^.LVTTimerRegister.Mask:=1;
+       //item.x86localapic^.SpuriousInterruptVectorRegister.SpuriousVector:=$FF;
+       writedata:=$FF+1 shl 8;
+       Pdword(@item.x86localapic^.SpuriousInterruptVectorRegister)^:=writedata;
+       //item.x86localapic^.DivideConfigurationRegisterForTimer.DivideValue1:=3;
+       //item.x86localapic^.DivideConfigurationRegisterForTimer.DivideValue2:=1;
+       writedata:=2+1 shl 3;
+       Pdword(@item.x86localapic^.DivideConfigurationRegisterForTimer)^:=writedata;
+       //item.x86localapic^.InitialCountRegisterForTimer.Count:=0;
+       writedata:=0;
+       Pdword(@item.x86localapic^.InitialCountRegisterForTimer)^:=writedata;
+       //item.x86localapic^.LVTTimerRegister.Mask:=0;
+       //item.x86localapic^.LVTTimerRegister.TimerMode:=0;
+       writedata:=3 shl 17;
+       Pdword(@item.x86localapic^.LVTTimerRegister)^:=writedata;
+       //item.x86localapic^.TaskPriorityRegister.TaskPriorityClass:=0;
+       writedata:=0;
+       Pdword(@item.x86localapic^.TaskPriorityRegister)^:=writedata;
+      end
+     else
+      begin
+       //item.x86localapic^.SpuriousInterruptVectorRegister.EnableAPIC:=1;
+       //item.x86localapic^.SpuriousInterruptVectorRegister.SpuriousVector:=$FF;
+       writedata:=$FF+1 shl 8;
+       Pdword(@item.x86localapic^.SpuriousInterruptVectorRegister)^:=writedata;
+       //item.x86localapic^.DivideConfigurationRegisterForTimer.DivideValue1:=3;
+       //item.x86localapic^.DivideConfigurationRegisterForTimer.DivideValue2:=1;
+       writedata:=2+1 shl 3;
+       Pdword(@item.x86localapic^.DivideConfigurationRegisterForTimer)^:=writedata;
+       //item.x86localapic^.InitialCountRegisterForTimer.Count:=0;
+       writedata:=0;
+       Pdword(@item.x86localapic^.InitialCountRegisterForTimer)^:=writedata;
+       //item.x86localapic^.LVTTimerRegister.Mask:=0;
+       //item.x86localapic^.LVTTimerRegister.TimerMode:=0;
+       writedata:=3 shl 17;
+       Pdword(@item.x86localapic^.LVTTimerRegister)^:=writedata;
+       //item.x86localapic^.TaskPriorityRegister.TaskPriorityClass:=0;
+       writedata:=0;
+       Pdword(@item.x86localapic^.TaskPriorityRegister)^:=writedata;
       end;
      if(request.requestsubclass=acpi_request_x86_local_apic_timer) then
       begin
-       item.x86localapic^.ICR1.DestinationShortHand:=2;
-       item.x86localapic^.ICR2.DestinationField:=(cpu.Processor.LocalAPICId+request.requestAPICIndex-1)^;
-       item.x86localapic^.InitialCountRegisterForTimer.Count:=request.requesttimer;
-       item.x86localapic^.LVTTimerRegister.TimerMode:=request.requesttimerstatus;
-       item.x86localapic^.LVTTimerRegister.Mask:=0;
-       item.x86localapic^.LVTTimerRegister.Vector:=request.requestnumber-1;
+       //item.x86localapic^.ICR1.DestinationShortHand:=0;
+       writedata:=3 shl 8;
+       Pdword(@item.x86localapic^.ICR1)^:=writedata;
+       //item.x86localapic^.ICR2.DestinationField:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^;
+       writedata:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^ shl 24;
+       Pdword(@item.x86localapic^.ICR2)^:=writedata;
+       //item.x86localapic^.InitialCountRegisterForTimer.Count:=request.requesttimer;
+       writedata:=request.requesttimer;
+       Pdword(@item.x86localapic^.InitialCountRegisterForTimer)^:=writedata;
+       //item.x86localapic^.CurrentCountRegisterForTimer.Count:=request.requesttimer;
+       writedata:=request.requesttimer;
+       Pdword(@item.x86localapic^.CurrentCountRegisterForTimer)^:=writedata;
+       //item.x86localapic^.LVTTimerRegister.TimerMode:=request.requesttimerstatus;
+       //item.x86localapic^.LVTTimerRegister.Mask:=0;
+       //item.x86localapic^.LVTTimerRegister.Vector:=request.requestnumber-1;
+       writedata:=request.requesttimerstatus shl 17+request.requestnumber-1;
+       Pdword(@item.x86localapic^.LVTTimerRegister)^:=writedata;
+       //item.x86localapic^.InitialCountRegisterForTimer.Count:=request.requesttimer;
+       writedata:=request.requesttimer;
+       Pdword(@item.x86localapic^.InitialCountRegisterForTimer)^:=writedata;
+       //item.x86localapic^.CurrentCountRegisterForTimer.Count:=request.requesttimer;
+       writedata:=request.requesttimer;
+       Pdword(@item.x86localapic^.CurrentCountRegisterForTimer)^:=writedata;
       end
      else if(request.requestsubclass=acpi_request_x86_local_apic_error) then
       begin
-       item.x86localapic^.ICR1.DestinationShortHand:=2;
-       item.x86localapic^.ICR2.DestinationField:=(cpu.Processor.LocalAPICId+request.requestAPICIndex-1)^;
-       item.x86localapic^.LVTErrorRegister.Mask:=0;
-       item.x86localapic^.LVTErrorRegister.Vector:=request.requestnumber-1;
+       //item.x86localapic^.ICR1.DestinationShortHand:=0;
+       writedata:=3 shl 8;
+       Pdword(@item.x86localapic^.ICR1)^:=writedata;
+       //item.x86localapic^.ICR2.DestinationField:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^;
+       writedata:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^ shl 24;
+       Pdword(@item.x86localapic^.ICR2)^:=writedata;
+       //item.x86localapic^.LVTErrorRegister.Mask:=0;
+       //item.x86localapic^.LVTErrorRegister.Vector:=request.requestnumber-1;
+       writedata:=request.requestnumber-1;
+       Pdword(@item.x86localapic^.LVTErrorRegister)^:=writedata;
       end
      else if(request.requestsubclass=acpi_request_x86_local_apic_lint0) then
       begin
-       item.x86localapic^.ICR1.DestinationShortHand:=2;
-       item.x86localapic^.ICR2.DestinationField:=(cpu.Processor.LocalAPICId+request.requestAPICIndex-1)^;
-       item.x86localapic^.LVTLInt0Register.Mask:=0;
-       item.x86localapic^.LVTLInt0Register.InterruptInputPinPolarity:=1;
-       item.x86localapic^.LVTLInt0Register.DeliveryMode:=request.requestDeliveryMode;
-       item.x86localapic^.LVTLInt0Register.TriggerMode:=1;
-       item.x86localapic^.LVTLInt0Register.Vector:=request.requestnumber-1;
+       //item.x86localapic^.ICR1.DestinationShortHand:=0;
+       writedata:=3 shl 8;
+       Pdword(@item.x86localapic^.ICR1)^:=writedata;
+       //item.x86localapic^.ICR2.DestinationField:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^;
+       writedata:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^ shl 24;
+       Pdword(@item.x86localapic^.ICR2)^:=writedata;
+       //item.x86localapic^.LVTLInt0Register.Mask:=0;
+       //item.x86localapic^.LVTLInt0Register.InterruptInputPinPolarity:=1;
+       //item.x86localapic^.LVTLInt0Register.DeliveryMode:=request.requestDeliveryMode;
+       //item.x86localapic^.LVTLInt0Register.TriggerMode:=1;
+       //item.x86localapic^.LVTLInt0Register.Vector:=request.requestnumber-1;
+       writedata:=1 shl 12+request.requestDeliveryMode shl 8+request.requestnumber;
+       Pdword(@item.x86localapic^.LVTLInt0Register)^:=writedata;
       end
      else if(request.requestsubclass=acpi_request_x86_local_apic_lint1) then
       begin
-       item.x86localapic^.ICR1.DestinationShortHand:=2;
-       item.x86localapic^.ICR2.DestinationField:=(cpu.Processor.LocalAPICId+request.requestAPICIndex-1)^;
-       item.x86localapic^.LVTLInt1Register.Mask:=0;
-       item.x86localapic^.LVTLInt1Register.InterruptInputPinPolarity:=1;
-       item.x86localapic^.LVTLInt1Register.DeliveryMode:=request.requestDeliveryMode;
-       item.x86localapic^.LVTLInt1Register.TriggerMode:=1;
-       item.x86localapic^.LVTLInt1Register.Vector:=request.requestnumber-1;
+       //item.x86localapic^.ICR1.DestinationShortHand:=0;
+       writedata:=3 shl 8;
+       Pdword(@item.x86localapic^.ICR1)^:=writedata;
+       //item.x86localapic^.ICR2.DestinationField:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^;
+       writedata:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^ shl 24;
+       Pdword(@item.x86localapic^.ICR2)^:=writedata;
+       //item.x86localapic^.LVTLInt1Register.Mask:=0;
+       //item.x86localapic^.LVTLInt1Register.InterruptInputPinPolarity:=1;
+       //item.x86localapic^.LVTLInt1Register.DeliveryMode:=request.requestDeliveryMode;
+       //item.x86localapic^.LVTLInt1Register.TriggerMode:=1;
+       //item.x86localapic^.LVTLInt1Register.Vector:=request.requestnumber-1;
+       writedata:=1 shl 12+request.requestDeliveryMode shl 8+request.requestnumber;
+       Pdword(@item.x86localapic^.LVTLInt1Register)^:=writedata;
       end
      else if(request.requestsubclass=acpi_request_x86_local_apic_cmci) then
       begin
-       item.x86localapic^.ICR1.DestinationShortHand:=2;
-       item.x86localapic^.ICR2.DestinationField:=(cpu.Processor.LocalAPICId+request.requestAPICIndex-1)^;
-       item.x86localapic^.LVTCMCIRegister.Mask:=0;
-       item.x86localapic^.LVTCMCIRegister.DeliveryMode:=request.requestDeliveryMode;
-       item.x86localapic^.LVTCMCIRegister.Vector:=request.requestnumber-1;
+       //item.x86localapic^.ICR1.DestinationShortHand:=0;
+       writedata:=3 shl 8;
+       Pdword(@item.x86localapic^.ICR1)^:=writedata;
+       //item.x86localapic^.ICR2.DestinationField:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^;
+       writedata:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^ shl 24;
+       Pdword(@item.x86localapic^.ICR2)^:=writedata;
+       //item.x86localapic^.LVTCMCIRegister.Mask:=0;
+       //item.x86localapic^.LVTCMCIRegister.DeliveryMode:=request.requestDeliveryMode;
+       //item.x86localapic^.LVTCMCIRegister.Vector:=request.requestnumber-1;
+       writedata:=request.requestDeliveryMode shl 8+request.requestnumber-1;
+       Pdword(@item.x86localapic^.LVTCMCIRegister)^:=writedata;
       end
      else if(request.requestsubclass=acpi_request_x86_local_apic_thermal) then
       begin
-       item.x86localapic^.ICR1.DestinationShortHand:=2;
-       item.x86localapic^.ICR2.DestinationField:=(cpu.Processor.LocalAPICId+request.requestAPICIndex-1)^;
-       item.x86localapic^.LVTThermalSensorRegister.DeliveryMode:=request.requestDeliveryMode;
-       item.x86localapic^.LVTThermalSensorRegister.Mask:=0;
-       item.x86localapic^.LVTThermalSensorRegister.Vector:=request.requestnumber-1;
+       //item.x86localapic^.ICR1.DestinationShortHand:=0;
+       writedata:=3 shl 8;
+       Pdword(@item.x86localapic^.ICR1)^:=writedata;
+       //item.x86localapic^.ICR2.DestinationField:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^;
+       writedata:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^ shl 24;
+       Pdword(@item.x86localapic^.ICR2)^:=writedata;
+       //item.x86localapic^.LVTThermalSensorRegister.DeliveryMode:=request.requestDeliveryMode;
+       //item.x86localapic^.LVTThermalSensorRegister.Mask:=0;
+       //item.x86localapic^.LVTThermalSensorRegister.Vector:=request.requestnumber-1;
+       writedata:=request.requestDeliveryMode shl 8+request.requestnumber-1;
+       Pdword(@item.x86localapic^.LVTThermalSensorRegister)^:=writedata;
       end
      else if(request.requestsubclass=acpi_request_x86_local_apic_performance) then
       begin
-       item.x86localapic^.ICR1.DestinationShortHand:=2;
-       item.x86localapic^.ICR2.DestinationField:=(cpu.Processor.LocalAPICId+request.requestAPICIndex-1)^;
-       item.x86localapic^.LVTPerformanceMonitoringCountersRegister.Mask:=0;
-       item.x86localapic^.LVTPerformanceMonitoringCountersRegister.DeliveryMode:=request.requestDeliveryMode;
-       item.x86localapic^.LVTPerformanceMonitoringCountersRegister.Vector:=request.requestnumber-1;
+       //item.x86localapic^.ICR1.DestinationShortHand:=0;
+       writedata:=3 shl 8;
+       Pdword(@item.x86localapic^.ICR1)^:=writedata;
+       //item.x86localapic^.ICR2.DestinationField:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^;
+       writedata:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^ shl 24;
+       Pdword(@item.x86localapic^.ICR2)^:=writedata;
+       //item.x86localapic^.LVTPerformanceMonitoringCountersRegister.Mask:=0;
+       //item.x86localapic^.LVTPerformanceMonitoringCountersRegister.DeliveryMode:=request.requestDeliveryMode;
+       //item.x86localapic^.LVTPerformanceMonitoringCountersRegister.Vector:=request.requestnumber-1;
+       writedata:=request.requestDeliveryMode shl 8+request.requestnumber-1;
+       Pdword(@item.x86localapic^.LVTPerformanceMonitoringCountersRegister)^:=writedata;
+      end
+     else if(request.requestsubclass=acpi_request_x86_local_apic_interprocessor) then
+      begin
+       //item.x86localapic^.ICR1.DestinationShortHand:=0;
+       writedata:=request.requestnumber-1;
+       Pdword(@item.x86localapic^.ICR1)^:=writedata;
+       //item.x86localapic^.ICR2.DestinationField:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^;
+       writedata:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^ shl 24;
+       Pdword(@item.x86localapic^.ICR2)^:=writedata;
       end;
     end;
   end
- else if(cpu.architecture=acpi_arm) or (cpu.architecture=acpi_arm64) then
+ else if(os_cpuinfo.architecture=acpi_arm) or (os_cpuinfo.architecture=acpi_arm64) then
   begin
 
   end
- else if(cpu.architecture=acpi_riscv32) or (cpu.architecture=acpi_riscv64) then
+ else if(os_cpuinfo.architecture=acpi_riscv32) or (os_cpuinfo.architecture=acpi_riscv64) then
   begin
 
   end
- else if(cpu.architecture=acpi_loongarch32) or (cpu.architecture=acpi_loongarch64) then
+ else if(os_cpuinfo.architecture=acpi_loongarch32) or (os_cpuinfo.architecture=acpi_loongarch64) then
   begin
 
   end;

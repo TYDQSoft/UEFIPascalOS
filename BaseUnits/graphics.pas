@@ -2,6 +2,8 @@ unit graphics;
 
 interface
 
+uses font;
+
 type graph_point=packed record
                  xpos,ypos:dword;
                  end;
@@ -35,6 +37,23 @@ type graph_point=packed record
                         1:(RGBRed:byte;RGBGreen:byte;RGBBlue:byte;RGBReserved:byte;);
                         end;
      Pgraph_output_color=^graph_output_color;
+     graph_char=packed record
+                content:WideChar;
+                color:graph_color;
+                end;
+     graph_string=packed record
+                  content:PWideChar;
+                  color:graph_color;
+                  end;
+     graph_string_with_graph_char=packed record
+                                  content:PWideChar;
+                                  color:^graph_color;
+                                  end;
+     graph_string_with_graph_string=packed record
+                                    content:^PWideChar;
+                                    color:^graph_color;
+                                    count:Natuint;
+                                    end;
      graph_heap=packed record
                 mem_start:Pointer;
                 mem_end:Pointer;
@@ -75,8 +94,10 @@ function graph_color_generate(Red:byte;Green:byte;Blue:byte;Alpha:byte):graph_co
 function graph_color_mixed(color1,color2:graph_color):graph_color;
 function graph_color_get_lightness(color:graph_color):byte;
 function graph_color_get_inverse(color:graph_color):graph_color;
+function graph_construct_graph_char(content:WideChar;color:graph_color):graph_char;
+function graph_construct_graph_string(content:PWideChar;color:graph_color):graph_string;
 procedure graph_heap_initialize(startaddr:Pointer;size:Natuint;blockpower:byte;width,height:dword;
-isvirtio:boolean;colortype:byte;outputaddr:Pointer);
+colortype:byte;outputaddr:Pointer);
 function graph_heap_getmem(width,height:dword;xpos,ypos:Integer;visible:boolean):Pointer;
 function graph_heap_getmemsize(ptr:Pointer):natuint;
 function graph_heap_allocmem(width,height:dword;xpos,ypos:Integer;visible:boolean):Pointer;
@@ -96,6 +117,11 @@ function graph_heap_get_y_position(ptr:Pointer):Integer;
 function graph_heap_get_width(ptr:Pointer):Dword;
 function graph_heap_get_height(ptr:Pointer):Dword;
 function graph_heap_get_visible(ptr:Pointer):boolean;
+procedure graph_heap_draw_graph_char(ptr:Pointer;xpos,ypos:Integer;gchar:graph_char);
+procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;gstr:graph_string);
+procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;gstr:graph_string;maxlinelen:word);
+procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;str:PWideChar;color:graph_color);
+procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;str:PWideChar;color:graph_color;maxlinelen:word);
 procedure graph_heap_output_screen;
 
 implementation
@@ -151,8 +177,17 @@ begin
  res.Red:=$FF-color.Red; res.Green:=$FF-color.Green; res.Blue:=$FF-color.Blue; res.Alpha:=color.Alpha;
  graph_color_get_inverse:=res;
 end;
-procedure graph_heap_initialize(startaddr:Pointer;size:Natuint;blockpower:byte;width,height:dword;
-isvirtio:boolean;colortype:byte;outputaddr:Pointer);
+function graph_construct_graph_char(content:WideChar;color:graph_color):graph_char;
+var res:graph_char;
+begin
+ res.content:=content; res.color:=color; graph_construct_graph_char:=res;
+end;
+function graph_construct_graph_string(content:PWideChar;color:graph_color):graph_string;
+var res:graph_string;
+begin
+ res.content:=content; res.color:=color; graph_construct_graph_string:=res;
+end;
+procedure graph_heap_initialize(startaddr:Pointer;size:Natuint;blockpower:byte;width,height:dword;colortype:byte;outputaddr:Pointer);
 var tempsize:natuint;
 begin
  gheap.mem_start:=startaddr;
@@ -817,6 +852,205 @@ procedure graph_heap_draw_polygon(ptr:Pointer;p:Pgraph_point;pcount:natuint;colo
 begin
 
 end;
+procedure graph_heap_draw_graph_char(ptr:Pointer;xpos,ypos:Integer;gchar:graph_char);
+var head:graph_header;
+    canvapos:natuint;
+    screenpos:natuint;
+    x1,x2,y1,y2:Integer;
+    i,j:dword;
+    drawbit:bit;
+begin
+ head:=graph_heap_get_header(ptr);
+ x1:=xpos; x2:=xpos+7; y1:=ypos; y2:=ypos+19; i:=x1; j:=x2;
+ screenpos:=(ypos-1)*head.width+(xpos-1); canvapos:=0;
+ for i:=x1 to x2 do
+  begin
+   for j:=y1 to y2 do
+    begin
+     drawbit:=font_zap_font_get_pixel(Word(gchar.content),canvapos);
+     if(drawbit=1) then Pgraph_color(ptr+screenpos shl 2)^:=gchar.color;
+     inc(canvapos); inc(screenpos);
+    end;
+   inc(screenpos,head.width-10);
+  end;
+end;
+procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;gstr:graph_string);
+var head:graph_header;
+    canvapos:natuint;
+    screenpos:natuint;
+    x1,x2,y1,y2:Integer;
+    curxpos,curypos:dword;
+    i,j,k:dword;
+    len:natuint;
+    drawbit:bit;
+    ch:WideChar;
+begin
+ head:=graph_heap_get_header(ptr); len:=Wstrlen(gstr.content);
+ curxpos:=xpos; curypos:=ypos; 
+ for k:=1 to len do
+  begin
+   ch:=(gstr.content+k-1)^;
+   x1:=curxpos; x2:=curxpos+15; y1:=curypos; y2:=curypos+31;
+   screenpos:=(curypos-1)*head.width+(curxpos-1); canvapos:=0;
+   if(ch>#32) and (ch<=#127) then
+    begin
+     for j:=y1 to y2 do
+      begin
+       for i:=x1 to x2 do
+        begin
+         drawbit:=font_zap_font_get_pixel(Word(ch),canvapos);
+         if(drawbit=1) then Pgraph_color(ptr+screenpos shl 2)^:=gstr.color;
+         inc(canvapos); inc(screenpos);
+        end;
+       inc(screenpos,head.width-16);
+      end;
+    end;
+   if(ch=#10) or (ch=#13) then
+    begin
+     inc(curypos,32); curxpos:=xpos;
+    end
+   else if(ch>=#32) and (ch<=#127) then
+    begin
+     inc(curxpos,16);
+    end;
+  end;
+end;
+procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;gstr:graph_string;maxlinelen:word);
+var head:graph_header;
+    canvapos:natuint;
+    screenpos:natuint;
+    x1,x2,y1,y2:Integer;
+    curxpos,curypos:dword;
+    i,j,k,m:dword;
+    len:natuint;
+    drawbit:bit;
+    ch:WideChar;
+begin
+ head:=graph_heap_get_header(ptr); len:=Wstrlen(gstr.content);
+ curxpos:=xpos; curypos:=ypos; m:=0;
+ for k:=1 to len do
+  begin
+   inc(m);
+   ch:=(gstr.content+k-1)^;
+   x1:=curxpos; x2:=curxpos+15; y1:=curypos; y2:=curypos+31;
+   screenpos:=(curypos-1)*head.width+(curxpos-1); canvapos:=0;
+   if(ch>#32) and (ch<=#127) then
+    begin
+     for j:=y1 to y2 do
+      begin
+       for i:=x1 to x2 do
+        begin
+         drawbit:=font_zap_font_get_pixel(Word(ch),canvapos);
+         if(drawbit=1) then Pgraph_color(ptr+screenpos shl 2)^:=gstr.color;
+         inc(canvapos); inc(screenpos);
+        end;
+       inc(screenpos,head.width-16);
+      end;
+    end;
+   if(ch=#10) or (ch=#13) then
+    begin
+     inc(curypos,32); curxpos:=xpos;
+    end
+   else if(ch>=#32) and (ch<=#127) then
+    begin
+     inc(curxpos,16);
+    end;
+   if(m>=maxlinelen) then
+    begin
+     curxpos:=xpos; inc(curypos,32); m:=0;
+    end;
+  end;
+end;
+procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;str:PWideChar;color:graph_color);
+var head:graph_header;
+    canvapos:natuint;
+    screenpos:natuint;
+    x1,x2,y1,y2:Integer;
+    curxpos,curypos:dword;
+    i,j,k:dword;
+    len:natuint;
+    drawbit:bit;
+    ch:WideChar;
+begin
+ head:=graph_heap_get_header(ptr); len:=Wstrlen(str);
+ curxpos:=xpos; curypos:=ypos; 
+ for k:=1 to len do
+  begin
+   ch:=(str+k-1)^;
+   x1:=curxpos; x2:=curxpos+15; y1:=curypos; y2:=curypos+31;
+   screenpos:=(curypos-1)*head.width+(curxpos-1); canvapos:=0;
+   if(ch>#32) and (ch<=#127) then
+    begin
+     for j:=y1 to y2 do
+      begin
+       for i:=x1 to x2 do
+        begin
+         drawbit:=font_zap_font_get_pixel(Word(ch),canvapos);
+         if(drawbit=1) then
+          begin
+           Pgraph_color(ptr+screenpos shl 2)^:=color;
+          end;
+         inc(canvapos); inc(screenpos);
+        end;
+       inc(screenpos,head.width-16);
+      end;
+    end;
+   if(ch=#10) or (ch=#13) then
+    begin
+     inc(curypos,32); curxpos:=xpos;
+    end
+   else if(ch>=#32) and (ch<=#127) then
+    begin
+     inc(curxpos,16);
+    end;
+  end;
+end;
+procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;str:PWideChar;color:graph_color;maxlinelen:word);
+var head:graph_header;
+    canvapos:natuint;
+    screenpos:natuint;
+    x1,x2,y1,y2:Integer;
+    curxpos,curypos:dword;
+    i,j,k,m:dword;
+    len:natuint;
+    drawbit:bit;
+    ch:WideChar;
+begin
+ head:=graph_heap_get_header(ptr); len:=Wstrlen(str);
+ curxpos:=xpos; curypos:=ypos; m:=0;
+ for k:=1 to len do
+  begin
+   inc(m);
+   ch:=(str+k-1)^;
+   x1:=curxpos; x2:=curxpos+15; y1:=curypos; y2:=curypos+31;
+   screenpos:=(curypos-1)*head.width+(curxpos-1); canvapos:=0;
+   if(ch>#32) and (ch<=#127) then
+    begin
+     for j:=y1 to y2 do
+      begin
+       for i:=x1 to x2 do
+        begin
+         drawbit:=font_zap_font_get_pixel(Word(ch),canvapos);
+         if(drawbit=1) then Pgraph_color(ptr+screenpos shl 2)^:=color;
+         inc(canvapos); inc(screenpos);
+        end;
+       inc(screenpos,head.width-16);
+      end;
+    end;
+   if(ch=#10) or (ch=#13) then
+    begin
+     inc(curypos,32); curxpos:=xpos;
+    end
+   else if(ch>=#32) and (ch<=#127) then
+    begin
+     inc(curxpos,16);
+    end;
+   if(m>=maxlinelen) then
+    begin
+     curxpos:=xpos; inc(curypos,32); m:=0;
+    end;
+  end;
+end;
 procedure graph_heap_output_screen;
 var i,j,k:natuint;
     screenpos:natuint;
@@ -831,14 +1065,13 @@ begin
   for j:=1 to gheap.screen_height do
    begin
     (gheap.screen_init_address+screenpos)^:=graph_color_black;
-    inc(screenpos,1);
+    inc(screenpos);
    end;
  {Then draw the initial screen}
  for i:=1 to gheap.item_max_index do
   begin
-   exist:=graph_heap_search_for_memindex(i);
-   if(exist=false) then continue;
    addr:=graph_heap_search_for_memindex_address(i);
+   if(addr=nil) then continue;
    header:=graph_heap_get_header(addr);
    if(header.visible=false) then continue;
    screenpos:=(header.ypos-1)*gheap.screen_width+header.xpos-1;
@@ -853,8 +1086,7 @@ begin
          inc(screenpos); inc(canvapos); continue;
         end;
        (gheap.screen_init_address+screenpos)^:=
-       graph_color_mixed((gheap.screen_init_address+screenpos)^,
-       Pgraph_color(addr+canvapos shl 2)^);
+       graph_color_mixed((gheap.screen_init_address+screenpos)^,Pgraph_color(addr+canvapos shl 2)^);
        inc(screenpos);
        inc(canvapos);
       end;
@@ -863,8 +1095,8 @@ begin
   end;
  {Then draw it to the physical screen}
  screenpos:=0;
- for i:=1 to gheap.screen_width do
-  for j:=1 to gheap.screen_height do
+ for j:=1 to gheap.screen_height do
+  for i:=1 to gheap.screen_width do
    begin
     if(gheap.screen_attribute=graph_color_type_bgr) then
      begin
@@ -874,7 +1106,6 @@ begin
       Pgraph_color(gheap.screen_init_address+screenpos)^.Blue;
       Pgraph_output_color(gheap.screen_output_address+screenpos)^.BGRGreen:=
       Pgraph_color(gheap.screen_init_address+screenpos)^.Green;
-      Pgraph_output_color(gheap.screen_output_address+screenpos)^.BGRReserved:=$00;
      end
     else
      begin
@@ -884,12 +1115,9 @@ begin
       Pgraph_color(gheap.screen_init_address+screenpos)^.Green;
       Pgraph_output_color(gheap.screen_output_address+screenpos)^.RGBBlue:=
       Pgraph_color(gheap.screen_init_address+screenpos)^.Blue;
-      Pgraph_output_color(gheap.screen_output_address+screenpos)^.RGBReserved:=$00;
      end;
-    inc(screenpos,1);
+    inc(screenpos);
    end;
 end;
 
 end.
-
-

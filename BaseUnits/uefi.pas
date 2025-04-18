@@ -2906,11 +2906,9 @@ function efi_get_platform:byte;
 procedure efi_console_clear_screen;
 procedure efi_console_output_string(outputstring:PWideChar);
 procedure efi_console_output_number(number:natint;endline:boolean);
-procedure efi_console_output_extended(number:extended;endline:boolean;Reserveddecimal:byte);
 procedure efi_console_output_hex(number:natuint;endline:boolean);
 procedure efi_console_output_string_with_colour(Outputstring:PWideChar;backgroundcolour:byte;textcolour:byte);
 procedure efi_console_output_number_with_colour(number:natint;endline:boolean;bckcolour:byte;texcolour:byte);
-procedure efi_console_output_extended_with_colour(number:extended;endline:boolean;Reserveddecimal:byte;bckcolour:byte;texcolour:byte);
 procedure efi_console_output_hex_with_colour(number:natuint;endline:boolean;bckcolour:byte;texcolour:byte);
 procedure efi_set_watchdog_timer_to_nil;
 procedure efi_console_read_string(var ReadString:PWideChar);
@@ -2930,7 +2928,7 @@ procedure efi_graphics_free(var egl:efi_graphics_list);
 function efi_loader_get_memory_map:efi_memory_map;
 function efi_loader_handle_memory_map(memorymap:efi_memory_map):efi_memory_map_simple;
 function efi_loader_find_suitable_memory_map(var smm:efi_memory_map_simple;size:natuint):efi_memory_map_result;
-procedure efi_loader_exit_boot_services(memorymap:efi_memory_map);
+procedure efi_loader_exit_boot_services;
 function efi_device_list_initialize:efi_device_list;
 procedure efi_device_list_free(var list:efi_device_list);
 function efi_smbios_list_initialize:efi_smbios_list;
@@ -3163,13 +3161,13 @@ begin
   begin
    multiplenum:=multiplenum*10; inc(numlength);
   end;
- multiplenum:=multiplenum div 10;
+ if(multiplenum>1) then multiplenum:=multiplenum div 10;
  for i:=start to start+numlength-1 do (outstr+i-1)^:='0';
  i:=start;
- while(multiplenum>0)do
+ while(i<=start+numlength-1)do
   begin
-   (outstr+i-1)^:=(decstr+optimize_integer_divide(orgnum,multiplenum))^;
-   orgnum:=optimize_integer_modulo(orgnum,multiplenum);
+   (outstr+i-1)^:=(decstr+orgnum div multiplenum)^;
+   orgnum:=orgnum mod multiplenum;
    multiplenum:=multiplenum div 10;
    inc(i);
   end;
@@ -3178,71 +3176,6 @@ begin
  if(numlength=0) then efi_console_output_string('0') else efi_console_output_string(outstr);
  if(endline) then efi_console_output_string(#10);
  efi_freemem(outstr);
-end;
-procedure efi_console_output_extended(number:extended;endline:boolean;Reserveddecimal:byte);[public,alias:'EFI_CONSOLE_OUTPUT_EXTENDED'];
-const exstr:PWideChar='0123456789';
-var i,j:Natuint;
-    intpart,decpart:Natuint;
-    intlength,declength:byte;
-    multiplenum:Natuint;
-    isnegative,haveint,havedec:boolean;
-    partstr1,partstr2:PWideChar;
-begin
- haveint:=false; havedec:=false;
- {Divide the integer part and float part of the extended number}
- if(number<0) then
-  begin
-   isnegative:=true;
-   intpart:=floor(-number); decpart:=Round(frac(-number)*IntPower(10,Reserveddecimal));
-  end
- else
-  begin
-   isnegative:=false;
-   intpart:=floor(number); decpart:=Round(frac(number)*IntPower(10,Reserveddecimal));
-  end;
- {Initialize the integer part}
- partstr1:=efi_allocmem(128); i:=1; multiplenum:=1; intlength:=0;
- while(intpart>=multiplenum) do 
-  begin
-   multiplenum:=multiplenum*10; inc(intlength);
-  end;
- multiplenum:=multiplenum div 10;
- for i:=1 to intlength do (partstr1+i-1)^:='0';
- i:=1;
- while(multiplenum>0)do
-  begin
-   (partstr1+i-1)^:=(exstr+optimize_integer_divide(intpart,multiplenum))^;
-   intpart:=optimize_integer_modulo(intpart,multiplenum);
-   multiplenum:=multiplenum div 10;
-   inc(i);
-  end;
- (partstr1+intlength)^:=#0;
- {Initialize the decimal part}
- partstr2:=efi_allocmem(128); i:=1; multiplenum:=1; declength:=0;
- while(decpart>=multiplenum) do 
-  begin
-   multiplenum:=multiplenum*10; inc(declength);
-  end;
- multiplenum:=multiplenum div 10;
- for i:=1 to declength do (partstr2+i-1)^:='0';
- i:=1;
- while(multiplenum>0)do
-  begin
-   (partstr2+i-1)^:=(exstr+optimize_integer_divide(decpart,multiplenum))^;
-   decpart:=optimize_integer_modulo(decpart,multiplenum);
-   multiplenum:=multiplenum div 10;
-   inc(i);
-  end;
- (partstr2+declength)^:=#0;
- {Output the extended number}
- if(isnegative) then efi_console_output_string('-');
- if(haveint=false) then efi_console_output_string('0') else efi_console_output_string(partstr1);
- if(havedec=true) then
-  begin
-   efi_console_output_string('.'); efi_console_output_string(partstr2);
-  end;
- efi_freemem(partstr1); efi_freemem(partstr2);
- if(endline) then efi_console_output_string(#10);
 end;
 procedure efi_console_output_hex(number:natuint;endline:boolean);[public,alias:'EFI_CONSOLE_OUTPUT_HEX'];
 const hexstr:PWideChar='0123456789ABCDEF';
@@ -3262,13 +3195,13 @@ begin
    multiplenum:=multiplenum shl 4;
    inc(hexlength);
   end;
- multiplenum:=multiplenum shr 4;
+ if(multiplenum shl 4<>0) and (multiplenum shr 4<>0) then multiplenum:=multiplenum shr 4;
  for i:=1 to hexlength do (outstr+i-1)^:='0';
  i:=1;
- while(multiplenum>0)do
+ while(i<=hexlength)do
   begin
-   (outstr+i-1)^:=(hexstr+optimize_integer_divide(orgnum,multiplenum))^;
-   orgnum:=optimize_integer_modulo(orgnum,multiplenum);
+   (outstr+i-1)^:=(hexstr+orgnum div multiplenum)^;
+   orgnum:=orgnum mod multiplenum;
    multiplenum:=multiplenum shr 4;
    inc(i);
   end;
@@ -3361,13 +3294,13 @@ begin
   begin
    multiplenum:=multiplenum*10; inc(numlength);
   end;
- multiplenum:=multiplenum div 10;
+ if(multiplenum>1) then multiplenum:=multiplenum div 10;
  for i:=start to start+numlength-1 do (outstr+i-1)^:='0';
  i:=start;
- while(multiplenum>0)do
+ while(i<=start+numlength-1)do
   begin
-   (outstr+i-1)^:=(decstr+optimize_integer_divide(orgnum,multiplenum))^;
-   orgnum:=optimize_integer_modulo(orgnum,multiplenum);
+   (outstr+i-1)^:=(decstr+orgnum div multiplenum)^;
+   orgnum:=orgnum mod multiplenum;
    multiplenum:=multiplenum div 10;
    inc(i);
   end;
@@ -3378,72 +3311,6 @@ begin
  if(endline) then 
  efi_console_output_string_with_colour(#10,bckcolour,texcolour);
  efi_freemem(outstr);
-end;
-procedure efi_console_output_extended_with_colour(number:extended;endline:boolean;Reserveddecimal:byte;bckcolour:byte;texcolour:byte);[public,alias:'EFI_CONSOLE_OUTPUT_EXTENDED_WITH_COLOUR'];
-const exstr:PWideChar='0123456789';
-var i,j:Natuint;
-    intpart,decpart:Natuint;
-    intlength,declength:byte;
-    multiplenum:Natuint;
-    isnegative,haveint,havedec:boolean;
-    partstr1,partstr2:PWideChar;
-begin
- haveint:=false; havedec:=false;
- {Divide the integer part and float part of the extended number}
- if(number<0) then
-  begin
-   isnegative:=true;
-   intpart:=floor(-number); decpart:=Round(frac(-number)*IntPower(10,Reserveddecimal));
-  end
- else
-  begin
-   isnegative:=false;
-   intpart:=floor(number); decpart:=Round(frac(number)*IntPower(10,Reserveddecimal));
-  end;
- {Initialize the integer part}
- partstr1:=efi_allocmem(128); i:=1; multiplenum:=1; intlength:=0;
- while(intpart>=multiplenum) do 
-  begin
-   multiplenum:=multiplenum*10; inc(intlength);
-  end;
- multiplenum:=multiplenum div 10;
- for i:=1 to intlength do (partstr1+i-1)^:='0';
- i:=1;
- while(multiplenum>0)do
-  begin
-   (partstr1+i-1)^:=(exstr+optimize_integer_divide(intpart,multiplenum))^;
-   intpart:=optimize_integer_modulo(intpart,multiplenum);
-   multiplenum:=multiplenum div 10;
-   inc(i);
-  end;
- (partstr1+intlength)^:=#0;
- {Initialize the decimal part}
- partstr2:=efi_allocmem(128); i:=1; multiplenum:=1; declength:=0;
- while(decpart>=multiplenum) do 
-  begin
-   multiplenum:=multiplenum*10; inc(declength);
-  end;
- multiplenum:=multiplenum div 10;
- for i:=1 to declength do (partstr2+i-1)^:='0';
- i:=1;
- while(multiplenum>0)do
-  begin
-   (partstr2+i-1)^:=(exstr+optimize_integer_divide(decpart,multiplenum))^;
-   decpart:=optimize_integer_modulo(decpart,multiplenum);
-   multiplenum:=multiplenum div 10;
-   inc(i);
-  end;
- (partstr2+declength)^:=#0;
- {Output the extended number}
- if(isnegative) then efi_console_output_string_with_colour('-',bckcolour,texcolour);
- if(haveint=false) then efi_console_output_string_with_colour('0',bckcolour,texcolour) 
- else efi_console_output_string_with_colour(partstr1,bckcolour,texcolour);
- if(havedec=true) then
-  begin
-   efi_console_output_string_with_colour('.',bckcolour,texcolour); efi_console_output_string_with_colour(partstr2,bckcolour,texcolour);
-  end;
- efi_freemem(partstr1); efi_freemem(partstr2);
- if(endline) then efi_console_output_string_with_colour(#10,bckcolour,texcolour);
 end;
 procedure efi_console_output_hex_with_colour(number:natuint;endline:boolean;bckcolour:byte;texcolour:byte);[public,alias:'EFI_CONSOLE_OUTPUT_HEX_WITH_COLOUR'];
 const hexstr:PWideChar='0123456789ABCDEF';
@@ -3463,13 +3330,13 @@ begin
    multiplenum:=multiplenum shl 4;
    inc(hexlength);
   end;
- multiplenum:=multiplenum shr 4;
+ if(multiplenum shl 4<>0) and (multiplenum shr 4<>0) then multiplenum:=multiplenum shr 4;
  for i:=1 to hexlength do (outstr+i-1)^:='0';
  i:=1;
- while(multiplenum>0)do
+ while(i<=hexlength)do
   begin
-   (outstr+i-1)^:=(hexstr+optimize_integer_divide(orgnum,multiplenum))^;
-   orgnum:=optimize_integer_modulo(orgnum,multiplenum);
+   (outstr+i-1)^:=(hexstr+orgnum div multiplenum)^;
+   orgnum:=orgnum mod multiplenum;
    multiplenum:=multiplenum shr 4;
    inc(i);
   end;
@@ -3840,7 +3707,6 @@ begin
 end;
 function efi_loader_get_memory_map:efi_memory_map;[public,alias:'EFI_LOADER_GET_MEMORY_MAP'];
 var ptr:Pointer;
-    endptr:^efi_memory_descriptor;
     size:natuint;
     descriptorSize:natuint;
     descriptorVersion:dword;
@@ -3848,7 +3714,7 @@ var ptr:Pointer;
     status:efi_status;
     i:natuint;
 begin
- res.memory_key:=0; res.memory_descriptor_count:=0; size:=0; descriptorsize:=0; descriptorversion:=0; ptr:=nil; 
+ res.memory_key:=0; res.memory_descriptor_count:=0; descriptorsize:=0; descriptorversion:=0; size:=0; ptr:=nil;
  status:=GlobalSystemTable^.BootServices^.GetMemoryMap(size,ptr,res.memory_key,descriptorSize,descriptorVersion); 
  while (status<>efi_success) do
   begin
@@ -3898,7 +3764,7 @@ begin
       end;
     end;
   end;
- res.memory_count:=position;
+ if(bool) then res.memory_count:=position else res.memory_count:=position-1;
  efi_loader_handle_memory_map:=res;
 end;
 function efi_loader_find_suitable_memory_map(var smm:efi_memory_map_simple;size:natuint):efi_memory_map_result;[public,alias:'EFI_LOADER_FIND_SUITABLE_MEMORY_MAP'];
@@ -3906,10 +3772,9 @@ var i:natuint;
     res:efi_memory_map_result;
 begin
  i:=1; res.memory_start:=nil; res.memory_size:=0;
- while(i<smm.memory_count) do
+ while(i<=smm.memory_count) do
   begin
-   inc(i);
-   if((smm.memory_start+i-1)^>$FF) and (size<=(smm.memory_size+i-1)^) then
+   if((smm.memory_start+i-1)^>=$FF) and (size<=(smm.memory_size+i-1)^) then
     begin
      res.memory_start:=Pointer((smm.memory_start+i-1)^);
      res.memory_size:=size;
@@ -3917,7 +3782,7 @@ begin
      (smm.memory_size+i-1)^:=(smm.memory_size+i-1)^-size;
      break;
     end
-   else if((smm.memory_start+i-1)^<=$FF) and ($FF+size<=(smm.memory_size+i-1)^) then
+   else if((smm.memory_start+i-1)^<$FF) and ($FF+size<=(smm.memory_size+i-1)^) then
     begin
      res.memory_start:=Pointer($FF);
      res.memory_size:=size;
@@ -3925,12 +3790,28 @@ begin
      (smm.memory_size+i-1)^:=(smm.memory_size+i-1)^-$FF-size;
      break;
     end;
+   inc(i);
   end;
  efi_loader_find_suitable_memory_map:=res;
 end;
-procedure efi_loader_exit_boot_services(memorymap:efi_memory_map);[public,alias:'EFI_LOADER_EXIT_BOOT_SERVICES'];
+procedure efi_loader_exit_boot_services;[public,alias:'EFI_LOADER_EXIT_BOOT_SERVICES'];
+var ptr:Pointer;
+    size:natuint;
+    descriptorSize:natuint;
+    descriptorVersion:dword;
+    res:efi_memory_map;
+    status:efi_status;
 begin
- GlobalSystemTable^.BootServices^.ExitBootServices(ParentImageHandle,memorymap.memory_key);
+ res.memory_key:=0; res.memory_descriptor_count:=0; descriptorsize:=0; descriptorversion:=0; size:=0; ptr:=nil;
+ status:=GlobalSystemTable^.BootServices^.GetMemoryMap(size,ptr,res.memory_key,descriptorSize,descriptorVersion); 
+ while(status<>efi_success) do
+  begin
+   ptr:=efi_allocmem(size);
+   status:=GlobalSystemTable^.BootServices^.GetMemoryMap(size,ptr,res.memory_key,descriptorSize,descriptorVersion);
+   if(status<>efi_success) then efi_freemem(ptr);
+  end;
+ status:=GlobalSystemTable^.BootServices^.ExitBootServices(ParentImageHandle,res.memory_key);
+ while(status<>efi_success) do;
 end;
 function efi_device_list_initialize:efi_device_list;[public,alias:'EFI_DEVICE_LIST_INITIALIZE'];
 var res:efi_device_list;
