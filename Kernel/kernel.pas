@@ -16,42 +16,39 @@ begin
  kernel_timer:=nil;
 end;
 procedure kernel_main;[public,alias:'kernel_main'];
-var ptr1,ptr2,ptr3,ptr4:Pointer;
+var ptr1:Pointer;
+    str:PWideChar;
+    tempptr1,tempptr2:Pointer;
     request:acpi_request;
-    i:byte;
 begin
- ptr4:=graph_heap_allocmem(gheap.screen_width,gheap.screen_height,1,1,true);
- ptr1:=graph_heap_allocmem(640,480,1,1,true);
- ptr2:=graph_heap_allocmem(960,720,641,481,true);
- ptr3:=graph_heap_allocmem(640,480,1281,961,true);
- graph_heap_draw_block(ptr4,1,1,gheap.screen_width,gheap.screen_height,graph_color_red);
- graph_heap_draw_eclipse(ptr1,1,1,240,360,graph_color_yellow);
- graph_heap_draw_fanshape(ptr2,480,360,300,60,120,graph_color_green);
- graph_heap_draw_block(ptr3,200,1,240,480,graph_color_blue);
- graph_heap_output_screen;
+ ptr1:=graph_heap_allocmem(gheap.screen_width,gheap.screen_height,1,1,true);
+ graph_heap_clear_canva(ptr1);
+ kernel_initialize;
  kernel_handle_function_init(@kernel_timer);
  kernel_handle_function_add_param(ptr1);
+ str:=IntToWHex(Byte(idtentry[41].Present));
+ graph_heap_draw_graph_string(ptr1,1,1,str,graph_color_white);
+ Wstrfree(str);
+ str:=IntToWHex(Byte(idtentry[41].DescriptorPrivilegeLevel));
+ graph_heap_draw_graph_string(ptr1,1,33,str,graph_color_white);
+ Wstrfree(str);
+ graph_heap_output_screen;
  request.requestrootclass:=acpi_request_x86_local_apic;
  request.requestsubclass:=acpi_request_x86_local_apic_timer;
  request.requestAPICIndex:=1;
- request.requestTimer:=20;
+ request.requestTimer:=10000;
  request.requestTimerStatus:=0;
- request.requestNumber:=33;
- acpi_cpu_request_interrupt(os_cpuinfo,request);
- asm
-  int $20
- end;
+ request.requestNumber:=41;
+ acpi_cpu_request_interrupt(request);
  while True do;
- graph_heap_freemem(ptr2);
  graph_heap_freemem(ptr1);
- graph_heap_freemem(ptr4);
- graph_heap_freemem(ptr3); 
 end;
 function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif}[public,alias:'_start'];
     {For UEFI Memory}
 var memmap:efi_memory_map;
     smemmap:efi_memory_map_simple;
     memres:efi_memory_map_result;
+    status:efi_status;
     {For Graphics}
     graphlist:efi_graphics_list;
     graphaddress:natuint=0;
@@ -128,17 +125,13 @@ begin
   end;
  exeheap_initialize(Natuint(memres.memory_start),memres.memory_size,16);
  {Set the graphics heap}
- memres:=efi_loader_find_suitable_memory_map(smemmap,smemmap.memory_total_size shr 2); 
+ memres:=efi_loader_find_suitable_memory_map(smemmap,smemmap.memory_total_size shr 3); 
  if(memres.memory_size=0) then
   begin
    efi_console_output_string('Graphics Heap Error!'#10);
    while True do;
   end;
- if(graphaddress=0) then
- graph_heap_initialize(memres.memory_start,memres.memory_size,8,graphwidth,graphheight,true,graphcolortype,nil)
- else
- graph_heap_initialize(memres.memory_start,memres.memory_size,8,graphwidth,graphheight,false,graphcolortype,
- Pointer(graphaddress));
+ graph_heap_initialize(memres.memory_start,memres.memory_size,8,graphwidth,graphheight,graphcolortype,Pointer(graphaddress));
  {Convert the PCI device list to OS's device list}
  i:=1;
  os_devlist:=device_list_initialize;
@@ -187,9 +180,8 @@ begin
  os_cpuinfo:=efi_get_cpu_info_from_acpi_table;
  efi_console_output_string('Processor information got!'#10);
  {Exit boot services}
- efi_console_output_number(kernel_get_architecture,true);
  efi_console_output_string('Exit the Boot Services......'#10);
- efi_loader_exit_boot_services(memmap);
+ efi_loader_exit_boot_services;
  {Enable the FPU in loongarch(LoongArch Only)}
  {$IFDEF CPULOONGARCH64}
  asm
@@ -198,7 +190,6 @@ begin
  end;
  {$ENDIF}
  {Enter the kernel}
- kernel_initialize;
  kernel_main;
  efi_main:=efi_success;
 end;
