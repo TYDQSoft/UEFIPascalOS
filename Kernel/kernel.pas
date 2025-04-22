@@ -2,37 +2,52 @@ program kernel;
 
 {$MODE FPC}
 
-uses uefi,binarybase,graphics,device,acpi,kernelbase;
+uses uefi,graphics,console,device,acpi,kernelbase,usb;
 
 function kernel_timer(param:Pointer):Pointer;
 var ptr:Pointer;
+    csptr:Pconsole_screen;
     xpos,ypos:Integer;
+    data:Pointer;
+    str:PWideChar;
+    i:word;
 begin
- ptr:=PPointer(param)^;
- xpos:=graph_heap_get_x_position(ptr); ypos:=graph_heap_get_y_position(ptr);
- graph_heap_edit_canva(ptr,xpos+160,ypos+160,true);
- graph_heap_draw_eclipse(ptr,1,1,240,360,graph_color_skyblue);
+ csptr:=Pconsole_screen(PPointer(param)^);
+ ptr:=PPointer(param+sizeof(Pconsole_screen))^;
+ console_screen_add_String(csptr^,'Timer Done!'#10,graph_color_white);
+ i:=1;
+ while(i<=os_devlist.count)do
+  begin
+   if((os_devlist.item+i-1)^.name=3) then break;
+   inc(i);
+  end;
+ data:=allocmem($40);
+ usb_receive_packet(Pusb_object((os_devlist.item+i-1)^.content),1,1,1,data,$40);
+ while(i<=$40)do
+  begin
+   str:=IntToWHex(Pbyte(data+i-1)^);
+   console_screen_add_string(csptr^,str,graph_color_white);
+   Wstrfree(str);
+   inc(i);
+  end;
+ FreeMem(data);
+ console_screen_add_String(csptr^,#10'USB Done!'#10,graph_color_white);
+ console_draw(csptr^,ptr,1,1);
  graph_heap_output_screen;
  kernel_timer:=nil;
 end;
 procedure kernel_main;[public,alias:'kernel_main'];
 var ptr1:Pointer;
-    str:PWideChar;
-    tempptr1,tempptr2:Pointer;
+    csptr:Pconsole_screen;
     request:acpi_request;
 begin
  ptr1:=graph_heap_allocmem(gheap.screen_width,gheap.screen_height,1,1,true);
+ csptr:=allocmem(sizeof(console_screen));
+ csptr^:=console_screen_init(gheap.screen_height shr 5,gheap.screen_width shr 4);
  graph_heap_clear_canva(ptr1);
- kernel_initialize;
  kernel_handle_function_init(@kernel_timer);
+ kernel_handle_function_add_param(csptr);
  kernel_handle_function_add_param(ptr1);
- str:=IntToWHex(Byte(idtentry[41].Present));
- graph_heap_draw_graph_string(ptr1,1,1,str,graph_color_white);
- Wstrfree(str);
- str:=IntToWHex(Byte(idtentry[41].DescriptorPrivilegeLevel));
- graph_heap_draw_graph_string(ptr1,1,33,str,graph_color_white);
- Wstrfree(str);
- graph_heap_output_screen;
  request.requestrootclass:=acpi_request_x86_local_apic;
  request.requestsubclass:=acpi_request_x86_local_apic_timer;
  request.requestAPICIndex:=1;
@@ -190,6 +205,7 @@ begin
  end;
  {$ENDIF}
  {Enter the kernel}
+ kernel_initialize;
  kernel_main;
  efi_main:=efi_success;
 end;
