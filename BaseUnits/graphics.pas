@@ -135,12 +135,12 @@ end;
 function graph_color_mixed(color1,color2:graph_color):graph_color;
 var res:graph_color;
 begin
- if(color2.Alpha=$FF) then
+ if(color2.Alpha=$FF) and (color1.Alpha=0) then
   begin
    res.Alpha:=$FF; res.Red:=color2.Red; res.Blue:=color2.Blue; res.Green:=color2.Green;
    exit(res);
   end
- else if(color2.Alpha=0) then
+ else if(color2.Alpha=0) and (color1.Alpha=$FF) then
   begin
    res.Alpha:=$FF; res.Red:=color1.Red; res.Blue:=color1.Blue; res.Green:=color1.Green;
    exit(res);
@@ -1064,8 +1064,7 @@ begin
  for i:=1 to gheap.screen_width do
   for j:=1 to gheap.screen_height do
    begin
-    (gheap.screen_init_address+screenpos)^:=graph_color_black;
-    inc(screenpos);
+    Pdword(gheap.screen_init_address+screenpos)^:=0; inc(screenpos);
    end;
  {Then draw the initial screen}
  for i:=1 to gheap.item_max_index do

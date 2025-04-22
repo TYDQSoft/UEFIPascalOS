@@ -177,8 +177,6 @@ operator := (x:extended)res:sys_variant;
 operator := (x:pointer)res:sys_variant;
 function fpc_qword_to_double(q:qword):double;compilerproc;
 function fpc_int64_to_double(i:int64):double;compilerproc;
-function optimize_integer_divide(a,b:natuint):natuint;
-function optimize_integer_modulo(a,b:natuint):natuint;
 function get_bit_from_byte(data:byte;position:byte):bit;
 function get_bit_from_word(data:word;position:byte):bit;
 function get_bit_from_dword(data:dword;position:byte):bit;
@@ -379,50 +377,6 @@ begin
  res.vartype:=sys_variant_type_pointer;
  res.varpointer:=x;
 end;
-function optimize_integer_divide(a,b:natuint):natuint;[public,alias:'optimize_integer_divide'];
-var procnum1,procnum2,degree,res:natuint;
-begin
- if(a=0) then exit(0);
- if(a<b) then exit(0);
- if(a=b) then exit(1);
- if(b=1) or (b=0) then exit(a);
- procnum1:=a; procnum2:=b; degree:=1; res:=0;
- while(procnum2<=procnum1 shr 1) do
-  begin
-   procnum2:=procnum2 shl 1;
-   degree:=degree shl 1;
-  end;
- while(procnum1>=b) do
-  begin
-   if(procnum1>=procnum2) then
-    begin
-     procnum1:=procnum1-procnum2;
-     res:=res+degree;
-    end;
-   degree:=degree shr 1;
-   procnum2:=procnum2 shr 1;
-  end;
- optimize_integer_divide:=res;
-end;
-function optimize_integer_modulo(a,b:natuint):natuint;[public,alias:'optimize_integer_modulo'];
-var res,procnum:natuint;
-begin
- if(a=0) then exit(0);
- if(a<b) then exit(a);
- if(a=b) then exit(0);
- if(b=1) or (b=0) then exit(0);
- res:=a; procnum:=b;
- while(procnum<=res shr 1) do
-  begin
-   procnum:=procnum shl 1;
-  end;
- while(res>=b) do
-  begin
-   if(res>=procnum) then res:=res-procnum;
-   procnum:=procnum shr 1;
-  end;
- optimize_integer_modulo:=res;
-end; 
 function get_bit_from_byte(data:byte;position:byte):bit;
 begin
  get_bit_from_byte:=(data shr position) and $1;

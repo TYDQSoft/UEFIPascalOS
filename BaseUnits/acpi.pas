@@ -2839,7 +2839,7 @@ begin
      else if(request.requestsubclass=acpi_request_x86_local_apic_interprocessor) then
       begin
        //item.x86localapic^.ICR1.DestinationShortHand:=0;
-       writedata:=request.requestnumber-1;
+       writedata:=request.requestnumber-1+request.requestDeliveryMode shl 8;
        Pdword(@item.x86localapic^.ICR1)^:=writedata;
        //item.x86localapic^.ICR2.DestinationField:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^;
        writedata:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^ shl 24;

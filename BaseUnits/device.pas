@@ -1,6 +1,8 @@
 unit device;
 
 interface
+
+uses usb;
       {Refer to PCI Code Specification}
 const device_class_old_device:byte=$0;
       device_class_mass_storage_controller:byte=$1;
@@ -287,6 +289,8 @@ type device_info=packed record
                    {Stores device I/O information}
                    io:^device_io_info;
                    iocount:byte;
+                   {Stores device object content}
+                   content:Pointer;
                    end;
      device_object_list=packed record
                         {Max index of the device list}
@@ -388,6 +392,11 @@ begin
    res.io:=nil;
    res.iocount:=0;
   end;
+ if(res.name=3) then
+  begin
+   res.content:=usb_initialize(res.io^.ioaddress.address_start);
+  end
+ else res.content:=nil;
  device_list_construct_device_object:=res;
 end;
 function device_list_search_for_index(list:device_object_list;searchindex:dword):boolean;[public,alias:'device_list_search_for_index'];
@@ -434,6 +443,7 @@ begin
    list.item^.io:=allocmem(item.iocount*sizeof(device_io_info));
    Move(item.io^,list.item^.io^,sizeof(device_io_info)*item.iocount);
    list.item^.iocount:=item.iocount;
+   list.item^.content:=item.content;
   end
  else
   begin
@@ -444,6 +454,7 @@ begin
    (list.item+list.count-1)^.io:=allocmem(item.iocount*sizeof(device_io_info));
    Move(item.io^,(list.item+list.count-1)^.io^,sizeof(device_io_info)*item.iocount);
    (list.item+list.count-1)^.iocount:=item.iocount;
+   (list.item+list.count-1)^.content:=item.content;
   end;
 end;
 procedure device_list_delete_item(var list:device_object_list;position:natuint);[public,alias:'device_list_delete_item'];
@@ -456,7 +467,7 @@ begin
    dec(list.maxindex);
    while(device_list_search_for_index(list,list.maxindex)) do dec(list.maxindex);
   end;
- FreeMem(item.io);
+ FreeMem(item.io); FreeMem(item.content);
  i:=position;
  while(i<list.count)do
   begin
@@ -485,6 +496,7 @@ begin
   begin
    item:=(list.item+i-1)^;
    FreeMem(item.io);
+   FreeMem(item.content);
    inc(i);
   end;
  FreeMem(list.item); list.maxindex:=0; list.count:=0;

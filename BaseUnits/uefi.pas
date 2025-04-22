@@ -3722,7 +3722,7 @@ begin
    status:=GlobalSystemTable^.BootServices^.GetMemoryMap(size,ptr,res.memory_key,descriptorSize,descriptorVersion);
    if(status<>efi_success) then efi_freemem(ptr);
   end;
- res.memory_descriptor_count:=optimize_integer_divide(size,descriptorsize);
+ res.memory_descriptor_count:=size div descriptorsize;
  res.memory_descriptor:=efi_allocmem(res.memory_descriptor_count*sizeof(efi_memory_descriptor));
  for i:=1 to res.memory_descriptor_count do
   begin
@@ -3847,13 +3847,22 @@ begin
        (res.pci+i-1)^.AddrOffset[j]:=0;
        (res.pci+i-1)^.AddrClass[j]:=3;
       end
-     else if(PByte(barcontent)^=$8A) then
+     else if(PByte(barcontent)^=$8A) and (PByte(barcontent+$3)^=0) then
       begin
        (res.pci+i-1)^.AddrIs64bit[j]:=true;
        (res.pci+i-1)^.AddrStart[j]:=Pqword(barcontent+$E)^; 
-       (res.pci+i-1)^.AddrEnd[j]:=Pqword(barcontent+$16)^;
+       (res.pci+i-1)^.AddrEnd[j]:=Pqword(barcontent+$E)^+Pqword(barcontent+$16)^;
        (res.pci+i-1)^.AddrOffset[j]:=Pqword(barcontent+$1E)^;
        (res.pci+i-1)^.AddrClass[j]:=Pbyte(barcontent+$3)^;
+       if(Pqword(barcontent+$6)^=64) then 
+        begin
+         inc(j);
+         (res.pci+i-1)^.AddrIs64bit[j]:=false;
+         (res.pci+i-1)^.AddrStart[j]:=0; 
+         (res.pci+i-1)^.AddrEnd[j]:=0;
+         (res.pci+i-1)^.AddrOffset[j]:=0;
+         (res.pci+i-1)^.AddrClass[j]:=3;
+        end;
       end
      else
       begin
@@ -3863,7 +3872,10 @@ begin
        (res.pci+i-1)^.AddrOffset[j]:=0;
        (res.pci+i-1)^.AddrClass[j]:=3;
       end;
-     if(barcontent<>nil) then efi_freemem(barcontent);
+     if(barcontent<>nil) then 
+      begin
+       efi_freemem(barcontent); barcontent:=nil;
+      end;
      inc(j);
     end;
   end;
