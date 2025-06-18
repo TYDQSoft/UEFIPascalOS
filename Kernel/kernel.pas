@@ -1,199 +1,103 @@
 program kernel;
 
-{$MODE FPC}
+{$MODE ObjFPC}{$H+}
 
-uses uefi,graphics,console,device,acpi,kernelbase,usb;
+uses uefi,acpi,graphics,console;
 
-function kernel_timer(param:Pointer):Pointer;
-var ptr:Pointer;
-    csptr:Pconsole_screen;
-    xpos,ypos:Integer;
-    data:Pointer;
-    str:PWideChar;
-    i:word;
+type kernel_param=packed record
+                  ScreenAddress:Pointer;
+                  ScreenColor:boolean;
+                  ScreenWidth:dword;
+                  ScreenHeight:dword;
+                  ACPIRsdpAddress:Pointer;
+                  end;
+
+procedure kernel_main(param:kernel_param);
+var testarray1,testarray2:array of Natuint;
+    ptr:Dword;
+    i,j,len:Natuint;
+    kconsole:console_screen;
+    tempstr:string;
 begin
- csptr:=Pconsole_screen(PPointer(param)^);
- ptr:=PPointer(param+sizeof(Pconsole_screen))^;
- console_screen_add_String(csptr^,'Timer Done!'#10,graph_color_white);
- i:=1;
- while(i<=os_devlist.count)do
+ testarray1:=[1,3,7,13,21,31];
+ testarray2:=copy(testarray1,1,3);
+ ptr:=graph_heap_allocmem(1,1,param.ScreenWidth,param.ScreenHeight,true);
+ kconsole:=console_screen.Create(param.ScreenWidth div 16,param.ScreenHeight div 20,1,1);
+ tempstr:='A';
+ for i:=1 to 40 do
   begin
-   if((os_devlist.item+i-1)^.name=3) then break;
-   inc(i);
+   tempstr:=tempstr+'A';
   end;
- data:=allocmem($40);
- usb_receive_packet(Pusb_object((os_devlist.item+i-1)^.content),1,1,1,data,$40);
- while(i<=$40)do
-  begin
-   str:=IntToWHex(Pbyte(data+i-1)^);
-   console_screen_add_string(csptr^,str,graph_color_white);
-   Wstrfree(str);
-   inc(i);
-  end;
- FreeMem(data);
- console_screen_add_String(csptr^,#10'USB Done!'#10,graph_color_white);
- console_draw(csptr^,ptr,1,1);
+ kconsole.AddString('ABCDEFGHIJKLMN',graph_color_yellow);
+ kconsole.DrawConsole(ptr,1);
  graph_heap_output_screen;
- kernel_timer:=nil;
-end;
-procedure kernel_main;[public,alias:'kernel_main'];
-var ptr1:Pointer;
-    csptr:Pconsole_screen;
-    request:acpi_request;
-begin
- ptr1:=graph_heap_allocmem(gheap.screen_width,gheap.screen_height,1,1,true);
- csptr:=allocmem(sizeof(console_screen));
- csptr^:=console_screen_init(gheap.screen_height shr 5,gheap.screen_width shr 4);
- graph_heap_clear_canva(ptr1);
- kernel_handle_function_init(@kernel_timer);
- kernel_handle_function_add_param(csptr);
- kernel_handle_function_add_param(ptr1);
- request.requestrootclass:=acpi_request_x86_local_apic;
- request.requestsubclass:=acpi_request_x86_local_apic_timer;
- request.requestAPICIndex:=1;
- request.requestTimer:=10000;
- request.requestTimerStatus:=0;
- request.requestNumber:=41;
- acpi_cpu_request_interrupt(request);
+ kconsole.Destroy;
+ tempstr:='';
  while True do;
- graph_heap_freemem(ptr1);
 end;
 function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif}[public,alias:'_start'];
-    {For UEFI Memory}
-var memmap:efi_memory_map;
+var graphlist:efi_graphics_list;
+    param:kernel_param;
+    memmap:efi_memory_map;
     smemmap:efi_memory_map_simple;
     memres:efi_memory_map_result;
-    status:efi_status;
-    {For Graphics}
-    graphlist:efi_graphics_list;
-    graphaddress:natuint=0;
-    graphwidth,graphheight:dword;
-    graphcolortype:byte;
-    i,j:dword;
-    {For device convertion only}
-    devlist:efi_device_list;
-    tempdevitem:efi_pci_configuration_space;
-    devobj:device_object;
-    iolist:Pdevice_io_info;
-    iocount:Byte;
 begin  
+ {Initialize the parameters}
+ param.ScreenAddress:=nil; param.ScreenColor:=false; 
+ param.ScreenWidth:=0; param.ScreenHeight:=0;
+ param.ACPIRsdpAddress:=nil;
  {Initialize uefi environment}
  efi_initialize(ImageHandle,systemtable);
  {Initialize the uefi loader}
  efi_console_initialize(efi_bck_black,efi_lightgrey,0);
  efi_console_output_string('Welcome to TYDQ bootloader!'#10);
- graphaddress:=0;
- {Initialize the PCI device list}
- efi_console_output_string('Device initializing......'#10);
- devlist:=efi_device_list_initialize;
- {Obtain the graph list}
+ {Initialize the Graphics}
  graphlist:=efi_graphics_initialize;
  efi_graphics_get_maxwidth_maxheight_and_maxdepth(graphlist,1);
  if(graphlist.graphics_count>0) then
   begin
-   efi_console_output_string('GPU initializing......'#10);
-   {If the graphlist have graph item,then normally initialize}
-   graphaddress:=(graphlist.graphics_item^)^.Mode^.FrameBufferBase;
-   graphwidth:=(graphlist.graphics_item^)^.Mode^.Info^.HorizontalResolution;
-   graphheight:=(graphlist.graphics_item^)^.Mode^.Info^.VerticalResolution;
-   if((graphlist.graphics_item^)^.Mode^.Info^.PixelFormat=PixelRedGreenBlueReserved8BitPerColor) then 
-   graphcolortype:=1 
-   else 
-   graphcolortype:=0;
-   if(graphwidth=0) or (graphheight=0) then 
+   efi_console_output_string('Graphics initializing......'#10);
+   {If the Graphics have graphics item,the initialize the graphics}
+   param.ScreenAddress:=Pointer((graphlist.graphics_item^)^.Mode^.FrameBufferBase);
+   param.ScreenColor:=((graphlist.graphics_item^)^.Mode^.Info^.PixelFormat=PixelRedGreenBlueReserved8BitPerColor);
+   param.ScreenWidth:=(graphlist.graphics_item^)^.Mode^.Info^.HorizontalResolution;
+   param.ScreenHeight:=(graphlist.graphics_item^)^.Mode^.Info^.VerticalResolution;
+   if(param.ScreenAddress=nil) or (param.ScreenWidth=0) or (param.ScreenHeight=0) then
     begin
-     efi_console_output_string('Graphics initialization failed.'#10); while True do;
+     efi_console_output_string('ERROR:Screen does not exist,graphics initialization failed.'#10);
+     while True do;
     end;
   end
  else
   begin
-   {else initialize empty}
-   graphaddress:=0; graphwidth:=0; graphheight:=0; graphcolortype:=0;
-   efi_console_output_string('Graphics initialization failed.'#10); while True do;
+   efi_console_output_string('ERROR:No Graphics Exists,Booting failed.'#10);
+   while True do;
   end;
- {Initialize the memory map of UEFI}
- efi_console_output_string('Memory initializing......'#10);
+ {Initialize the Memory}
+ efi_console_output_string('Memory Initializing......'#10);
+ efi_console_output_string('Initalizating System Heap......'#10);
  memmap:=efi_loader_get_memory_map;
- smemmap:=efi_loader_handle_memory_map(memmap); 
- {Set the compiler heap}
- memres:=efi_loader_find_suitable_memory_map(smemmap,1 shl 22);
+ smemmap:=efi_loader_handle_memory_map(memmap);
+ memres:=efi_loader_find_suitable_memory_map(smemmap,smemmap.memory_total_size div 4);
  if(memres.memory_size=0) then
   begin
-   efi_console_output_string('Compiler Heap Error!'#10);
-   while True do;
+   efi_console_output_string('ERROR:System Heap intialization failed!');
   end;
- compheap_initialize(Natuint(memres.memory_start),memres.memory_size,16);
- {Set the system heap}
- memres:=efi_loader_find_suitable_memory_map(smemmap,smemmap.memory_total_size shr 1);
+ sysheap:=heap_initialize(memres.memory_start,memres.memory_start+memres.memory_size-1,3,3,2,8);
+ efi_console_output_string('Initalizating Graphics Heap......'#10);
+ memres:=efi_loader_find_suitable_memory_map(smemmap,smemmap.memory_total_size div 4);
  if(memres.memory_size=0) then
   begin
-   efi_console_output_string('System Heap Error!'#10);
-   while True do;
+   efi_console_output_string('ERROR:Graphics Heap intialization failed!');
   end;
- sysheap_initialize(Natuint(memres.memory_start),memres.memory_size,16);
- {Set the executable heap}
- memres:=efi_loader_find_suitable_memory_map(smemmap,smemmap.memory_total_size shr 3);
- if(memres.memory_size=0) then
-  begin
-   efi_console_output_string('Executable Heap Error!'#10);
-   while True do;
-  end;
- exeheap_initialize(Natuint(memres.memory_start),memres.memory_size,16);
- {Set the graphics heap}
- memres:=efi_loader_find_suitable_memory_map(smemmap,smemmap.memory_total_size shr 3); 
- if(memres.memory_size=0) then
-  begin
-   efi_console_output_string('Graphics Heap Error!'#10);
-   while True do;
-  end;
- graph_heap_initialize(memres.memory_start,memres.memory_size,8,graphwidth,graphheight,graphcolortype,Pointer(graphaddress));
- {Convert the PCI device list to OS's device list}
- i:=1;
- os_devlist:=device_list_initialize;
- while(i<=devlist.pcicount)do
-  begin
-   {Get the PCI item of temporary PCI device list}
-   tempdevitem:=(devlist.pci+i-1)^;
-   {Create the io list}
-   j:=1; iolist:=nil; iocount:=0;
-   while(j<=6)do
-    begin
-     if(tempdevitem.AddrStart[j]<>0) and (tempdevitem.AddrEnd[j]<>0) and (tempdevitem.AddrClass[j]=$00) then
-      begin
-       inc(iocount);
-       ReallocMem(iolist,iocount*sizeof(device_io_info));
-       (iolist+iocount-1)^.ismmio:=true;
-       (iolist+iocount-1)^.ioaddress.address_start:=Pointer(tempdevitem.AddrStart[j]);
-       (iolist+iocount-1)^.ioaddress.address_end:=Pointer(tempdevitem.AddrEnd[j]);
-       (iolist+iocount-1)^.ioaddress.address_offset:=tempdevitem.AddrOffset[j];
-      end;
-     inc(j);
-    end;
-   if(iocount=0) or (iolist=nil) then
-    begin
-     inc(i); continue;
-    end;
-   {Create the device object}
-   devobj:=device_list_construct_device_object(tempdevitem.ClassCode[1],tempdevitem.ClassCode[2],tempdevitem.ClassCode[3],
-   tempdevitem.manufracturer,tempdevitem.device,iolist,iocount);
-   {Add the device object to device list}
-   device_list_add_item(os_devlist,devobj);
-   {Free the solo device object}
-   FreeMem(iolist); iocount:=0;
-   FreeMem(devobj.io); devobj.iocount:=0;
-   inc(i);
-  end;
- efi_Console_output_string('All Device initialized!'#10);
- {Clear the list of memory map}
+ graph_heap_initialize(memres.memory_start,memres.memory_start+memres.memory_size-1,12,
+ param.ScreenWidth,param.ScreenHeight,param.ScreenAddress,param.ScreenColor);
+ param.ACPIRsdpAddress:=efi_get_cpu_info_from_acpi_table;
+ {Then Free the Memory of unused}
  efi_freemem(memmap.memory_descriptor);
  efi_freemem(smemmap.memory_start);
  efi_freemem(smemmap.memory_size);
  efi_graphics_free(graphlist);
- efi_device_list_free(devlist);
- {Generate the cpu info}
- efi_console_output_string('Get the Processor information......'#10);
- os_cpuinfo:=efi_get_cpu_info_from_acpi_table;
- efi_console_output_string('Processor information got!'#10);
  {Exit boot services}
  efi_console_output_string('Exit the Boot Services......'#10);
  efi_loader_exit_boot_services;
@@ -204,11 +108,9 @@ begin
   csrxchg     $t0, $t0, 0x2
  end;
  {$ENDIF}
+ kernel_main(param);
  {Enter the kernel}
- kernel_initialize;
- kernel_main;
  efi_main:=efi_success;
 end;
-
 begin
 end.
