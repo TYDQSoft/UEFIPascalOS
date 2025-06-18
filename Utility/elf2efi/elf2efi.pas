@@ -87,7 +87,7 @@ begin
    conv_pe_free(pefile);
    writeln('ELF file '+ParamStr(1)+' was successfully converted to EFI file '+ParamStr(2)+',Command Done!');
    conv_heap_finalize;
-   readln;
   end;
 end.
+
 

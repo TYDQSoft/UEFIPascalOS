@@ -90,7 +90,7 @@ procedure conv_heap_initialize;
 var ptr:Pointer;
 begin
  ptr:=allocmem(1024*1024*512);
- memheap:=heap_initialize(SizeUint(ptr),SizeUint(ptr+1024*1024*512-1),4);
+ memheap:=heap_initialize(SizeUint(ptr),SizeUint(ptr+1024*1024*512),4);
 end;
 function conv_allocmem(Size:SizeUint):Pointer;
 begin
