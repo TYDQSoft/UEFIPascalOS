@@ -2,137 +2,307 @@ unit graphics;
 
 interface
 
+{$MODE objFPC}{$H+}
+
 uses font;
 
 type graph_point=packed record
-                 xpos,ypos:dword;
+                 XPosition,YPosition:extended;
                  end;
-     Pgraph_point=^graph_point;
-     graph_item=bitpacked record
-                haveprev:boolean;
-                allocated:0..63;
-                havenext:boolean;
-                end;
-     Pgraph_item=^graph_item;
-     graph_header=packed record
-                  visible:boolean;
-                  Index:Natuint;
-                  xpos,ypos:Integer;
-                  width,height:Dword;
-                  Padding:array[1..3] of byte;
-                  end;
-     Pgraph_header=^graph_header;
-     graph_color=packed record
-                Red:byte;
-                Green:byte;
-                Blue:byte;
-                Alpha:byte;
-                end;
-     graph_colour=graph_color;
-     Pgraph_color=^graph_color;
-     Pgraph_colour=^graph_colour;
+     graph_point_array=array of graph_point;
+     graph_input_point=packed record
+                       XPosition,YPosition:Integer;
+                       end;
+     graph_input_point_array=array of graph_input_point;
+     graph_line_segment=packed record
+                        IsVertical:boolean;
+                        Slope:Extended;
+                        Intercept:Extended;
+                        StartX,EndX:Extended;
+                        end;
+     graph_attribute=packed record
+                     Index:Natuint;
+                     xposition,yposition:Integer;
+                     CanvaWidth,CanvaHeight:Dword;
+                     StartItemIndex:Dword;
+                     Visible:boolean;
+                     end;
+     Pgraph_attribute=^graph_attribute;
      graph_output_color=packed record
                         case Byte of
-                        0:(BGRBlue:byte;BGRGreen:byte;BGRRed:byte;BGRReserved:byte;);
-                        1:(RGBRed:byte;RGBGreen:byte;RGBBlue:byte;RGBReserved:byte;);
+                        0:(RGBRed:byte;RGBGreen:byte;RGBBlue:byte;RGBReserved:byte;);
+                        1:(BGRBlue:byte;BGRGreen:byte;BGRRed:byte;BGRReserved:byte;);
                         end;
      Pgraph_output_color=^graph_output_color;
-     graph_char=packed record
-                content:WideChar;
-                color:graph_color;
+     graph_color=packed record
+                 Red:byte;
+                 Green:byte;
+                 Blue:byte;
+                 Alpha:byte;
+                 end;
+     Pgraph_color=^graph_color;
+     graph_item=packed record
+                Allocated:dword;
+                RightIndex:dword;
                 end;
-     graph_string=packed record
-                  content:PWideChar;
-                  color:graph_color;
-                  end;
-     graph_string_with_graph_char=packed record
-                                  content:PWideChar;
-                                  color:^graph_color;
-                                  end;
-     graph_string_with_graph_string=packed record
-                                    content:^PWideChar;
-                                    color:^graph_color;
-                                    count:Natuint;
-                                    end;
+     Pgraph_item=^graph_item;
      graph_heap=packed record
-                mem_start:Pointer;
-                mem_end:Pointer;
-                mem_block_power:byte;
-                item_max_pos:natuint;
-                item_max_index:natuint;
-                screen_attribute:byte;
-                screen_width,screen_height:dword;
-                screen_init_address:^graph_color;
-                screen_output_address:^graph_output_color;
+                MaxIndex:Natuint;
+                {For Heap Only}
+                HeapStartAddress:Pgraph_item;
+                HeapEndAddress:Pgraph_color;
+                AvailablePosition:Dword;
+                MaxItemIndex:Dword;
+                RestSize:Natuint;
+                {For Attribute Only}
+                AttributeAddress:Pgraph_attribute;
+                AttributeMaxCount:Dword;
+                AttributeMaxIndex:Dword;
+                AvailableIndex:Dword;
+                BlockPower:byte;
+                {For Screen Only}
+                ScreenAttribute:boolean;
+                ScreenWidth,ScreenHeight:dword;
+                ScreenInitAddress:Pgraph_color;
+                ScreenOutputAddress:Pgraph_output_color;
                 end;
 
-const graph_pi:extended=3.1415926;
-      graph_color_type_bgr:byte=0;
-      graph_color_type_rgb:byte=1;
-      graph_color_none:graph_color=(Red:$00;Green:$00;Blue:$00;Alpha:$00);
-      graph_color_black:graph_color=(Red:$00;Green:$00;Blue:$00;Alpha:$FF);
-      graph_color_red:graph_color=(Red:$FF;Green:$00;Blue:$00;Alpha:$FF);
-      graph_color_green:graph_color=(Red:$00;Green:$FF;Blue:$00;Alpha:$FF);
-      graph_color_blue:graph_color=(Red:$00;Green:$00;Blue:$FF;Alpha:$FF);
-      graph_color_yellow:graph_color=(Red:$FF;Green:$FF;Blue:$00;Alpha:$FF);
-      graph_color_skyblue:graph_color=(Red:$00;Green:$FF;Blue:$FF;Alpha:$FF);
-      graph_color_pink:graph_color=(Red:$FF;Green:$00;Blue:$FF;Alpha:$FF);
-      graph_color_white:graph_color=(Red:$FF;Green:$FF;Blue:$FF;Alpha:$FF);
-      graph_color_ivory_black:graph_color=(Red:$29;Green:$24;Blue:$21;Alpha:$FF);
-      graph_color_grey:graph_color=(Red:$C0;Green:$C0;Blue:$C0;Alpha:$FF);
-      graph_color_cold_grey:graph_color=(Red:$80;Green:$8A;Blue:$87;Alpha:$FF);
-      graph_color_slabstone_grey:graph_color=(Red:$70;Green:$80;Blue:$69;Alpha:$FF);
-      graph_color_warm_grey:graph_color=(Red:$80;Green:$80;Blue:$69;Alpha:$FF);
-      graph_color_antique_white:graph_color=(Red:$FA;Green:$EB;Blue:$D7;Alpha:$FF);
-      graph_color_mist_white:graph_color=(Red:$F5;Green:$F5;Blue:$F5;Alpha:$FF);
-      graph_color_almond_white:graph_color=(Red:$FF;Green:$EB;Blue:$CD;Alpha:$FF);
-      graph_color_cornslik:graph_color=(Red:$FF;Green:$F8;Blue:$DC;Alpha:$FF);
+const graph_color_screen_rgb:boolean=false;
+      graph_color_screen_bgr:boolean=true;
+      graph_color_zero:graph_color=(Red:0;Green:0;Blue:0;Alpha:0);
+      graph_color_none:graph_color=(Red:0;Green:0;Blue:0;Alpha:0);
+      graph_color_black:graph_color=(Red:0;Green:0;Blue:0;Alpha:$FF);
+      graph_color_ivory_black:graph_color=(Red:41;Green:36;Blue:33;Alpha:$FF);
+      graph_color_grey:graph_color=(Red:192;Green:192;Blue:192;Alpha:$FF);
+      graph_color_cold_grey:graph_color=(Red:128;Green:138;Blue:135;Alpha:$FF);
+      graph_color_slate_grey:graph_color=(Red:112;Green:128;Blue:105;Alpha:$FF);
+      graph_color_warm_grey:graph_color=(Red:128;Green:128;Blue:105;Alpha:$FF);
+      graph_color_white:graph_color=(Red:255;Green:255;Blue:255;Alpha:$FF);
+      graph_color_antique_white:graph_color=(Red:250;Green:235;Blue:215;Alpha:$FF);
+      graph_color_light_sky_blue:graph_color=(Red:240;Green:255;Blue:255;Alpha:$FF);
+      graph_color_white_smoke:graph_color=(Red:245;Green:245;Blue:255;Alpha:$FF);
+      graph_color_white_almond:graph_color=(Red:255;Green:235;Blue:205;Alpha:$FF);
+      graph_color_cornsilk:graph_color=(Red:255;Green:248;Blue:220;Alpha:$FF);
+      graph_color_eggshell:graph_color=(Red:252;Green:230;Blue:201;Alpha:$FF);
+      graph_color_yellow:graph_color=(Red:255;Green:255;Blue:0;Alpha:$FF);
+      graph_color_banana:graph_color=(Red:227;Green:207;Blue:87;Alpha:$FF);
+      graph_color_cadmium_yellow:graph_color=(Red:255;Green:153;Blue:18;Alpha:$FF);
+      graph_color_dougello:graph_color=(Red:235;Green:142;Blue:85;Alpha:$FF);
+      graph_color_forum_gold:graph_color=(Red:255;Green:237;Blue:222;Alpha:$FF);
+      graph_color_gold:graph_color=(Red:255;Green:215;Blue:0;Alpha:$FF);
+      graph_color_flower_yellow:graph_color=(Red:218;Green:165;Blue:105;Alpha:$FF);
+      graph_color_melon_yellow:graph_color=(Red:227;Green:168;Blue:105;Alpha:$FF);
+      graph_color_orange:graph_color=(Red:255;Green:97;Blue:0;Alpha:$FF);
+      graph_color_cadmium_orange:graph_color=(Red:255;Green:97;Blue:3;Alpha:$FF);
+      graph_color_carrot_yellow:graph_color=(Red:237;Green:145;Blue:33;Alpha:$FF);
+      graph_color_orange_yellow:graph_color=(Red:255;Green:128;Blue:0;Alpha:$FF);
+      graph_color_pale_yellow:graph_color=(Red:245;Green:222;Blue:179;Alpha:$FF);
+      graph_color_light_grey_blue:graph_color=(Red:176;Green:224;Blue:230;Alpha:$FF);
+      graph_color_reddish_blue:graph_color=(Red:65;Green:105;Blue:255;Alpha:$FF);
+      graph_color_slate_blue:graph_color=(Red:106;Green:90;Blue:205;Alpha:$FF);
+      graph_color_sky_blue:graph_color=(Red:135;Green:206;Blue:235;Alpha:$FF);
+      graph_color_cyan:graph_color=(Red:0;Green:255;Blue:255;Alpha:$FF);
+      graph_color_green_dirt:graph_color=(Red:56;Green:94;Blue:15;Alpha:$FF);
+      graph_color_indigo_blue:graph_color=(Red:8;Green:46;Blue:84;Alpha:$FF);
+      graph_color_aqua_marine:graph_color=(Red:127;Green:255;Blue:212;Alpha:$FF);
+      graph_color_turquoise:graph_color=(Red:64;Green:224;Blue:208;Alpha:$FF);
+      graph_color_green:graph_color=(Red:0;Green:255;Blue:0;Alpha:$FF);
+      graph_color_yellow_green:graph_color=(Red:127;Green:255;Blue:0;Alpha:$FF);
+      graph_color_cobalt_green:graph_color=(Red:61;Green:145;Blue:64;Alpha:$FF);
+      graph_color_viridis:graph_color=(Red:0;Green:201;Blue:87;Alpha:$FF);
+      graph_color_flower_white:graph_color=(Red:255;Green:250;Blue:240;Alpha:$FF);
+      graph_color_gainsboro:graph_color=(Red:220;Green:220;Blue:220;Alpha:$FF);
+      graph_color_ghost_white:graph_color=(Red:248;Green:248;Blue:255;Alpha:$FF);
+      graph_color_honey_dew_orange:graph_color=(Red:240;Green:255;Blue:240;Alpha:$FF);
+      graph_color_ivory_white:graph_color=(Red:250;Green:255;Blue:240;Alpha:$FF);
+      graph_color_flaxen:graph_color=(Red:250;Green:240;Blue:230;Alpha:$FF);
+      graph_color_navajo_white:graph_color=(Red:255;Green:222;Blue:173;Alpha:$FF);
+      graph_color_old_lace:graph_color=(Red:253;Green:245;Blue:230;Alpha:$FF);
+      graph_color_sea_shell:graph_color=(Red:255;Green:245;Blue:238;Alpha:$FF);
+      graph_color_snow_white:graph_color=(Red:255;Green:250;Blue:250;Alpha:$FF);
+      graph_color_red:graph_color=(Red:255;Green:0;Blue:0;Alpha:$FF);
+      graph_color_brick_red:graph_color=(Red:156;Green:102;Blue:31;Alpha:$FF);
+      graph_color_cobalt_red:graph_color=(Red:227;Green:23;Blue:13;Alpha:$FF);
+      graph_color_coral:graph_color=(Red:255;Green:127;Blue:80;Alpha:$FF);
+      graph_color_firebrick_red:graph_color=(Red:178;Green:34;Blue:34;Alpha:$FF);
+      graph_color_indian_red:graph_color=(Red:176;Green:23;Blue:31;Alpha:$FF);
+      graph_color_maroon:graph_color=(Red:176;Green:46;Blue:96;Alpha:$FF);
+      graph_color_pink_red:graph_color=(Red:255;Green:192;Blue:203;Alpha:$FF);
+      graph_color_strawberry:graph_color=(Red:135;Green:38;Blue:87;Alpha:$FF);
+      graph_color_orange_red:graph_color=(Red:250;Green:128;Blue:114;Alpha:$FF);
+      graph_color_tomato_red:graph_color=(Red:255;Green:99;Blue:71;Alpha:$FF);
+      graph_color_vermillion:graph_color=(Red:255;Green:69;Blue:0;Alpha:$FF);
+      graph_color_heavy_red:graph_color=(Red:255;Green:0;Blue:255;Alpha:$FF);
+      graph_color_brown:graph_color=(Red:128;Green:42;Blue:42;Alpha:$FF);
+      graph_color_cream:graph_color=(Red:163;Green:148;Blue:128;Alpha:$FF);
+      graph_color_soil_yellow:graph_color=(Red:138;Green:54;Blue:15;Alpha:$FF);
+      graph_color_soil_brown:graph_color=(Red:135;Green:51;Blue:36;Alpha:$FF);
+      graph_color_chocolate:graph_color=(Red:210;Green:105;Blue:30;Alpha:$FF);
+      graph_color_meat:graph_color=(Red:255;Green:125;Blue:64;Alpha:$FF);
+      graph_color_yellow_brown:graph_color=(Red:240;Green:230;Blue:140;Alpha:$FF);
+      graph_color_rose_red:graph_color=(Red:188;Green:143;Blue:143;Alpha:$FF);
+      graph_color_dirt_red:graph_color=(Red:199;Green:97;Blue:20;Alpha:$FF);
+      graph_color_dirt_brown:graph_color=(Red:115;Green:74;Blue:18;Alpha:$FF);
+      graph_color_squid_brown:graph_color=(Red:94;Green:38;Blue:18;Alpha:$FF);
+      graph_color_ocher:graph_color=(Red:160;Green:82;Blue:45;Alpha:$FF);
+      graph_color_horse_brown:graph_color=(Red:139;Green:69;Blue:19;Alpha:$FF);
+      graph_color_sand_brown:graph_color=(Red:244;Green:164;Blue:96;Alpha:$FF);
+      graph_color_dark_brown:graph_color=(Red:210;Green:180;Blue:140;Alpha:$FF);
+      graph_color_blue:graph_color=(Red:0;Green:0;Blue:255;Alpha:$FF);
+      graph_color_cobalt:graph_Color=(Red:61;Green:89;Blue:171;Alpha:$FF);
+      graph_color_dodger_blue:graph_color=(Red:30;Green:144;Blue:255;Alpha:$FF);
+      graph_color_jackie_blue:graph_color=(Red:11;Green:23;Blue:70;Alpha:$FF);
+      graph_color_manganese_blue:graph_color=(Red:3;Green:168;Blue:158;Alpha:$FF);
+      graph_color_heavy_blue:graph_color=(Red:25;Green:25;Blue:112;Alpha:$FF);
+      graph_color_peacock_blue:graph_color=(Red:51;Green:161;Blue:201;Alpha:$FF);
+      graph_color_turkey_jade_blue:graph_color=(Red:0;Green:199;Blue:140;Alpha:$FF);
+      graph_color_forest_green:graph_color=(Red:34;Green:134;Blue:34;Alpha:$FF);
+      graph_color_grassland_green:graph_color=(Red:124;Green:252;Blue:0;Alpha:$FF);
+      graph_color_sour_orange_green:graph_color=(Red:50;Green:205;Blue:50;Alpha:$FF);
+      graph_color_mint_green:graph_color=(Red:189;Green:252;Blue:201;Alpha:$FF);
+      graph_color_grass_green:graph_color=(Red:107;Green:142;Blue:35;Alpha:$FF);
+      graph_color_dark_green:graph_color=(Red:48;Green:128;Blue:20;Alpha:$FF);
+      graph_color_sea_green:graph_color=(Red:46;Green:139;Blue:87;Alpha:$FF);
+      graph_color_fresh_green:graph_color=(Red:0;Green:255;Blue:127;Alpha:$FF);
+      graph_color_purple:graph_color=(Red:160;Green:32;Blue:240;Alpha:$FF);
+      graph_color_violet_purple:graph_color=(Red:138;Green:43;Blue:226;Alpha:$FF);
+      graph_color_jasona:graph_color=(Red:160;Green:102;Blue:211;Alpha:$FF);
+      graph_color_lake_purple:graph_color=(Red:153;Green:51;Blue:250;Alpha:$FF);
+      graph_color_light_purple:graph_color=(Red:218;Green:112;Blue:214;Alpha:$FF);
+      graph_color_plum_purple:graph_color=(Red:221;Green:160;Blue:221;Alpha:$FF);
+      graph_align_left:byte=0;
+      graph_align_center:byte=1;
+      graph_align_right:byte=2;
+      graph_align_top:byte=0;
+      graph_align_middle:byte=1;
+      graph_align_buttom:byte=2;
+      graph_align_maxlength:dword=$FFFFFFFF;
+      graph_pi:extended=3.1415976;
 
-var gheap:graph_heap;
-
-function graph_color_generate(Red:byte;Green:byte;Blue:byte;Alpha:byte):graph_color;
-function graph_color_mixed(color1,color2:graph_color):graph_color;
-function graph_color_get_lightness(color:graph_color):byte;
-function graph_color_get_inverse(color:graph_color):graph_color;
-function graph_construct_graph_char(content:WideChar;color:graph_color):graph_char;
-function graph_construct_graph_string(content:PWideChar;color:graph_color):graph_string;
-procedure graph_heap_initialize(startaddr:Pointer;size:Natuint;blockpower:byte;width,height:dword;
-colortype:byte;outputaddr:Pointer);
-function graph_heap_getmem(width,height:dword;xpos,ypos:Integer;visible:boolean):Pointer;
-function graph_heap_getmemsize(ptr:Pointer):natuint;
-function graph_heap_allocmem(width,height:dword;xpos,ypos:Integer;visible:boolean):Pointer;
-procedure graph_heap_freemem(var ptr:Pointer);
-procedure graph_heap_reallocmem(var ptr:Pointer;newwidth,newheight:dword;newxpos,newypos:Integer;
-visible:boolean);
-procedure graph_heap_draw_point(ptr:Pointer;xpos,ypos:Integer;color:graph_color);
-procedure graph_heap_draw_block(ptr:Pointer;xpos,ypos:Integer;width,height:Dword;color:graph_color);
-procedure graph_heap_draw_circle(ptr:Pointer;xpos,ypos:Integer;radius:dword;color:graph_color);
-procedure graph_heap_draw_fanshape(ptr:Pointer;xpos,ypos:Integer;radius:dword;
-anglestart,angleend:extended;color:graph_color);
-procedure graph_heap_draw_eclipse(ptr:Pointer;xpos,ypos:Integer;width,height:Dword;Color:graph_color);
-procedure graph_heap_clear_canva(ptr:Pointer);
-procedure graph_heap_edit_canva(ptr:Pointer;newxpos,newypos:Integer;visible:boolean);
-function graph_heap_get_x_position(ptr:Pointer):Integer;
-function graph_heap_get_y_position(ptr:Pointer):Integer;
-function graph_heap_get_width(ptr:Pointer):Dword;
-function graph_heap_get_height(ptr:Pointer):Dword;
-function graph_heap_get_visible(ptr:Pointer):boolean;
-procedure graph_heap_draw_graph_char(ptr:Pointer;xpos,ypos:Integer;gchar:graph_char);
-procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;gstr:graph_string);
-procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;gstr:graph_string;maxlinelen:word);
-procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;str:PWideChar;color:graph_color);
-procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;str:PWideChar;color:graph_color;maxlinelen:word);
+operator := (point:graph_input_point)res:graph_point;
+function graph_color_alpha(color:graph_color;Alpha:byte):graph_color;
+function graph_color_alpha_mix(Alpha1,Alpha2:byte):byte;
+function graph_color_mix_color(color1,color2:graph_color;color1ratio:extended):graph_color;
+function graph_color_inverse(color:graph_color):graph_color;
+function graph_color_darker(color1,color2:graph_color):graph_color;
+function graph_color_brighter(color1,color2:graph_color):graph_color;
+function graph_color_multiply(color1,color2:graph_color):graph_color;
+function graph_color_filter(color1,color2:graph_color):graph_color;
+function graph_color_color_burn(color1,color2:graph_color):graph_color;
+function graph_color_color_dodge(color1,color2:graph_color):graph_color;
+function graph_color_linear_burn(color1,color2:graph_color):graph_color;
+function graph_color_linear_dodge(color1,color2:graph_color):graph_color;
+function graph_color_overlay(color1,color2:graph_color):graph_color;
+function graph_color_highlight(color1,color2:graph_color):graph_color;
+function graph_color_diffuse(color1,color2:graph_color):graph_color;
+function graph_color_light(color1,color2:graph_color):graph_color;
+function graph_color_point_light(color1,color2:graph_color):graph_color;
+function graph_color_linear_light(color1,color2:graph_color):graph_color;
+function graph_color_solid_color_mix(color1,color2:graph_color):graph_color;
+function graph_color_except(color1,color2:graph_color):graph_color;
+function graph_color_delta(color1,color2:graph_color):graph_color;
+procedure graph_heap_initialize(StartAddress:Pointer;EndAddress:Pointer;BlockPower:byte;
+ScreenWidth,ScreenHeight:dword;OutputAddress:Pointer;ScreenRedGreenBlue:boolean);
+function graph_heap_getmem(xposition,yposition:Integer;
+Width,Height:Dword;Visible:boolean):Dword;
+function graph_heap_getmemsize(index:Dword):Natuint;
+function graph_heap_allocmem(xposition,yposition:Integer;
+Width,Height:Dword;Visible:boolean):Dword;
+procedure graph_heap_freemem(var index:Dword);
+procedure graph_heap_reallocmem(var Index:Dword;xposition,yposition:Integer;
+Width,Height:Dword;Visible:boolean);
+procedure graph_heap_set_attribute(Index:Dword;
+newxposition,newyposition:Integer;NewVisibleStatus:boolean);
+procedure graph_heap_clear(Index:Dword);
+procedure graph_heap_fill_with_color(Index:Dword;Color:graph_color);
+procedure graph_heap_draw_point(Index:Dword;RelativeX,RelativeY:Integer;Color:graph_color);
+procedure graph_heap_draw_block(Index:Dword;RelativeX,Relativey:Integer;Width,Height:Dword;
+Color:graph_color);
+procedure graph_heap_draw_circle(Index:Dword;RelativeX,Relativey:Integer;Radius:dword;Color:graph_color);
+procedure graph_heap_draw_fanshape(Index:Dword;RelativeX,Relativey:Integer;Radius:dword;
+StartAngle,EndAngle:extended;Color:graph_color);
+var RelatedWidth,RelatedHeight:Dword;
+procedure graph_heap_draw_eclipse(Index:Dword;RelativeX,Relativey:Integer;Width,Height:Dword;
+Color:graph_color);
+procedure graph_heap_draw_polygon(Index:Dword;Point:array of graph_point;Color:graph_color);
+procedure graph_heap_draw_polygon(Index:Dword;Point:graph_point_array;Color:graph_color);
+procedure graph_heap_draw_line(Index:Dword;Point:array of graph_point;Thickness:Dword;
+Color:graph_color);
+procedure graph_heap_draw_line(Index:Dword;Point:graph_point_array;Thickness:Dword;
+Color:graph_color);
+procedure graph_heap_draw_char(Index:Dword;Xalign:byte;YAlign:byte;PointX,PointY:Integer;
+FontIndex:byte;Character:Char;Color:graph_color);
+procedure graph_heap_draw_char(Index:Dword;Xalign:byte;YAlign:byte;Point:graph_input_point;
+FontIndex:byte;Character:Char;Color:graph_color);
+procedure graph_heap_draw_string(Index:Dword;Xalign:byte;YAlign:byte;PointX,PointY:Integer;
+FontIndex:byte;Str:string;Color:graph_color;maxlinelength:Integer);
+procedure graph_heap_draw_string(Index:Dword;Xalign:byte;YAlign:byte;PointX,PointY:Integer;
+FontIndex:byte;Str:PChar;Color:graph_color;maxlinelength:Integer);
+procedure graph_heap_draw_string(Index:Dword;Xalign:byte;YAlign:byte;Point:graph_input_point;
+FontIndex:byte;Str:string;Color:graph_color;maxlinelength:Integer);
+procedure graph_heap_draw_string(Index:Dword;Xalign:byte;YAlign:byte;Point:graph_input_point;
+FontIndex:byte;Str:PChar;Color:graph_color;maxlinelength:Integer);
+function graph_heap_get_visible_status(Index:Dword):boolean;
+function graph_heap_get_x_position(Index:Dword):Integer;
+function graph_heap_get_y_position(Index:Dword):Integer;
+procedure graph_heap_set_visible_status(Index:Dword;NewVisibleStatus:boolean);
+procedure graph_heap_set_x_position(Index:Dword;XPosition:Integer);
+procedure graph_heap_set_y_position(Index:Dword;YPosition:Integer);
 procedure graph_heap_output_screen;
+
+var graphheap:graph_heap;
 
 implementation
 
-function graph_color_generate(Red:byte;Green:byte;Blue:byte;Alpha:byte):graph_color;
-var res:graph_color;
+operator := (point:graph_input_point)res:graph_point;
 begin
- res.Red:=Red; res.Green:=Green; res.Blue:=blue; res.Alpha:=Alpha;
- graph_color_generate:=res;
+ res.xposition:=point.XPosition;
+ res.YPosition:=point.YPosition;
 end;
-function graph_color_mixed(color1,color2:graph_color):graph_color;
+operator * (point:graph_point;lamdba:extended)res:graph_point;
+begin
+ res.XPosition:=point.XPosition*lamdba;
+ res.YPosition:=point.YPosition*lamdba;
+end;
+operator + (point1,point2:graph_point)res:graph_point;
+begin
+ res.XPosition:=point1.XPosition+point2.XPosition;
+ res.YPosition:=point1.YPosition+point2.YPosition;
+end;
+operator - (point1,point2:graph_point)res:graph_point;
+begin
+ res.XPosition:=point1.XPosition-point2.XPosition;
+ res.YPosition:=point1.YPosition-point2.YPosition;
+end;
+function graph_get_bezier_point(Ratio:extended;Point:array of graph_point):graph_point;
+var i:Natuint;
+    res:graph_point;
+begin
+ i:=1; res.XPosition:=0; res.YPosition:=0;
+ while(i<=length(Point))do
+  begin
+   res:=res+Point[i-1]*
+   (factorial(length(Point))/(factorial(i)*factorial(length(Point)-i))
+   *Power(Ratio,i)*Power(1-Ratio,length(Point)-i));
+   inc(i);
+  end;
+ graph_get_bezier_point:=res;
+end;
+function graph_get_bezier_point(Ratio:extended;Point:graph_point_array):graph_point;
+var i:Natuint;
+    res:graph_point;
+begin
+ i:=1; res.XPosition:=0; res.YPosition:=0;
+ while(i<=length(Point))do
+  begin
+   res:=res+Point[i-1]*
+   (factorial(length(Point))/(factorial(i)*factorial(length(Point)-i))
+   *Power(Ratio,i)*Power(1-Ratio,length(Point)-i));
+   inc(i);
+  end;
+ graph_get_bezier_point:=res;
+end;
+function graph_color_mix(color1,color2:graph_color):graph_color;
 var res:graph_color;
 begin
  if(color2.Alpha=$FF) and (color1.Alpha=0) then
@@ -144,979 +314,1630 @@ begin
   begin
    res.Alpha:=$FF; res.Red:=color1.Red; res.Blue:=color1.Blue; res.Green:=color1.Green;
    exit(res);
+  end
+ else if(color2.Alpha=$FF) and (color1.Alpha=$FF) then
+  begin
+   res.Alpha:=$FF; res.Red:=color2.Red; res.Blue:=color2.Blue; res.Green:=color2.Green;
+   exit(res);
   end;
  res.Alpha:=color1.Alpha;
  res.Red:=(color1.Red*res.Alpha+color2.Red*(255-res.Alpha) shr 8) and $FF;
  res.Blue:=(color1.Blue*res.Alpha+color2.Blue*(255-res.Alpha) shr 8) and $FF;
  res.Green:=(color1.Green*res.Alpha+color2.Green*(255-res.Alpha) shr 8) and $FF;
  res.Alpha:=(color1.Alpha*res.Alpha+color2.Alpha*(255-res.Alpha) shr 8) and $FF;
- graph_color_mixed:=res;
+ graph_color_mix:=res;
 end;
-function graph_color_mixed_with_weight(color1:graph_color;color2:graph_color;weight:extended):graph_color;
+function graph_max(x,y:Natuint):Natuint;
+begin
+ if(x>y) then graph_max:=x else graph_max:=y;
+end;
+function graph_min(x,y:Natuint):Natuint;
+begin
+ if(x>y) then graph_min:=y else graph_min:=x;
+end;
+function graph_color_alpha(color:graph_color;Alpha:byte):graph_color;
 var res:graph_color;
 begin
- res.Red:=round(color1.Red-(color2.Red-$FF)*(1-weight)) and $FF;
- res.Green:=round(color1.Green-(color2.Green-$FF)*(1-weight)) and $FF;
- res.Blue:=round(color1.Blue-(color2.Blue-$FF)*(1-weight)) and $FF;
- res.Alpha:=round(color1.Alpha-(color2.Alpha-$FF)*(1-weight)) and $FF;
- graph_color_mixed_with_weight:=res;
+ res.Red:=color.Red; res.Green:=color.Green; res.Blue:=color.Blue; res.Alpha:=Alpha;
+ graph_color_alpha:=res;
 end;
-function graph_color_get_lightness(color:graph_color):byte;
-var res:byte;
+function graph_color_alpha_mix(Alpha1,Alpha2:byte):byte;
 begin
- res:=0;
- if(color.Red>res) then res:=color.Red;
- if(color.Green>res) then res:=color.Green;
- if(color.Blue>res) then res:=color.Blue;
- if(color.Alpha>res) then res:=color.Alpha;
- graph_color_get_lightness:=res;
+ graph_color_alpha_mix:=(Alpha1*Alpha1+Alpha2*(255-Alpha1) shr 8) and $FF;
 end;
-function graph_color_get_inverse(color:graph_color):graph_color;
+function graph_color_mix_color(color1,color2:graph_color;color1ratio:extended):graph_color;
 var res:graph_color;
 begin
- res.Red:=$FF-color.Red; res.Green:=$FF-color.Green; res.Blue:=$FF-color.Blue; res.Alpha:=color.Alpha;
- graph_color_get_inverse:=res;
+ res.Red:=Floor(color1.Red*color1ratio+color2.Red*(1-color1ratio));
+ res.Green:=Floor(color1.Green*color1ratio+color2.Green*(1-color1ratio));
+ res.Blue:=Floor(color1.Blue*color1ratio+color2.Blue*(1-color1ratio));
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_mix_color:=res;
 end;
-function graph_construct_graph_char(content:WideChar;color:graph_color):graph_char;
-var res:graph_char;
+function graph_color_inverse(color:graph_color):graph_color;
+var res:graph_color;
 begin
- res.content:=content; res.color:=color; graph_construct_graph_char:=res;
+ res.Red:=255-color.Red; res.Blue:=255-color.Blue; res.Green:=255-color.Green; res.Alpha:=color.Alpha;
+ graph_color_inverse:=res;
 end;
-function graph_construct_graph_string(content:PWideChar;color:graph_color):graph_string;
-var res:graph_string;
+function graph_color_darker(color1,color2:graph_color):graph_color;
+var res:graph_color;
 begin
- res.content:=content; res.color:=color; graph_construct_graph_string:=res;
+ res.Red:=graph_min(color1.Red,color2.Red);
+ res.Green:=graph_min(color1.Green,color2.Green);
+ res.Blue:=graph_min(color1.Blue,color2.Blue);
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_darker:=res;
 end;
-procedure graph_heap_initialize(startaddr:Pointer;size:Natuint;blockpower:byte;width,height:dword;colortype:byte;outputaddr:Pointer);
-var tempsize:natuint;
+function graph_color_brighter(color1,color2:graph_color):graph_color;
+var res:graph_color;
 begin
- gheap.mem_start:=startaddr;
- gheap.screen_width:=width;
- gheap.screen_height:=height;
- gheap.screen_attribute:=colortype;
- tempsize:=size-width*height*sizeof(graph_color);
- gheap.screen_output_address:=outputaddr;
- gheap.screen_init_address:=startaddr+tempsize;
- gheap.mem_end:=startaddr+tempsize;
- gheap.mem_block_power:=blockpower;
- gheap.item_max_pos:=0;
- gheap.item_max_index:=0;
+ res.Red:=graph_max(color1.Red,color2.Red);
+ res.Green:=graph_max(color1.Green,color2.Green);
+ res.Blue:=graph_max(color1.Blue,color2.Blue);
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_brighter:=res;
 end;
-function graph_heap_get_address_from_index(index:Natuint):Pointer;
+function graph_color_multiply(color1,color2:graph_color):graph_color;
+var res:graph_color;
 begin
- graph_heap_get_address_from_index:=Pointer(gheap.mem_start+(index-1) shl gheap.mem_block_power);
+ res.Red:=Word(color1.Red*color2.Red) div 255;
+ res.Green:=Word(color1.Green*color2.Green) div 255;
+ res.Blue:=Word(color1.Blue*color2.Blue) div 255;
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_multiply:=res;
 end;
-function graph_heap_get_index_from_address(address:Pointer):Natuint;
+function graph_color_filter(color1,color2:graph_color):graph_color;
+var res:graph_color;
 begin
- graph_heap_get_index_from_address:=(address-gheap.mem_start) shr gheap.mem_block_power+1;
+ res.Red:=255-(255-color1.Red)*(255-color2.Red) div 255;
+ res.Green:=255-(255-color1.Green)*(255-color2.Green) div 255;
+ res.Blue:=255-(255-color1.Blue)*(255-color2.Blue) div 255;
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_filter:=res;
 end;
-function graph_heap_get_graph_item_from_index(index:Natuint):graph_item;
+function graph_color_color_burn(color1,color2:graph_color):graph_color;
+var res:graph_color;
 begin
- graph_heap_get_graph_item_from_index:=Pgraph_item(gheap.mem_end-index)^;
+ res.Red:=color1.Red-(255-color1.Red)*(255-color2.Red) div color2.Red;
+ res.Green:=color1.Green-(255-color1.Green)*(255-color2.Green) div color2.Green;
+ res.Blue:=color1.Blue-(255-color1.Blue)*(255-color2.Blue) div color2.Blue;
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_color_burn:=res;
 end;
-function graph_heap_get_graph_item_from_address(address:Pointer):graph_item;
-var blockpos:Natuint;
+function graph_color_color_dodge(color1,color2:graph_color):graph_color;
+var res:graph_color;
 begin
- blockpos:=Natuint(address-gheap.mem_start) shr gheap.mem_block_power+1;
- graph_heap_get_graph_item_from_address:=Pgraph_item(gheap.mem_end-blockpos)^;
+ res.Red:=color1.Red+color1.Red*color2.Red div (255-color2.Red);
+ res.Green:=color1.Green+color1.Green*color2.Green div (255-color2.Green);
+ res.Blue:=color1.Blue+color1.Blue*color2.Blue div (255-color2.Blue);
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_color_dodge:=res;
 end;
-procedure graph_heap_write_graph_item_from_index(item:graph_item;index:Natuint);
+function graph_color_linear_burn(color1,color2:graph_color):graph_color;
+var res:graph_color;
 begin
- Pgraph_item(gheap.mem_end-index)^:=item;
+ res.Red:=color1.Red+color2.Red-255;
+ res.Green:=color1.Green+color2.Green-255;
+ res.Blue:=color1.Blue+color2.Blue-255;
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_linear_burn:=res;
 end;
-procedure graph_heap_write_graph_item_from_address(item:graph_item;Address:Pointer);
-var blockpos:Natuint;
+function graph_color_linear_dodge(color1,color2:graph_color):graph_color;
+var res:graph_color;
 begin
- blockpos:=Natuint(address-gheap.mem_start) shr gheap.mem_block_power+1;
- Pgraph_item(gheap.mem_end-blockpos)^:=item;
+ res.Red:=color1.Red+color2.Red;
+ res.Green:=color1.Green+color2.Green;
+ res.Blue:=color1.Blue+color2.Blue;
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_linear_dodge:=res;
 end;
-function graph_heap_test_mem_from_index(index:Natuint):boolean;
-var item:graph_item;
+function graph_color_overlay(color1,color2:graph_color):graph_color;
+var res:graph_color;
 begin
- if(index>gheap.item_max_pos) then graph_heap_test_mem_from_index:=false
+ if(color1.Red<=128) then res.Red:=color1.Red*color2.Red div 128
+ else color1.Red:=255-(255-color1.Red)*(255-color2.Red) div 128;
+ if(color1.Green<=128) then res.Green:=color1.Green*color2.Green div 128
+ else res.Green:=255-(255-color1.Green)*(255-color2.Green) div 128;
+ if(color1.Blue<=128) then res.Blue:=color1.Blue*color2.Blue div 128
+ else res.Blue:=255-(255-color1.Blue)*(255-color2.Blue) div 128;
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_overlay:=res;
+end;
+function graph_color_highlight(color1,color2:graph_color):graph_color;
+var res:graph_color;
+begin
+ if(color2.Red<=128) then res.Red:=color1.Red*color2.Red div 128
+ else color1.Red:=255-(255-color1.Red)*(255-color2.Red) div 128;
+ if(color2.Green<=128) then res.Green:=color1.Green*color2.Green div 128
+ else res.Green:=255-(255-color1.Green)*(255-color2.Green) div 128;
+ if(color2.Blue<=128) then res.Blue:=color1.Blue*color2.Blue div 128
+ else res.Blue:=255-(255-color1.Blue)*(255-color2.Blue) div 128;
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_highlight:=res;
+end;
+function graph_color_diffuse(color1,color2:graph_color):graph_color;
+var res:graph_color;
+begin
+ if(color2.Red<=128) then
+ res.Red:=color1.Red*color2.Red div 128+color1.Red*color1.Red*(255-color2.Red*2) div (255*255)
  else
-  begin
-   item:=Pgraph_item(gheap.mem_end-index)^;
-   graph_heap_test_mem_from_index:=item.allocated>0;
-  end;
-end;
-function graph_heap_test_mem_from_address(address:Pointer):boolean;
-var item:graph_item;
-    blockpos:natuint;
-begin
- blockpos:=Natuint(address-gheap.mem_start) shr gheap.mem_block_power+1;
- if(blockpos>gheap.item_max_pos) then graph_heap_test_mem_from_address:=false
+ res.Red:=color1.Red*(255-color2.Red) div 128+sqrt(color1.Red)*(color2.Red*2-255) div sqrt(255);
+ if(color2.Green<=128) then
+ res.Green:=color1.Green*color2.Green div 128+color1.Green*color1.Green*(255-color2.Green*2) div (255*255)
  else
-  begin
-   item:=Pgraph_item(gheap.mem_end-blockpos)^;
-   graph_heap_test_mem_from_address:=item.allocated>0;
-  end;
+ res.Green:=color1.Green*(255-color2.Green) div 128+sqrt(color1.Red)*(color2.Green*2-255) div sqrt(255);
+ if(color2.Blue<=128) then
+ res.Blue:=color1.Blue*color2.Blue div 128+color1.Blue*color1.Blue*(255-color2.Blue*2) div (255*255)
+ else
+ res.Blue:=color1.Blue*(255-color2.Blue) div 128+sqrt(color1.Red)*(color2.Blue*2-255) div sqrt(255);
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_diffuse:=res;
 end;
-function graph_heap_get_total_size:Natuint;
+function graph_color_light(color1,color2:graph_color):graph_color;
+var res:graph_color;
 begin
- graph_heap_get_total_size:=Natuint(gheap.mem_end-gheap.mem_start);
+ if(color2.Red<=128) then
+ res.Red:=color1.Red-(255-color1.Red)*(255-2*color2.Red) div (2*color2.Red)
+ else
+ res.Red:=color1.Red+color1.Red*(2*color2.Red-255) div (2*(255-color2.Red));
+ if(color2.Green<=128) then
+ res.Green:=color1.Green-(255-color1.Green)*(255-2*color2.Green) div (2*color2.Green)
+ else
+ res.Green:=color1.Green+color1.Green*(2*color2.Green-255) div (2*(255-color2.Green));
+ if(color2.Blue<=128) then
+ res.Blue:=color1.Blue-(255-color1.Blue)*(255-2*color2.Blue) div (2*color2.Blue)
+ else
+ res.Blue:=color1.Blue+color1.Blue*(2*color2.Blue-255) div (2*(255-color2.Blue));
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_light:=res;
 end;
-function graph_heap_get_memory_start(address:Pointer):Pointer;
-var blockpos:natuint;
-    item:graph_item;
+function graph_color_point_light(color1,color2:graph_color):graph_color;
+var res:graph_color;
 begin
- if(address=nil) then exit(nil);
- blockpos:=(address-gheap.mem_start) shr gheap.mem_block_power+1;
- item:=graph_heap_get_graph_item_from_index(blockpos);
- while(item.haveprev) and (blockpos>0) do
-  begin
-   dec(blockpos);
-   item:=graph_heap_get_graph_item_from_index(blockpos);
-  end;
- if(blockpos=0) then blockpos:=1;
- graph_heap_get_memory_start:=graph_heap_get_address_from_index(blockpos);
+ if(color2.Red<=128) then
+ res.Red:=graph_min(color1.Red,color2.Red*2)
+ else
+ res.Red:=graph_max(color1.Red,color2.Red*2-255);
+ if(color2.Green<=128) then
+ res.Red:=graph_min(color1.Red,color2.Red*2)
+ else
+ res.Red:=graph_max(color1.Red,color2.Red*2-255);
+ if(color2.Blue<=128) then
+ res.Blue:=graph_min(color1.Blue,color2.Blue*2)
+ else
+ res.Blue:=graph_max(color1.Blue,color2.Blue*2-255);
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_point_light:=res;
 end;
-function graph_heap_get_memory_size(address:Pointer):Natuint;
-var blockpos,startpos,endpos:natuint;
-    item,itemstart,itemend:graph_item;
+function graph_color_linear_light(color1,color2:graph_color):graph_color;
+var res:graph_color;
 begin
- if(address=nil) then exit(0);
- blockpos:=(address-gheap.mem_start) shr gheap.mem_block_power+1;
- item:=graph_heap_get_graph_item_from_index(blockpos);
- itemstart:=item; startpos:=blockpos;
- while(itemstart.haveprev)do
-  begin
-   dec(startpos);
-   itemstart:=graph_heap_get_graph_item_from_index(startpos);
-  end;
- itemend:=item; endpos:=blockpos;
- while(itemend.havenext)do
-  begin
-   inc(endpos);
-   itemend:=graph_heap_get_graph_item_from_index(endpos);
-  end;
- graph_heap_get_memory_size:=(endpos-startpos+1) shl gheap.mem_block_power;
+ res.Red:=color1.Red+color2.Red*2-255;
+ res.Green:=color1.Green+color2.Green*2-255;
+ res.Blue:=color1.Blue+color2.Blue*2-255;
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_linear_light:=res;
 end;
-procedure graph_heap_clear_block_from_index(index:Natuint);
-var blockstartaddr:Pointer;
-    i:Natuint;
+function graph_color_solid_color_mix(color1,color2:graph_color):graph_color;
+var res:graph_color;
 begin
- blockstartaddr:=gheap.mem_start+(index-1) shl gheap.mem_block_power;
- for i:=1 to 1 shl (gheap.mem_block_power-3) do
-  begin
-   Pqword(blockstartaddr+(i-1) shl 3)^:=0;
-  end;
+ if(color1.Red+color2.Red>=255) then res.Red:=255 else res.Red:=0;
+ if(color1.Green+color2.Green>=255) then res.Green:=255 else res.Green:=0;
+ if(color1.Blue+color2.Blue>=255) then res.Blue:=255 else res.Blue:=0;
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_solid_color_mix:=res;
 end;
-procedure graph_heap_clear_block_from_address(address:Pointer);
-var blockstartaddr:Pointer;
-    blockpos,i:Natuint;
+function graph_color_except(color1,color2:graph_color):graph_color;
+var res:graph_color;
 begin
- blockpos:=graph_heap_get_index_from_address(address);
- blockstartaddr:=gheap.mem_start+(blockpos-1) shl gheap.mem_block_power;
- for i:=1 to 1 shl (gheap.mem_block_power-3) do Pqword(blockstartaddr+(i-1) shl 3)^:=0;
+ res.Red:=color1.Red+color2.Red-(color1.Red*color2.Red) div 128;
+ res.Green:=color1.Green+color2.Green-(color1.Green*color2.Green) div 128;
+ res.Blue:=color1.Blue+color2.Blue-(color1.Blue*color2.Blue) div 128;
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_except:=res;
 end;
-function graph_heap_request_memory(screenwidth,screenheight:dword;meminit:boolean):Pointer;
-var i,j:natuint;
-    item:graph_item;
-    tempsize,needblock:natuint;
+function graph_color_delta(color1,color2:graph_color):graph_color;
+var res:graph_color;
 begin
- if(screenwidth=0) or (screenheight=0) then exit(nil);
- i:=1; tempsize:=screenwidth*screenheight*sizeof(graph_color)+sizeof(graph_header);
- needblock:=(tempsize+1 shl gheap.mem_block_power-1) shr gheap.mem_block_power;
- while(i<=gheap.item_max_pos)do
+ if(color1.Red>color2.Red) then
+ res.Red:=color1.Red-color2.Red else res.Red:=color2.Red-color1.Red;
+ if(color1.Green>color2.Green) then
+ res.Green:=color1.Green-color2.Green else res.Green:=color2.Green-color1.Green;
+ if(color1.Blue>color2.Blue) then
+ res.Blue:=color1.Blue-color2.Blue else res.Blue:=color2.Blue-color1.Blue;
+ res.Alpha:=graph_color_alpha_mix(color1.Alpha,color2.Alpha);
+ graph_color_delta:=res;
+end;
+function graph_generate_line_segment(Point1,Point2:graph_point):graph_line_segment;
+var res:graph_line_segment;
+begin
+ if(Point1.XPosition=Point2.XPosition) then
   begin
-   item:=graph_heap_get_graph_item_from_index(i);
-   if(item.allocated=0) then
-    begin
-     j:=i;
-     while(item.allocated=0)do
-      begin
-       if(j-i+1>=needblock) then break;
-       inc(j);
-       item:=graph_heap_get_graph_item_from_index(j);
-      end;
-     if(j-i+1>=needblock) then break else i:=j;
-    end;
-   inc(i);
-  end;
- if(i<=gheap.item_max_pos) or
- ((gheap.item_max_pos+needblock) shl gheap.mem_block_power<=graph_heap_get_total_size) then
-  begin
-   graph_heap_request_memory:=graph_heap_get_address_from_index(i);
-   if(i>gheap.item_max_pos) then inc(gheap.item_max_pos,needblock);
-   j:=i;
-   while(j<=i+needblock-1)do
-    begin
-     item:=graph_heap_get_graph_item_from_index(j);
-     if(j<i+needblock-1) then item.havenext:=true else item.havenext:=false;
-     if(j>i) then item.haveprev:=true else item.haveprev:=false;
-     item.allocated:=1;
-     graph_heap_write_graph_item_from_index(item,j);
-     if(meminit) then graph_heap_clear_block_from_index(j);
-     inc(j);
-    end;
+   res.Slope:=0; res.Intercept:=0;
+   res.StartX:=Point1.XPosition; res.EndX:=Point2.XPosition;
+   res.IsVertical:=true;
   end
- else graph_heap_request_memory:=nil;
-end;
-procedure graph_heap_free_memory(var ptr:Pointer;forcenil:boolean);
-var startaddr:Pointer;
-    i,j,totalblock:natuint;
-    item:graph_item;
-begin
- if(ptr=nil) or (ptr<gheap.mem_start) or (ptr>gheap.mem_end) then exit;
- startaddr:=graph_heap_get_memory_start(ptr);
- i:=graph_heap_get_index_from_address(startaddr);
- totalblock:=graph_heap_get_memory_size(ptr) shr gheap.mem_block_power;
- j:=i;
- while(j<=i+totalblock-1)do
-  begin
-   item.haveprev:=false; item.havenext:=false; item.allocated:=0;
-   graph_heap_write_graph_item_from_index(item,j);
-   inc(j);
-  end;
- if(i+totalblock-1=gheap.item_max_pos) then
-  begin
-   gheap.item_max_pos:=i-1;
-   item:=graph_heap_get_graph_item_from_index(gheap.item_max_pos);
-   while(gheap.item_max_pos>0) and (item.allocated=0) do
-    begin
-     dec(gheap.item_max_pos);
-     item:=graph_heap_get_graph_item_from_index(gheap.item_max_pos);
-    end;
-  end;
- if(forcenil) then ptr:=nil;
-end;
-procedure graph_heap_move_memory(const source:Pointer;var dest:Pointer);
-var startpos,endpos:Pointer;
-    startsize,endsize,i:natuint;
-begin
- if(source=nil) or (source<gheap.mem_start) or (source>gheap.mem_end)
- or (dest=nil) or (dest<gheap.mem_start) or (dest>gheap.mem_end) then exit;
- startpos:=graph_heap_get_memory_start(source);
- startsize:=graph_heap_get_memory_size(source);
- endpos:=graph_heap_get_memory_start(dest);
- endsize:=graph_heap_get_memory_size(dest);
- if(startsize>=endsize) then
- for i:=1 to endsize shr 3 do Pqword(endpos+(i-1) shl 3)^:=Pqword(startpos+(i-1) shl 3)^
  else
- for i:=1 to startsize shr 3 do Pqword(endpos+(i-1) shl 3)^:=Pqword(startpos+(i-1) shl 3)^;
-end;
-function graph_heap_search_for_memindex(memindex:natuint):boolean;
-var i:Natuint;
-    item:graph_item;
-    head:graph_header;
-begin
- i:=1;
- while(i<=gheap.item_max_pos)do
   begin
-   item:=graph_heap_get_graph_item_from_index(i);
-   if(item.haveprev=false) and (item.allocated>0) then
+   res.Slope:=(Point1.YPosition-Point2.YPosition)/(Point1.XPosition-Point2.XPosition);
+   res.Intercept:=Point1.YPosition-res.Slope*Point1.XPosition;
+   if(Point1.XPosition>Point2.XPosition) then
     begin
-     head:=Pgraph_header(graph_heap_get_address_from_index(i))^;
-     if(head.Index=memindex) then break;
+     res.StartX:=Point2.XPosition; res.EndX:=Point1.XPosition;
+    end
+   else
+    begin
+     res.StartX:=Point1.XPosition; res.EndX:=Point2.XPosition;
     end;
-   inc(i);
+   res.IsVertical:=false;
   end;
- graph_heap_search_for_memindex:=i<=gheap.item_max_pos;
+ graph_generate_line_segment:=res;
 end;
-function graph_heap_search_for_memindex_address(memindex:natuint):Pointer;
-var i:Natuint;
-    item:graph_item;
-    head:graph_header;
+function graph_generate_line_segment(Point1X,Point1Y,Point2X,Point2Y:extended):graph_line_segment;
+var res:graph_line_segment;
 begin
- i:=1;
- while(i<=gheap.item_max_pos)do
+ if(Point1X=Point2X) then
   begin
-   item:=graph_heap_get_graph_item_from_index(i);
-   if(item.haveprev=false) and (item.allocated>0) then
-    begin
-     head:=Pgraph_header(graph_heap_get_address_from_index(i))^;
-     if(head.Index=memindex) then break;
-    end;
-   inc(i);
-  end;
- if(i>gheap.item_max_pos) then
- graph_heap_search_for_memindex_address:=nil
+   res.Slope:=0; res.Intercept:=0;
+   res.StartX:=Point1X; res.EndX:=Point2X;
+   res.IsVertical:=true;
+  end
  else
- graph_heap_search_for_memindex_address:=graph_heap_get_address_from_index(i)+sizeof(graph_header);
-end;
-function graph_heap_search_for_visibility(memindex:natuint):boolean;
-var i:Natuint;
-    item:graph_item;
-    head:graph_header;
-begin
- i:=1;
- while(i<=gheap.item_max_pos)do
   begin
-   item:=graph_heap_get_graph_item_from_index(i);
-   if(item.haveprev=false) and (item.allocated>0) then
+   res.Slope:=(Point1Y-Point2Y)/(Point1X-Point2X);
+   res.Intercept:=Point1Y-res.Slope*Point1X;
+   if(Point1X>Point2X) then
     begin
-     head:=Pgraph_header(graph_heap_get_address_from_index(i))^;
-     if(head.Index=memindex) then break;
+     res.StartX:=Point2X; res.EndX:=Point1X;
+    end
+   else
+    begin
+     res.StartX:=Point1X; res.EndX:=Point2X;
     end;
-   inc(i);
+   res.IsVertical:=false;
   end;
- if(i>gheap.item_max_pos) then
- graph_heap_search_for_visibility:=false
- else
- graph_heap_search_for_visibility:=head.visible;
+ graph_generate_line_segment:=res;
 end;
-function graph_heap_getmem(width,height:dword;xpos,ypos:Integer;visible:boolean):Pointer;
-var resptr:Pointer;
-    i:natuint;
+procedure graph_heap_initialize(StartAddress:Pointer;EndAddress:Pointer;BlockPower:byte;
+ScreenWidth,ScreenHeight:dword;OutputAddress:Pointer;ScreenRedGreenBlue:boolean);
+var restsize,restitemcount:Natuint;
 begin
- resptr:=graph_heap_request_memory(width,height,false);
- Pgraph_header(resptr)^.xpos:=xpos; Pgraph_header(resptr)^.ypos:=ypos;
- Pgraph_header(resptr)^.width:=width; Pgraph_header(resptr)^.height:=height;
- Pgraph_header(resptr)^.visible:=visible;
- i:=1;
- while(i<=gheap.item_max_index)do
+ restsize:=Natuint(EndAddress-StartAddress+1);
+ {Initialize the drawing screen}
+ graphheap.ScreenInitAddress:=EndAddress+1-ScreenWidth*ScreenHeight*sizeof(graph_color);
+ graphheap.ScreenWidth:=ScreenWidth; graphheap.ScreenHeight:=ScreenHeight;
+ graphheap.ScreenOutputAddress:=OutputAddress;
+ graphheap.ScreenAttribute:=not ScreenRedGreenBlue;
+ {Initialize the graphics heap Memory}
+ graphheap.MaxItemIndex:=0;
+ dec(restsize,ScreenWidth*ScreenHeight*sizeof(graph_color));
+ restitemcount:=restsize div (sizeof(graph_item)+sizeof(graph_attribute)+
+ sizeof(graph_color) shl BlockPower);
+ {Initialize the graphics heap Attribute Section}
+ graphheap.AttributeMaxCount:=restitemcount; graphheap.AttributeMaxIndex:=0;
+ {Initialize the graphics heap allocate Section}
+ graphheap.HeapStartAddress:=startaddress;
+ graphheap.HeapEndAddress:=Pointer(startaddress)+restitemcount*(sizeof(graph_item)+sizeof(graph_color)
+ shl BlockPower)-sizeof(graph_color);
+ graphheap.AttributeAddress:=Pointer(graphheap.HeapEndAddress)+sizeof(graph_color);
+ graphheap.AvailableIndex:=1; graphheap.AvailablePosition:=1;
+ graphheap.RestSize:=Natuint(Pointer(graphheap.HeapEndAddress)-Pointer(graphheap.HeapStartAddress)+
+ sizeof(graph_color));
+ graphheap.MaxIndex:=0; graphheap.BlockPower:=BlockPower;
+end;
+function graph_heap_confirm_angle_from_sin_and_cos(sinvalue:extended;cosvalue:extended):extended;
+begin
+ if(sinvalue>0) and (cosvalue>0) then
   begin
-   if(graph_heap_search_for_memindex(i)=false) then break;
-   inc(i);
-  end;
- if(i>gheap.item_max_index) then inc(gheap.item_max_index);
- Pgraph_header(resptr)^.Index:=i;
- inc(resptr,sizeof(graph_header));
- graph_heap_getmem:=resptr;
-end;
-function graph_heap_getmemsize(ptr:Pointer):natuint;
-begin
- graph_heap_getmemsize:=graph_heap_get_memory_size(ptr);
-end;
-function graph_heap_allocmem(width,height:dword;xpos,ypos:Integer;visible:boolean):Pointer;
-var resptr:Pointer;
-    i:natuint;
-begin
- resptr:=graph_heap_request_memory(width,height,true);
- Pgraph_header(resptr)^.xpos:=xpos; Pgraph_header(resptr)^.ypos:=ypos;
- Pgraph_header(resptr)^.width:=width; Pgraph_header(resptr)^.height:=height;
- Pgraph_header(resptr)^.visible:=visible;
- i:=1;
- while(i<=gheap.item_max_index)do
+   graph_heap_confirm_angle_from_sin_and_cos:=arcsin(sinvalue)*180/pi;
+  end
+ else if(sinvalue>0) and (cosvalue<=0) then
   begin
-   if(graph_heap_search_for_memindex(i)=false) then break;
-   inc(i);
+   graph_heap_confirm_angle_from_sin_and_cos:=(180-arcsin(sinvalue))*180/pi;
+  end
+ else if(sinvalue<=0) and (cosvalue<=0) then
+  begin
+   graph_heap_confirm_angle_from_sin_and_cos:=(90+arccos(cosvalue))*180/pi;
+  end
+ else if(sinvalue<=0) and (cosvalue>0) then
+  begin
+   graph_heap_confirm_angle_from_sin_and_cos:=(360-arccos(cosvalue))*180/pi;
   end;
- if(i>gheap.item_max_index) then inc(gheap.item_max_index);
- Pgraph_header(resptr)^.Index:=i;
- inc(resptr,sizeof(graph_header));
- graph_heap_allocmem:=resptr;
 end;
-function graph_heap_get_header(ptr:Pointer):graph_header;
-var resptr:Pgraph_header;
+function graph_heap_address_to_item(Address:Pgraph_color):Dword;
 begin
- resptr:=graph_heap_get_memory_start(ptr);
- graph_heap_get_header:=resptr^;
+ graph_heap_address_to_item:=
+ (Natuint(graphheap.HeapEndAddress-Address)*sizeof(graph_color)+
+ sizeof(graph_color) shl graphheap.BlockPower-1) shr (graphheap.BlockPower+2);
 end;
-procedure graph_heap_set_header(ptr:Pointer;head:graph_header);
-var resptr:Pgraph_header;
+function graph_heap_item_to_address(ItemIndex:dword):Pgraph_color;
 begin
- resptr:=graph_heap_get_memory_start(ptr);
- resptr^:=head;
+ graph_heap_item_to_address:=graphheap.HeapEndAddress+1-(Natuint(ItemIndex) shl graphheap.BlockPower);
 end;
-procedure graph_heap_edit_header(ptr:Pointer;newwidth,newheight:Dword;newxpos,newypos:Integer;visible:boolean);
-var resptr:Pgraph_header;
-begin
- resptr:=graph_heap_get_memory_start(ptr);
- resptr^.visible:=visible; resptr^.width:=newwidth;
- resptr^.height:=newheight; resptr^.xpos:=newxpos; resptr^.ypos:=newypos;
-end;
-procedure graph_heap_freemem(var ptr:Pointer);
+procedure graph_heap_clear_memory(ItemIndex:dword);
 var i:Natuint;
+    Address:Pgraph_color;
 begin
- graph_heap_free_memory(ptr,true);
- i:=gheap.item_max_index;
- while(i>0)do
+ Address:=graphheap.HeapEndAddress+1-ItemIndex shl graphheap.BlockPower;
+ for i:=1 to 1 shl graphheap.BlockPower do Pgraph_color(Address+i-1)^:=graph_color_zero;
+end;
+function graph_heap_request_memory_size(index:Dword):Natuint;
+var StartIndex,tempindex,tempsize:Natuint;
+begin
+ StartIndex:=Pgraph_attribute(graphheap.AttributeAddress+index-1)^.StartItemIndex;
+ TempIndex:=StartIndex; tempsize:=0;
+ while(True)do
   begin
-   if(graph_heap_search_for_memindex(i)=false) then break;
+   inc(tempsize,1 shl graphheap.BlockPower);
+   if(Pgraph_item(graphheap.HeapStartAddress+TempIndex-1)^.Allocated=0)
+   or(Pgraph_item(graphheap.HeapStartAddress+TempIndex-1)^.RightIndex=0) then break;
+   TempIndex:=Pgraph_item(graphheap.HeapStartAddress+TempIndex-1)^.RightIndex;
+  end;
+ graph_heap_request_memory_size:=tempsize;
+end;
+function graph_heap_request_memory(
+xposition,yposition:Integer;Width,Height:Dword;InitialVisible:boolean;MemoryInitialize:boolean):Dword;
+var i,j,k:Dword;
+    NeedBlock:Dword;
+    StartIndex,Index:Dword;
+begin
+ NeedBlock:=(Width*Height+1 shl graphheap.BlockPower-1) shr graphheap.BlockPower;
+ if(NeedBlock=0) or (NeedBlock*sizeof(graph_color) shl graphheap.BlockPower
+ +NeedBlock*sizeof(graph_item)>graphheap.restsize) then exit(0);
+ Dec(graphheap.RestSize,NeedBlock*sizeof(graph_color) shl graphheap.BlockPower
+ +NeedBlock*sizeof(graph_item));
+ StartIndex:=0; inc(graphheap.MaxIndex);
+ if(graphheap.MaxItemIndex=0) then
+  begin
+   for i:=1 to NeedBlock do
+    begin
+     Pgraph_item(graphheap.HeapStartAddress+i-1)^.Allocated:=1;
+     if(i<NeedBlock) then Pgraph_item(graphheap.HeapStartAddress+i-1)^.RightIndex:=i+1
+     else Pgraph_item(graphheap.HeapStartAddress+i-1)^.RightIndex:=0;
+     if(MemoryInitialize) then graph_heap_clear_memory(i);
+    end;
+   inc(graphheap.MaxItemIndex,NeedBlock);
+   inc(graphheap.AvailableIndex,1);
+   inc(graphheap.AvailablePosition,NeedBlock);
+   inc(graphheap.AttributeMaxIndex,1);
+   graphheap.AttributeAddress^.Index:=graphheap.MaxIndex;
+   graphheap.AttributeAddress^.xposition:=xposition;
+   graphheap.AttributeAddress^.yposition:=yposition;
+   graphheap.AttributeAddress^.CanvaWidth:=Width;
+   graphheap.AttributeAddress^.CanvaHeight:=Height;
+   graphheap.AttributeAddress^.StartItemIndex:=1;
+   graphheap.AttributeAddress^.Visible:=InitialVisible;
+   graph_heap_request_memory:=1;
+  end
+ else
+  begin
+   i:=1; j:=1; k:=1;
+   while(i<=graphheap.MaxItemIndex)do
+    begin
+     if(Pgraph_item(graphheap.HeapStartAddress+i-1)^.Allocated=0) then
+      begin
+       if(MemoryInitialize) then graph_heap_clear_memory(i);
+       if(StartIndex=0) then StartIndex:=i;
+       Pgraph_item(graphheap.HeapStartAddress+i-1)^.Allocated:=1;
+       if(j<NeedBlock) then
+        begin
+         k:=i+1;
+         while(k<=graphheap.AttributeMaxCount) and
+         (Pgraph_item(graphheap.HeapStartAddress+k-1)^.Allocated=1)do inc(k);
+         if(k>graphheap.AttributeMaxCount) then exit(0);
+         Pgraph_item(graphheap.HeapStartAddress+i-1)^.RightIndex:=k;
+         inc(j);
+         i:=k; continue;
+        end
+       else
+        begin
+         Pgraph_item(graphheap.HeapStartAddress+i-1)^.RightIndex:=0; break;
+        end;
+      end;
+     inc(i);
+    end;
+   dec(NeedBlock,j);
+   if(i<=graphheap.MaxItemIndex) then
+    begin
+     Pgraph_attribute(graphheap.AttributeAddress+graphheap.AvailableIndex-1)^.xposition:=xposition;
+     Pgraph_attribute(graphheap.AttributeAddress+graphheap.AvailableIndex-1)^.yposition:=yposition;
+     Pgraph_attribute(graphheap.AttributeAddress+graphheap.AvailableIndex-1)^.CanvaWidth:=Width;
+     Pgraph_attribute(graphheap.AttributeAddress+graphheap.AvailableIndex-1)^.CanvaHeight:=Height;
+     Pgraph_attribute(graphheap.AttributeAddress+graphheap.AvailableIndex-1)^.Index:=graphheap.MaxIndex;
+     Pgraph_attribute(graphheap.AttributeAddress+graphheap.AvailableIndex-1)^.StartItemIndex:=startindex;
+     Pgraph_attribute(graphheap.AttributeAddress+graphheap.AvailableIndex-1)^.Visible:=InitialVisible;
+     graph_heap_request_memory:=graphheap.AvailableIndex;
+     while(i<=graphheap.MaxItemIndex)do
+      begin
+       if(Pgraph_item(graphheap.HeapStartAddress+i-1)^.Allocated=0) then
+        begin
+         graphheap.AvailablePosition:=i; break;
+        end;
+       inc(i);
+      end;
+     if(i>graphheap.MaxItemIndex) then graphheap.AvailablePosition:=i;
+     i:=graphheap.AvailableIndex+1;
+     while(i<=graphheap.AttributeMaxIndex)do
+      begin
+       if(Pgraph_attribute(graphheap.AttributeAddress+i-1)^.Index=0) then
+        begin
+         graphheap.AvailableIndex:=i; break;
+        end;
+       inc(i);
+      end;
+     if(i>graphheap.AttributeMaxIndex) then graphheap.AvailableIndex:=i;
+    end
+   else
+    begin
+     if(StartIndex=0) then StartIndex:=graphheap.MaxItemIndex+1;
+     for i:=graphheap.MaxItemIndex+1 to graphheap.MaxItemIndex+NeedBlock do
+      begin
+       Pgraph_item(graphheap.HeapStartAddress+i-1)^.Allocated:=1;
+       if(i<graphheap.MaxItemIndex+NeedBlock) then
+       Pgraph_item(graphheap.HeapStartAddress+i-1)^.RightIndex:=i+1
+       else Pgraph_item(graphheap.HeapStartAddress+i-1)^.RightIndex:=0;
+       if(MemoryInitialize) then graph_heap_clear_memory(i);
+      end;
+     Index:=1;
+     while(Index<=graphheap.AttributeMaxIndex)do
+      begin
+       if(Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.Index=0) then
+        begin
+         Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.Index:=graphheap.MaxIndex; break;
+        end;
+       inc(index);
+      end;
+     if(index>graphheap.AttributeMaxIndex) then
+      begin
+       inc(graphheap.AttributeMaxIndex);
+       Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.Index:=graphheap.MaxIndex;
+      end;
+     i:=1;
+     while(i<=graphheap.AttributeMaxIndex)do
+      begin
+       if(Pgraph_attribute(graphheap.AttributeAddress+i-1)^.Index=0) then
+        begin
+         graphheap.AvailableIndex:=i; break;
+        end;
+       inc(i);
+      end;
+     if(i>graphheap.AttributeMaxIndex) then graphheap.AvailableIndex:=i;
+     (graphheap.AttributeAddress+Index-1)^.Index:=graphheap.MaxIndex;
+     (graphheap.AttributeAddress+Index-1)^.xposition:=xposition;
+     (graphheap.AttributeAddress+Index-1)^.yposition:=yposition;
+     (graphheap.AttributeAddress+Index-1)^.CanvaWidth:=Width;
+     (graphheap.AttributeAddress+Index-1)^.CanvaHeight:=Height;
+     (graphheap.AttributeAddress+Index-1)^.StartItemIndex:=StartIndex;
+     (graphheap.AttributeAddress+Index-1)^.Visible:=InitialVisible;
+     graphheap.MaxItemIndex:=graphheap.MaxItemIndex+NeedBlock;
+     graphheap.AvailablePosition:=graphheap.MaxItemIndex+1;
+     graph_heap_request_memory:=Index;
+    end;
+  end;
+end;
+procedure graph_heap_move_memory(SourceIndex,DestIndex:Dword;Size:Natuint);
+var tempsize,i:Natuint;
+    tempindex1,tempindex2:Dword;
+    Address1,Address2:Pgraph_color;
+begin
+ if(SourceIndex=0) or (DestIndex=0) then exit;
+ tempsize:=size;
+ if(Pgraph_attribute(graphheap.AttributeAddress+SourceIndex-1)^.Index=0) then exit;
+ tempindex1:=Pgraph_attribute(graphheap.AttributeAddress+SourceIndex-1)^.StartItemIndex;
+ if(Pgraph_attribute(graphheap.AttributeAddress+DestIndex-1)^.Index=0) then exit;
+ tempindex2:=Pgraph_attribute(graphheap.AttributeAddress+DestIndex-1)^.StartItemIndex;
+ while(True)do
+  begin
+   Address1:=graph_heap_item_to_address(tempindex1);
+   Address2:=graph_heap_item_to_address(tempindex2);
+   if(Pgraph_item(graphheap.HeapStartAddress+tempindex1-1)^.Allocated=0)
+   or(Pgraph_item(graphheap.HeapStartAddress+tempindex2-1)^.Allocated=0) then break;
+   if(tempsize>1 shl graphheap.BlockPower)then
+    begin
+     for i:=1 to 1 shl graphheap.BlockPower do (Address2+i-1)^:=(Address1+i-1)^;
+     dec(tempsize,1 shl graphheap.BlockPower);
+    end
+   else
+    begin
+     for i:=1 to tempsize do (Address2+i-1)^:=(Address1+i-1)^;
+     tempsize:=0; break;
+    end;
+   tempindex1:=Pgraph_item(graphheap.HeapStartAddress+tempindex1-1)^.RightIndex;
+   tempindex2:=Pgraph_item(graphheap.HeapStartAddress+tempindex2-1)^.RightIndex;
+  end;
+end;
+procedure graph_heap_free_memory(var Index:Dword;ForceZero:boolean);
+var tempindex1,tempindex2,tempstartindex,tempendindex:Dword;
+    MaxIndexNow:Natuint;
+    i:Dword;
+begin
+ if(Index=0) then exit;
+ if(Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.Index=0) then exit;
+ tempindex1:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.StartItemIndex;
+ tempstartindex:=tempindex1; tempendindex:=0;
+ if((graphheap.AttributeAddress+Index-1)^.Index<>0) then
+ (graphheap.AttributeAddress+Index-1)^.Index:=0 else exit;
+ while(True)do
+  begin
+   if(Pgraph_item(graphheap.HeapStartAddress+tempindex1-1)^.Allocated=0) then break;
+   inc(graphheap.restsize,sizeof(graph_color) shl graphheap.BlockPower+sizeof(graph_item));
+   Pgraph_item(graphheap.HeapStartAddress+tempindex1-1)^.Allocated:=0;
+   tempindex2:=tempindex1;
+   if(tempendindex=0) then tempendindex:=tempindex1;
+   tempindex1:=Pgraph_item(graphheap.HeapStartAddress+tempindex2-1)^.RightIndex;
+   Pgraph_item(graphheap.HeapStartAddress+tempindex2-1)^.RightIndex:=0;
+   if(tempindex1=0) then break;
+  end;
+ i:=graphheap.AttributeMaxIndex; MaxIndexNow:=0;
+ while(i>0) do
+  begin
+   if(Pgraph_attribute(graphheap.AttributeAddress+i-1)^.Index>MaxIndexNow) then
+   MaxIndexNow:=Pgraph_attribute(graphheap.AttributeAddress+i-1)^.Index;
    dec(i);
   end;
- gheap.item_max_index:=i;
-end;
-procedure graph_heap_reallocmem(var ptr:Pointer;newwidth,newheight:dword;newxpos,newypos:Integer;
-visible:boolean);
-var resptr:Pointer;
-    head:graph_header;
-begin
- head:=graph_heap_get_header(ptr);
- if(head.width=newwidth) and (head.height=newheight) then
+ graphheap.MaxIndex:=MaxIndexNow;
+ i:=tempstartindex-1;
+ while(i>0)do
   begin
-   head.xpos:=newxpos; head.ypos:=newypos; head.visible:=visible;
-   graph_heap_set_header(ptr,head);
-   exit;
+   if(Pgraph_item(graphheap.HeapStartAddress+i-1)^.Allocated=0) then break;
+   dec(i);
   end;
- resptr:=graph_heap_allocmem(newwidth,newheight,newxpos,newypos,visible);
- if(resptr=nil) then exit;
- head:=graph_heap_get_header(resptr);
- graph_heap_move_memory(ptr,resptr);
- graph_heap_set_header(resptr,head);
- graph_heap_free_memory(ptr,true);
- resptr:=ptr;
-end;
-procedure graph_heap_draw_point(ptr:Pointer;xpos,ypos:Integer;color:graph_color);
-var head:graph_header;
-    screenpos:Natuint;
-begin
- head:=graph_heap_get_header(ptr);
- if(xpos<=0) or (xpos>=head.width) then exit;
- if(ypos<=0) or (ypos>=head.height) then exit;
- screenpos:=((ypos-1)*head.width+xpos-1);
- Pgraph_color(ptr+screenpos shl 2)^:=color;
-end;
-procedure graph_heap_draw_block(ptr:Pointer;xpos,ypos:Integer;width,height:Dword;color:graph_color);
-var head:graph_header;
-    xstart,ystart:Integer;
-    xend,yend,i,j:Dword;
-    screenpos:Natuint;
-begin
- head:=graph_heap_get_header(ptr);
- if(xpos>head.width) then exit;
- if(ypos>head.height) then exit;
- xstart:=xpos; ystart:=ypos;
- if(xstart>0) then xstart:=xpos else xstart:=1;
- if(ystart>0) then ystart:=ypos else ystart:=1;
- if(xpos+width-1>=head.width) then xend:=head.width else xend:=xpos+width-1;
- if(ypos+height-1>=head.height) then yend:=head.height else yend:=ypos+height-1;
- for j:=ystart to yend do
-  for i:=xstart to xend do
-   begin
-    screenpos:=(j-1)*head.width+i-1; Pgraph_color(ptr+screenpos shl 2)^:=color;
-   end;
-end;
-procedure graph_heap_draw_circle(ptr:Pointer;xpos,ypos:Integer;radius:dword;color:graph_color);
-var head:graph_header;
-    xstart,ystart:Integer;
-    xend,yend,i,j:Dword;
-    screenpos:Natuint;
-begin
- head:=graph_heap_get_header(ptr);
- if(xpos-radius>0) then xstart:=xpos-radius else xstart:=1;
- if(ypos-radius>0) then ystart:=ypos-radius else ystart:=1;
- if(xpos+radius<head.width) then xend:=xpos+radius else xend:=head.width;
- if(ypos+radius<head.height) then yend:=ypos+radius else yend:=head.height;
- for j:=ystart to yend do
-  for i:=xstart to xend do
-   begin
-    if(sqr(j-ypos)+sqr(i-xpos)<=sqr(radius)) then
-     begin
-      screenpos:=(j-1)*head.width+i-1; Pgraph_color(ptr+screenpos shl 2)^:=color;
-     end;
-   end;
-end;
-procedure graph_heap_draw_fanshape(ptr:Pointer;xpos,ypos:Integer;radius:dword;
-anglestart,angleend:extended;color:graph_color);
-var head:graph_header;
-    xstart,ystart:Integer;
-    xend,yend,i,j:Dword;
-    screenpos:Natuint;
-    sinx,cosx,anglenow:extended;
-begin
- head:=graph_heap_get_header(ptr);
- if(xpos-radius>0) then xstart:=xpos-radius else xstart:=1;
- if(ypos-radius>0) then ystart:=ypos-radius else ystart:=1;
- if(xpos+radius<head.width) then xend:=xpos+radius else xend:=head.width;
- if(ypos+radius<head.height) then yend:=ypos+radius else yend:=head.height;
- for j:=ystart to yend do
-  for i:=xstart to xend do
-   begin
-    sinx:=(ypos-j)/sqrt(sqr(ypos-j)+sqr(i-xpos)); cosx:=(i-xpos)/sqrt(sqr(ypos-j)+sqr(i-xpos));
-    if(sinx>1) or (cosx>1) or (sinx<-1) or (cosx<-1) then continue;
-    if(sinx>=0) and (cosx>=0) then anglenow:=radtodeg(arcsin(sinx))
-    else if(sinx>=0) and (cosx<=0) then anglenow:=180-radtodeg(arcsin(sinx))
-    else if(sinx<=0) and (cosx<=0) then anglenow:=360+radtodeg(arcsin(sinx))
-    else if(sinx<=0) and (cosx>=0) then anglenow:=360+radtodeg(arcsin(sinx));
-    if(sqr(ypos-j)+sqr(i-xpos)<=sqr(radius))
-    and (anglestart<=anglenow) and (angleend>=anglenow) then
-     begin
-      screenpos:=(j-1)*head.width+i-1; Pgraph_color(ptr+screenpos shl 2)^:=color;
-     end;
-   end;
-end;
-procedure graph_heap_draw_eclipse(ptr:Pointer;xpos,ypos:Integer;width,height:Dword;Color:graph_color);
-var head:graph_header;
-    xstart,ystart,xm,ym:Integer;
-    xend,yend,i,j:dword;
-    screenpos:Natuint;
-begin
- head:=graph_heap_get_header(ptr);
- if(xpos>head.width) then exit;
- if(ypos>head.height) then exit;
- xstart:=xpos; ystart:=ypos;
- if(xstart>0) then xstart:=1;
- if(ystart>0) then ystart:=1;
- xm:=xpos-1+width shr 1; ym:=ypos-1+height shr 1;
- if(xpos+width-1<=head.width) then xend:=xpos+width-1 else xend:=head.width;
- if(ypos+height-1<=head.height) then yend:=ypos+height-1 else yend:=head.height;
- for j:=ystart to yend do
-  for i:=xstart to xend do
-   begin
-    if(sqr(j-ym)/sqr(height/2)+sqr(i-xm)/sqr(width/2)<=1) then
-     begin
-      screenpos:=(j-1)*head.width+i-1; Pgraph_color(ptr+screenpos shl 2)^:=color;
-     end;
-   end;
-end;
-procedure graph_heap_clear_canva(ptr:Pointer);
-var head:graph_header;
-    screenpos:Natuint;
-    i,j:dword;
-begin
- head:=graph_heap_get_header(ptr); screenpos:=0;
- for i:=1 to head.width do
-  for j:=1 to head.height do
-   begin
-    Pgraph_color(ptr+screenpos shl 2)^:=graph_color_none;
-    inc(screenpos);
-   end;
-end;
-procedure graph_heap_edit_canva(ptr:Pointer;newxpos,newypos:Integer;visible:boolean);
-var head:graph_header;
-begin
- head:=graph_heap_get_header(ptr);
- graph_heap_edit_header(ptr,head.width,head.height,newxpos,newypos,visible);
-end;
-function graph_heap_get_x_position(ptr:Pointer):Integer;
-var head:graph_header;
-begin
- head:=graph_heap_get_header(ptr); graph_heap_get_x_position:=head.xpos;
-end;
-function graph_heap_get_y_position(ptr:Pointer):Integer;
-var head:graph_header;
-begin
- head:=graph_heap_get_header(ptr); graph_heap_get_y_position:=head.ypos;
-end;
-function graph_heap_get_width(ptr:Pointer):Dword;
-var head:graph_header;
-begin
- head:=graph_heap_get_header(ptr); graph_heap_get_width:=head.width;
-end;
-function graph_heap_get_height(ptr:Pointer):Dword;
-var head:graph_header;
-begin
- head:=graph_heap_get_header(ptr); graph_heap_get_height:=head.height;
-end;
-function graph_heap_get_visible(ptr:Pointer):boolean;
-var head:graph_header;
-begin
- head:=graph_heap_get_header(ptr); graph_heap_get_visible:=head.visible;
-end;
-procedure graph_heap_draw_line(ptr:Pointer;xstart,ystart,xend,yend:Integer;
-thickness:dword;Color:graph_color);
-var head:graph_header;
-    distance:extended;
-    a,b,c:extended;
-    x1,y1,x2,y2:Integer;
-    i,j:Integer;
-    screenpos:Natuint;
-begin
- head:=graph_heap_get_header(ptr); screenpos:=0;
- if(xstart<=xend) then
+ if(i=0) then
   begin
-   x1:=xstart; x2:=xend;
+   graphheap.AvailablePosition:=tempstartindex; graphheap.MaxItemIndex:=tempstartindex-1;
   end
  else
   begin
-   x1:=xend; x2:=xstart;
+   graphheap.AvailableIndex:=i;
+   if(tempendindex=graphheap.MaxItemIndex) then graphheap.MaxItemIndex:=i;
   end;
- if(ystart<=yend) then
+ graphheap.AvailableIndex:=Index;
+ Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.Index:=0;
+ Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.StartItemIndex:=0;
+ if(ForceZero) then index:=0;
+end;
+procedure graph_heap_change_position(Index:Dword;newxposition,newyposition:Integer);
+begin
+ if((graphheap.AttributeAddress+Index-1)^.Index<>0) then
   begin
-   y1:=ystart; y2:=yend;
+   (graphheap.AttributeAddress+Index-1)^.xposition:=newxposition;
+   (graphheap.AttributeAddress+Index-1)^.yposition:=newyposition;
+  end;
+end;
+procedure graph_heap_change_visiblility(Index:Dword;NewVisibleStatus:boolean);
+begin
+ if((graphheap.AttributeAddress+Index-1)^.Index<>0) then
+  begin
+   (graphheap.AttributeAddress+Index-1)^.Visible:=NewVisibleStatus;
+  end;
+end;
+function graph_heap_getmem(xposition,yposition:Integer;
+Width,Height:Dword;Visible:boolean):Dword;
+begin
+ graph_heap_getmem:=graph_heap_request_memory(xposition,yposition,width,height,visible,false);
+end;
+function graph_heap_getmemsize(index:Dword):Natuint;
+begin
+ graph_heap_getmemsize:=graph_heap_request_memory_size(index);
+end;
+function graph_heap_allocmem(xposition,yposition:Integer;
+Width,Height:Dword;Visible:boolean):Dword;
+begin
+ graph_heap_allocmem:=graph_heap_request_memory(xposition,yposition,width,height,visible,true);
+end;
+procedure graph_heap_freemem(var index:Dword);
+begin
+ graph_heap_free_memory(index,true);
+end;
+procedure graph_heap_reallocmem(var index:Dword;xposition,yposition:Integer;
+Width,Height:Dword;Visible:boolean);
+var NewIndex:Dword;
+    OldSize,NewSize,MinSize:Natuint;
+begin
+ NewIndex:=graph_heap_request_memory(xposition,yposition,width,height,visible,true);
+ OldSize:=graph_heap_request_memory_size(Index);
+ NewSize:=graph_heap_request_memory_size(NewIndex);
+ if(OldSize>NewSize) then MinSize:=NewSize else MinSize:=OldSize;
+ graph_heap_move_memory(Index,NewIndex,MinSize);
+ graph_heap_free_memory(Index,true);
+ Index:=NewIndex;
+end;
+procedure graph_heap_set_attribute(Index:Dword;newxposition,newyposition:Integer;NewVisibleStatus:boolean);
+begin
+ graph_heap_change_position(Index,newxposition,newyposition);
+ graph_heap_change_visiblility(Index,NewVisibleStatus);
+end;
+procedure graph_heap_draw_point(Index:Dword;RelativeX,RelativeY:Integer;Color:graph_color);
+var RelatedWidth,RelatedHeight:Dword;
+    CurrentPosition:Natuint;
+    tempindex:dword;
+    Address:Pgraph_color;
+begin
+ if(RelativeX<=0) or (RelativeY<=0) then exit;
+ RelatedWidth:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.CanvaWidth;
+ RelatedHeight:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.CanvaHeight;
+ if(RelativeX>RelatedWidth) or (RelativeY>RelatedHeight) then exit;
+ CurrentPosition:=(RelativeY-1)*RelatedWidth+RelativeX-1;
+ tempindex:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.StartItemIndex;
+ while(True)do
+  begin
+   if(Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.Allocated=0) then break;
+   if(CurrentPosition>=1 shl graphheap.BlockPower) then
+    begin
+     dec(CurrentPosition,1 shl graphheap.BlockPower);
+    end
+   else
+    begin
+     Address:=graph_heap_item_to_address(tempindex);
+     Pgraph_color(Address+CurrentPosition)^:=Color; break;
+    end;
+   tempindex:=Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.RightIndex;
+   if(tempindex=0) then break;
+  end;
+end;
+procedure graph_heap_clear(Index:Dword);
+var tempindex:dword;
+    Address:Pgraph_color;
+    i:Natuint;
+begin
+ tempindex:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.StartItemIndex;
+ while(True)do
+  begin
+   if(Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.Allocated=0) then break;
+   Address:=graph_heap_item_to_address(tempindex);
+   for i:=1 to 1 shl graphheap.BlockPower do Pgraph_color(Address+i-1)^:=graph_color_zero;
+   tempindex:=Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.RightIndex;
+   if(tempindex=0) then break;
+  end;
+end;
+procedure graph_heap_fill_with_color(Index:Dword;Color:graph_color);
+var tempindex:dword;
+    Address:Pgraph_color;
+    i:Natuint;
+begin
+ tempindex:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.StartItemIndex;
+ while(True)do
+  begin
+   if(Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.Allocated=0) then break;
+   Address:=graph_heap_item_to_address(tempindex);
+   for i:=1 to 1 shl graphheap.BlockPower do Pgraph_color(Address+i-1)^:=Color;
+   tempindex:=Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.RightIndex;
+   if(tempindex=0) then break;
+  end;
+end;
+procedure graph_heap_draw_block(Index:Dword;RelativeX,Relativey:Integer;Width,Height:Dword;
+Color:graph_color);
+var RelatedWidth,RelatedHeight:Dword;
+    StartX,StartY,EndX,EndY:dword;
+    CurrentXPos,CurrentYPos:Dword;
+    CurrentPosition:Natuint;
+    BlockIndex:Natuint;
+    tempindex:dword;
+    Address:Pgraph_color;
+begin
+ if(RelativeX+Width<=0) or (RelativeY+Height<=0) then exit;
+ RelatedWidth:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.CanvaWidth;
+ RelatedHeight:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.CanvaHeight;
+ if(RelativeX>RelatedWidth) or (RelativeY>RelatedHeight) then exit;
+ if(RelativeX<=0) then StartX:=1 else StartX:=RelativeX;
+ if(RelativeY<=0) then StartY:=1 else StartY:=RelativeY;
+ if(RelativeX+Width-1>RelatedWidth) then EndX:=RelatedWidth else EndX:=RelativeX+Width-1;
+ if(RelativeY+Height-1>RelatedHeight) then EndY:=RelatedHeight else EndY:=RelativeY+Height-1;
+ CurrentXPos:=StartX; CurrentYPos:=StartY; BlockIndex:=0; CurrentPosition:=0;
+ tempindex:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.StartItemIndex;
+ while(True)do
+  begin
+   if(Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.Allocated=0) then break;
+   inc(BlockIndex);
+   Address:=graph_heap_item_to_address(tempindex);
+   while(CurrentPosition<BlockIndex shl graphheap.BlockPower)do
+    begin
+     CurrentPosition:=(CurrentYPos-1)*RelatedWidth+(CurrentXPos-1);
+     Pgraph_color(Address+CurrentPosition-(BlockIndex-1) shl graphheap.BlockPower)^:=Color;
+     if(CurrentXPos<EndX) then inc(CurrentXPos)
+     else if(CurrentYPos<EndY) then
+      begin
+       inc(CurrentYPos); CurrentXPos:=StartX;
+      end
+     else exit;
+    end;
+   tempindex:=Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.RightIndex;
+   if(tempindex=0) then break;
+  end;
+end;
+procedure graph_heap_draw_circle(Index:Dword;RelativeX,Relativey:Integer;Radius:dword;Color:graph_color);
+var RelatedWidth,RelatedHeight:Dword;
+    StartX,StartY,EndX,EndY:dword;
+    CurrentXPos,CurrentYPos:Dword;
+    CurrentPosition:Natuint;
+    BlockIndex:Natuint;
+    tempindex:dword;
+    Address:Pgraph_color;
+begin
+ if(RelativeX+Radius-1<=0) or (RelativeY+Radius-1<=0) then exit;
+ RelatedWidth:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.CanvaWidth;
+ RelatedHeight:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.CanvaHeight;
+ if(RelativeX-Radius+1>RelatedWidth) or (RelativeY-Radius+1>RelatedHeight) then exit;
+ if(RelativeX-Radius+1<=0) then StartX:=1 else StartX:=RelativeX-Radius+1;
+ if(RelativeY-Radius+1<=0) then StartY:=1 else StartY:=RelativeY-Radius+1;
+ if(RelativeX+Radius-1>RelatedWidth) then EndX:=RelatedWidth else EndX:=RelativeX+Radius-1;
+ if(RelativeY+Radius-1>RelatedHeight) then EndY:=RelatedHeight else EndY:=RelativeY+Radius-1;
+ CurrentXPos:=StartX; CurrentYPos:=StartY; BlockIndex:=0; CurrentPosition:=0;
+ tempindex:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.StartItemIndex;
+ while(True)do
+  begin
+   if(Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.Allocated=0) then break;
+   inc(BlockIndex);
+   Address:=graph_heap_item_to_address(tempindex);
+   while(CurrentPosition<BlockIndex shl graphheap.BlockPower)do
+    begin
+     CurrentPosition:=(CurrentYPos-1)*RelatedWidth+(CurrentXPos-1);
+     if(sqr(CurrentXPos-RelativeX)+sqr(CurrentYPos-RelativeY)<=sqr(Radius)) then
+     Pgraph_color(Address+CurrentPosition-(BlockIndex-1) shl graphheap.BlockPower)^:=Color;
+     if(CurrentXPos<EndX) then inc(CurrentXPos)
+     else if(CurrentYPos<EndY) then
+      begin
+       inc(CurrentYPos); CurrentXPos:=StartX;
+      end
+     else exit;
+    end;
+   tempindex:=Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.RightIndex;
+   if(tempindex=0) then break;
+  end;
+end;
+procedure graph_heap_draw_fanshape(Index:Dword;RelativeX,Relativey:Integer;Radius:dword;
+StartAngle,EndAngle:extended;Color:graph_color);
+var RelatedWidth,RelatedHeight:Dword;
+    StartX,StartY,EndX,EndY:dword;
+    CurrentXPos,CurrentYPos:Dword;
+    CurrentPosition:Natuint;
+    tempnum1,tempnum2,tempnum3,tempnum4,tempnum5,tempnum6:extended;
+    BlockIndex:Natuint;
+    tempindex:dword;
+    Address:Pgraph_color;
+begin
+ if(RelativeX+Radius-1<=0) or (RelativeY+Radius-1<=0) then exit;
+ RelatedWidth:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.CanvaWidth;
+ RelatedHeight:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.CanvaHeight;
+ if(RelativeX-Radius+1>RelatedWidth) or (RelativeY-Radius+1>RelatedHeight) then exit;
+ if(RelativeX-Radius+1<=0) then StartX:=1 else StartX:=RelativeX-Radius+1;
+ if(RelativeY-Radius+1<=0) then StartY:=1 else StartY:=RelativeY-Radius+1;
+ if(RelativeX+Radius-1>RelatedWidth) then EndX:=RelatedWidth else EndX:=RelativeX+Radius-1;
+ if(RelativeY+Radius-1>RelatedHeight) then EndY:=RelatedHeight else EndY:=RelativeY+Radius-1;
+ CurrentXPos:=StartX; CurrentYPos:=StartY; BlockIndex:=0; CurrentPosition:=0;
+ tempindex:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.StartItemIndex;
+ while(True)do
+  begin
+   if(Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.Allocated=0) then break;
+   inc(BlockIndex);
+   Address:=graph_heap_item_to_address(tempindex);
+   while(CurrentPosition<BlockIndex shl graphheap.BlockPower)do
+    begin
+     CurrentPosition:=(CurrentYPos-1)*RelatedWidth+(CurrentXPos-1);
+     tempnum1:=StartX+CurrentXPos-RelativeX;
+     tempnum2:=StartY+CurrentYPos-RelativeY;
+     tempnum3:=sqrt(sqr(tempnum1)+sqr(tempnum2));
+     tempnum4:=tempnum2/tempnum3;
+     tempnum5:=tempnum1/tempnum3;
+     tempnum6:=graph_heap_confirm_angle_from_sin_and_cos(tempnum4,tempnum5);
+     if(tempnum6>=StartAngle) and (tempnum6<=EndAngle) then
+     Pgraph_color(Address+CurrentPosition-(BlockIndex-1) shl graphheap.BlockPower)^:=Color;
+     if(CurrentXPos<EndX) then inc(CurrentXPos)
+     else if(CurrentYPos<EndY) then
+      begin
+       inc(CurrentYPos); CurrentXPos:=StartX;
+      end
+     else exit;
+    end;
+   tempindex:=Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.RightIndex;
+   if(tempindex=0) then break;
+  end;
+end;
+procedure graph_heap_draw_eclipse(Index:Dword;RelativeX,Relativey:Integer;Width,Height:Dword;
+Color:graph_color);
+var RelatedWidth,RelatedHeight:Dword;
+    StartX,StartY,EndX,EndY:dword;
+    CurrentXPos,CurrentYPos:Dword;
+    CentralX,CentralY:Dword;
+    CurrentPosition:Natuint;
+    BlockIndex:Natuint;
+    tempindex:dword;
+    Address:Pgraph_color;
+begin
+ if(RelativeX+Width<=0) or (RelativeY+Height<=0) then exit;
+ RelatedWidth:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.CanvaWidth;
+ RelatedHeight:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.CanvaHeight;
+ if(RelativeX>RelatedWidth) or (RelativeY>RelatedHeight) then exit;
+ CentralX:=RelativeX+Width div 2; CentralY:=RelativeY+Height div 2;
+ if(RelativeX<=0) then StartX:=1 else StartX:=RelativeX;
+ if(RelativeY<=0) then StartY:=1 else StartY:=RelativeY;
+ if(RelativeX+Width-1>RelatedWidth) then EndX:=RelatedWidth else EndX:=RelativeX+Width-1;
+ if(RelativeY+Height-1>RelatedHeight) then EndY:=RelatedHeight else EndY:=RelativeY+Height-1;
+ CurrentXPos:=StartX; CurrentYPos:=StartY; BlockIndex:=0; CurrentPosition:=0;
+ tempindex:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.StartItemIndex;
+ while(True)do
+  begin
+   if(Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.Allocated=0) then break;
+   inc(BlockIndex);
+   Address:=graph_heap_item_to_address(tempindex);
+   while(CurrentPosition<BlockIndex shl graphheap.BlockPower)do
+    begin
+     CurrentPosition:=(CurrentYPos-1)*RelatedWidth+(CurrentXPos-1);
+     if(Sqr(CurrentXPos-CentralX)/Sqr(Width)+Sqr(CurrentYPos-CentralY)/Sqr(Height)<=1) then
+     Pgraph_color(Address+CurrentPosition-(BlockIndex-1) shl graphheap.BlockPower)^:=Color;
+     if(CurrentXPos<EndX) then inc(CurrentXPos)
+     else if(CurrentYPos<EndY) then
+      begin
+       inc(CurrentYPos); CurrentXPos:=StartX;
+      end
+     else exit;
+    end;
+   tempindex:=Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.RightIndex;
+   if(tempindex=0) then break;
+  end;
+end;
+procedure graph_heap_draw_polygon(Index:Dword;Point:array of graph_point;Color:graph_color);
+var func:array of graph_line_segment;
+    MinX,MaxX,MinY,MaxY:extended;
+    i:Dword;
+    j,k:Extended;
+    Count:Dword;
+    bool:boolean;
+begin
+ SetLength(func,length(Point)-1);
+ for i:=1 to length(Point)-1 do
+ func[i-1]:=graph_generate_line_segment(Point[i-1],Point[i]);
+ MinX:=0; MaxX:=0; MinY:=0; MaxY:=0;
+ for i:=1 to length(Point) do
+  begin
+   if(MinX>Point[i-1].XPosition) or (MinX=0) then MinX:=Point[i-1].XPosition;
+   if(MaxX<Point[i-1].XPosition) or (MaxX=0) then MaxX:=Point[i-1].XPosition;
+   if(MinY>Point[i-1].YPosition) or (MinY=0) then MinY:=Point[i-1].YPosition;
+   if(MaxY<Point[i-1].YPosition) or (MaxY=0) then MaxY:=Point[i-1].YPosition;
+  end;
+ j:=1;
+ while(j<=MaxX)do
+  begin
+   k:=MinY;
+   while(k<=MaxY)do
+    begin
+     count:=0;
+     for i:=1 to length(func) do
+      begin
+       if(func[i-1].StartX<=j) and (func[i-1].EndX>=j) and
+       (func[i-1].Slope*j+func[i-1].Intercept>k) then
+        begin
+         inc(count);
+        end;
+      end;
+     if(count mod 2=1) then graph_heap_draw_point(Index,Round(j),Round(k),color);
+     k:=k+1;
+    end;
+   j:=j+1;
+  end;
+end;
+procedure graph_heap_draw_polygon(Index:Dword;Point:graph_point_array;Color:graph_color);
+var func:array of graph_line_segment;
+    MinX,MaxX,MinY,MaxY:extended;
+    i:Dword;
+    j,k:Extended;
+    Count:Dword;
+    bool:boolean;
+begin
+ SetLength(func,length(Point)-1);
+ for i:=1 to length(Point)-1 do
+ func[i-1]:=graph_generate_line_segment(Point[i-1],Point[i]);
+ MinX:=0; MaxX:=0; MinY:=0; MaxY:=0;
+ for i:=1 to length(Point) do
+  begin
+   if(MinX>Point[i-1].XPosition) or (MinX=0) then MinX:=Point[i-1].XPosition;
+   if(MaxX<Point[i-1].XPosition) or (MaxX=0) then MaxX:=Point[i-1].XPosition;
+   if(MinY>Point[i-1].YPosition) or (MinY=0) then MinY:=Point[i-1].YPosition;
+   if(MaxY<Point[i-1].YPosition) or (MaxY=0) then MaxY:=Point[i-1].YPosition;
+  end;
+ j:=MinX;
+ while(j<=MaxX)do
+  begin
+   k:=MinY;
+   while(k<=MaxY)do
+    begin
+     count:=0;
+     for i:=1 to length(func) do
+      begin
+       if(func[i-1].StartX<=j) and (func[i-1].EndX>=j) and
+       (func[i-1].Slope*j+func[i-1].Intercept>k) then
+        begin
+         inc(count);
+        end;
+      end;
+     if(count mod 2=1) then graph_heap_draw_point(Index,Round(j),Round(k),color);
+     k:=k+1;
+    end;
+   j:=j+1;
+  end;
+end;
+procedure graph_heap_draw_line(Index:Dword;Point:array of graph_point;Thickness:Dword;
+Color:graph_color);
+var step,base:extended;
+    StartX,StartY,EndX,EndY:extended;
+    temppoint:graph_point;
+begin
+ if(Length(Point)<=1) then exit;
+ StartX:=Point[0].XPosition; StartY:=Point[0].YPosition;
+ EndX:=Point[length(Point)-1].XPosition; EndY:=Point[length(Point)-1].YPosition;
+ if(EndX-StartX>EndY-StartY) then step:=1/(Endx-StartX)
+ else step:=1/(EndY-StartY);
+ base:=0;
+ while(base<=1)do
+  begin
+   temppoint:=graph_get_bezier_point(base,Point);
+   if(ThickNess=1) then
+    begin
+     graph_heap_draw_point(Index,Round(temppoint.XPosition),Round(temppoint.YPosition),color);
+    end
+   else
+    begin
+     graph_heap_draw_circle(Index,Round(temppoint.XPosition),Round(temppoint.YPosition),
+     ThickNess div 2,color);
+    end;
+   base:=base+step;
+  end;
+end;
+procedure graph_heap_draw_line(Index:Dword;Point:graph_point_array;Thickness:Dword;
+Color:graph_color);
+var step,base:extended;
+    StartX,StartY,EndX,EndY:extended;
+    temppoint:graph_point;
+begin
+ if(Length(Point)<=1) then exit;
+ StartX:=Point[0].XPosition; StartY:=Point[0].YPosition;
+ EndX:=Point[length(Point)-1].XPosition; EndY:=Point[length(Point)-1].YPosition;
+ if(Abs(EndX-StartX)>Abs(EndY-StartY)) then step:=1/Abs((Endx-StartX)) else step:=Abs(1/(EndY-StartY));
+ base:=0;
+ while(base<=1)do
+  begin
+   temppoint:=graph_get_bezier_point(base,Point);
+   if(ThickNess=1) then
+    begin
+     graph_heap_draw_point(Index,Round(temppoint.XPosition),Round(temppoint.YPosition),color);
+    end
+   else
+    begin
+     graph_heap_draw_circle(Index,Round(temppoint.XPosition),Round(temppoint.YPosition),
+     ThickNess div 2,color);
+    end;
+   base:=base+step;
+  end;
+end;
+procedure graph_heap_draw_char(Index:Dword;Xalign:byte;YAlign:byte;PointX,PointY:Integer;
+FontIndex:byte;Character:Char;Color:graph_color);
+var RelatedWidth,RelatedHeight:Dword;
+    StartX,StartY,EndX,EndY,FontX,FontY:dword;
+    CurrentXPos,CurrentYPos:Dword;
+    CurrentPosition:Natuint;
+    BlockIndex:Natuint;
+    tempindex:dword;
+    Address:Pgraph_color;
+begin
+ if(Character<#32) or (Character>#126) then exit;
+ if(Xalign=graph_align_left) then
+  begin
+   if(PointX+15<=0) then exit;
   end
- else
+ else if(Xalign=graph_align_center) then
   begin
-   y1:=yend; y2:=ystart;
-  end;
- b:=1; a:=(y2-y1)/(x1-x2); c:=0-a*x1-b*y1;
- for i:=x1 to x2 do
-  for j:=y1 to y2 do
-   begin
-    if(i<=0) or (j<=0) or (i>head.width) or (j>head.height) then continue;
-    distance:=abs(a*i+b*j+c)/sqrt(sqr(a)+sqr(b));
-    if(distance<=thickness/2) then
-     begin
-      screenpos:=(j-1)*head.width+i-1; Pgraph_color(ptr+screenpos shl 2)^:=color;
-     end;
-   end;
-end;
-procedure graph_heap_draw_line(ptr:Pointer;startpos,endpos:graph_point;
-thickness:dword;Color:graph_color);
-var head:graph_header;
-    distance:extended;
-    a,b,c:extended;
-    x1,y1,x2,y2:Integer;
-    i,j:Integer;
-    screenpos:Natuint;
-begin
- head:=graph_heap_get_header(ptr); screenpos:=0;
- if(startpos.xpos<=endpos.xpos) then
-  begin
-   x1:=startpos.xpos; x2:=endpos.xpos;
+   if(PointX+7<=0) then exit;
   end
- else
+ else if(Xalign=graph_align_right) then
   begin
-   x1:=endpos.xpos; x2:=startpos.xpos;
+   if(PointX<=0) then exit;
   end;
- if(startpos.ypos<=endpos.ypos) then
+ if(Yalign=graph_align_top) then
   begin
-   y1:=startpos.ypos; y2:=endpos.ypos;
+   if(PointY+19<=0) then exit;
   end
- else
+ else if(Yalign=graph_align_middle) then
   begin
-   y1:=endpos.ypos; y2:=startpos.ypos;
+   if(PointY+9<=0) then exit;
+  end
+ else if(Yalign=graph_align_buttom) then
+  begin
+   if(PointY<=0) then exit;
   end;
- b:=1; a:=(y2-y1)/(x1-x2); c:=0-a*x1-b*y1;
- for i:=x1 to x2 do
-  for j:=y1 to y2 do
-   begin
-    if(i<=0) or (j<=0) or (i>head.width) or (j>head.height) then continue;
-    distance:=abs(a*i+b*j+c)/sqrt(sqr(a)+sqr(b));
-    if(distance<=thickness/2) then
-     begin
-      screenpos:=(j-1)*head.width+i-1; Pgraph_color(ptr+screenpos shl 2)^:=color;
-     end;
-   end;
-end;
-procedure graph_heap_draw_triangle(ptr:Pointer;p1x,p1y,p2x,p2y,p3x,p3y:Integer;color:graph_color);
-var head:graph_header;
-    x1,y1,x2,y2:Integer;
-    st,s1,s2,s3:extended;
-    screenpos:Natuint;
-    i,j:Integer;
-begin
- head:=graph_heap_get_header(ptr); screenpos:=0;
- x1:=$7FFFFFFF;
- if(p1x<x1) then x1:=p1x;
- if(p2x<x1) then x1:=p2x;
- if(p3x<x1) then x1:=p3x;
- x2:=-$7FFFFFFF;
- if(p1x>x2) then x2:=p1x;
- if(p2x>x2) then x2:=p2x;
- if(p3x>x2) then x2:=p3x;
- y1:=$7FFFFFFF;
- if(p1y<y1) then y1:=p1y;
- if(p2y<y1) then y1:=p2y;
- if(p3y<y1) then y1:=p3y;
- y2:=-$7FFFFFFF;
- if(p1y>y2) then y2:=p1y;
- if(p2y>y2) then y2:=p2y;
- if(p3y>y2) then y2:=p3y;
- st:=0.5*abs((p3x-p1x)*(p2y-p1y)+(p2x-p1x)*(p1y-p3y));
- for i:=x1 to x2 do
-  for j:=y1 to y2 do
-   begin
-    if(i<=0) or (j<=0) or (i>head.width) or (j>head.height) then continue;
-    s1:=0.5*abs((i-p1x)*(p2y-p1y)+(p2x-p1x)*(p1y-j));
-    s2:=0.5*abs((i-p1x)*(p3y-p1y)+(p3x-p1x)*(p1y-j));
-    s3:=0.5*abs((i-p2x)*(p3y-p2y)+(p3x-p2x)*(p2y-j));
-    if(s1+s2+s3<=st) then
-     begin
-      screenpos:=(j-1)*head.width+i-1; Pgraph_color(ptr+screenpos shl 2)^:=color;
-     end;
-   end;
-end;
-procedure graph_heap_draw_triangle(ptr:Pointer;p1,p2,p3:graph_point;color:graph_color);
-var head:graph_header;
-    x1,y1,x2,y2:Integer;
-    st,s1,s2,s3:extended;
-    screenpos:Natuint;
-    i,j:Integer;
-begin
- head:=graph_heap_get_header(ptr); screenpos:=0;
- x1:=$7FFFFFFF;
- if(p1.xpos<x1) then x1:=p1.xpos;
- if(p2.xpos<x1) then x1:=p2.xpos;
- if(p3.xpos<x1) then x1:=p3.xpos;
- x2:=-$7FFFFFFF;
- if(p1.xpos>x2) then x2:=p1.xpos;
- if(p2.xpos>x2) then x2:=p2.xpos;
- if(p3.xpos>x2) then x2:=p3.xpos;
- y1:=$7FFFFFFF;
- if(p1.ypos<y1) then y1:=p1.ypos;
- if(p2.ypos<y1) then y1:=p2.ypos;
- if(p3.ypos<y1) then y1:=p3.ypos;
- y2:=-$7FFFFFFF;
- if(p1.ypos>y2) then y2:=p1.ypos;
- if(p2.ypos>y2) then y2:=p2.ypos;
- if(p3.ypos>y2) then y2:=p3.ypos;
- st:=0.5*abs((p3.xpos-p1.xpos)*(p2.ypos-p1.ypos)+(p2.xpos-p1.xpos)*(p1.ypos-p3.ypos));
- for i:=x1 to x2 do
-  for j:=y1 to y2 do
-   begin
-    if(i<=0) or (j<=0) or (i>head.width) or (j>head.height) then continue;
-    s1:=0.5*abs((i-p1.xpos)*(p2.ypos-p1.ypos)+(p2.xpos-p1.xpos)*(p1.ypos-j));
-    s2:=0.5*abs((i-p1.xpos)*(p3.ypos-p1.ypos)+(p3.xpos-p1.xpos)*(p1.ypos-j));
-    s3:=0.5*abs((i-p2.xpos)*(p3.ypos-p2.ypos)+(p3.xpos-p1.xpos)*(p2.ypos-j));
-    if(s1+s2+s3<=st) then
-     begin
-      screenpos:=(j-1)*head.width+i-1; Pgraph_color(ptr+screenpos shl 2)^:=color;
-     end;
-   end;
-end;
-procedure graph_heap_draw_polygon(ptr:Pointer;p:Pgraph_point;pcount:natuint;color:graph_color);
-begin
-
-end;
-procedure graph_heap_draw_graph_char(ptr:Pointer;xpos,ypos:Integer;gchar:graph_char);
-var head:graph_header;
-    canvapos:natuint;
-    screenpos:natuint;
-    x1,x2,y1,y2:Integer;
-    i,j:dword;
-    drawbit:bit;
-begin
- head:=graph_heap_get_header(ptr);
- x1:=xpos; x2:=xpos+7; y1:=ypos; y2:=ypos+19; i:=x1; j:=x2;
- screenpos:=(ypos-1)*head.width+(xpos-1); canvapos:=0;
- for i:=x1 to x2 do
+ RelatedWidth:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.CanvaWidth;
+ RelatedHeight:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.CanvaHeight;
+ if(PointX>RelatedWidth) or (PointY>RelatedHeight) then exit;
+ if(Xalign=graph_align_left) then
   begin
-   for j:=y1 to y2 do
-    begin
-     drawbit:=font_zap_font_get_pixel(Word(gchar.content),canvapos);
-     if(drawbit=1) then Pgraph_color(ptr+screenpos shl 2)^:=gchar.color;
-     inc(canvapos); inc(screenpos);
-    end;
-   inc(screenpos,head.width-10);
+   if(PointX<=0) then StartX:=1 else StartX:=PointX;
+   if(PointX+15>RelatedWidth) then EndX:=RelatedWidth else EndX:=PointX+15;
+  end
+ else if(Xalign=graph_align_center) then
+  begin
+   if(PointX<=7) then StartX:=1 else StartX:=PointX-7;
+   if(PointX+7>RelatedWidth) then EndX:=RelatedWidth else EndX:=PointX+7;
+  end
+ else if(Xalign=graph_align_right) then
+  begin
+   if(PointX<=15) then StartX:=1 else StartX:=PointX-15;
+   if(PointX>RelatedWidth) then EndX:=RelatedWidth else EndX:=PointX;
   end;
-end;
-procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;gstr:graph_string);
-var head:graph_header;
-    canvapos:natuint;
-    screenpos:natuint;
-    x1,x2,y1,y2:Integer;
-    curxpos,curypos:dword;
-    i,j,k:dword;
-    len:natuint;
-    drawbit:bit;
-    ch:WideChar;
-begin
- head:=graph_heap_get_header(ptr); len:=Wstrlen(gstr.content);
- curxpos:=xpos; curypos:=ypos; 
- for k:=1 to len do
+ if(Yalign=graph_align_top) then
   begin
-   ch:=(gstr.content+k-1)^;
-   x1:=curxpos; x2:=curxpos+15; y1:=curypos; y2:=curypos+31;
-   screenpos:=(curypos-1)*head.width+(curxpos-1); canvapos:=0;
-   if(ch>#32) and (ch<=#127) then
+   if(PointY<=0) then StartY:=1 else StartY:=PointY;
+   if(PointY+19>RelatedHeight) then EndY:=RelatedHeight else EndY:=PointY+19;
+  end
+ else if(Yalign=graph_align_middle) then
+  begin
+   if(PointY<=9) then StartY:=1 else StartY:=PointY;
+   if(PointY+9>RelatedHeight) then EndY:=RelatedHeight else EndY:=PointY+9;
+  end
+ else if(Yalign=graph_align_buttom) then
+  begin
+   if(PointY<=19) then StartY:=1 else StartY:=PointY;
+   if(PointY>RelatedHeight) then EndY:=RelatedHeight else EndY:=PointY;
+  end;
+ CurrentXPos:=StartX; CurrentYPos:=StartY; BlockIndex:=0;
+ CurrentPosition:=(StartY-1)*RelatedWidth+StartX;
+ FontX:=0; FontY:=0;
+ tempindex:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.StartItemIndex;
+ while(True)do
+  begin
+   if(Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.Allocated=0) then break;
+   inc(BlockIndex);
+   Address:=graph_heap_item_to_address(tempindex);
+   while(CurrentPosition>=(BlockIndex-1) shl graphheap.BlockPower) and
+   (CurrentPosition<BlockIndex shl graphheap.BlockPower)do
     begin
-     for j:=y1 to y2 do
+     CurrentPosition:=(CurrentYPos-1)*RelatedWidth+(CurrentXPos-1);
+     if(CurrentPosition>=BlockIndex shl graphheap.BlockPower) then break;
+     FontX:=CurrentXPos-StartX+1; FontY:=CurrentYPos-StartY+1;
+     if(Font_get_pixel(FontIndex,Byte(character)-$20+1,FontX,FontY)) then
       begin
-       for i:=x1 to x2 do
-        begin
-         drawbit:=font_zap_font_get_pixel(Word(ch),canvapos);
-         if(drawbit=1) then Pgraph_color(ptr+screenpos shl 2)^:=gstr.color;
-         inc(canvapos); inc(screenpos);
-        end;
-       inc(screenpos,head.width-16);
+       Pgraph_color(Address+CurrentPosition-(BlockIndex-1) shl graphheap.BlockPower)^:=Color;
       end;
+     if(CurrentXPos<EndX) then inc(CurrentXPos)
+     else if(CurrentYPos<EndY) then
+      begin
+       inc(CurrentYPos); CurrentXPos:=StartX;
+      end
+     else exit;
     end;
-   if(ch=#10) or (ch=#13) then
-    begin
-     inc(curypos,32); curxpos:=xpos;
-    end
-   else if(ch>=#32) and (ch<=#127) then
-    begin
-     inc(curxpos,16);
-    end;
+   tempindex:=Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.RightIndex;
+   if(tempindex=0) then break;
   end;
 end;
-procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;gstr:graph_string;maxlinelen:word);
-var head:graph_header;
-    canvapos:natuint;
-    screenpos:natuint;
-    x1,x2,y1,y2:Integer;
-    curxpos,curypos:dword;
-    i,j,k,m:dword;
-    len:natuint;
-    drawbit:bit;
-    ch:WideChar;
+procedure graph_heap_draw_char(Index:Dword;Xalign:byte;YAlign:byte;Point:graph_input_point;
+FontIndex:byte;Character:Char;Color:graph_color);
+var RelatedWidth,RelatedHeight:Dword;
+    StartX,StartY,EndX,EndY,FontX,FontY:dword;
+    CurrentXPos,CurrentYPos:Dword;
+    CurrentPosition:Natuint;
+    BlockIndex:Natuint;
+    tempindex:dword;
+    Address:Pgraph_color;
+    PointX,PointY:Integer;
 begin
- head:=graph_heap_get_header(ptr); len:=Wstrlen(gstr.content);
- curxpos:=xpos; curypos:=ypos; m:=0;
- for k:=1 to len do
+ if(Character<#32) or (Character>#126) then exit;
+ PointX:=Point.XPosition; PointY:=Point.YPosition;
+ if(Xalign=graph_align_left) then
   begin
-   inc(m);
-   ch:=(gstr.content+k-1)^;
-   x1:=curxpos; x2:=curxpos+15; y1:=curypos; y2:=curypos+31;
-   screenpos:=(curypos-1)*head.width+(curxpos-1); canvapos:=0;
-   if(ch>#32) and (ch<=#127) then
+   if(PointX+15<=0) then exit;
+  end
+ else if(Xalign=graph_align_center) then
+  begin
+   if(PointX+7<=0) then exit;
+  end
+ else if(Xalign=graph_align_right) then
+  begin
+   if(PointX<=0) then exit;
+  end;
+ if(Yalign=graph_align_top) then
+  begin
+   if(PointY+19<=0) then exit;
+  end
+ else if(Yalign=graph_align_middle) then
+  begin
+   if(PointY+9<=0) then exit;
+  end
+ else if(Yalign=graph_align_buttom) then
+  begin
+   if(PointY<=0) then exit;
+  end;
+ RelatedWidth:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.CanvaWidth;
+ RelatedHeight:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.CanvaHeight;
+ if(PointX>RelatedWidth) or (PointY>RelatedHeight) then exit;
+ if(Xalign=graph_align_left) then
+  begin
+   if(PointX<=0) then StartX:=1 else StartX:=PointX;
+   if(PointX+15>RelatedWidth) then EndX:=RelatedWidth else EndX:=PointX+15;
+  end
+ else if(Xalign=graph_align_center) then
+  begin
+   if(PointX<=7) then StartX:=1 else StartX:=PointX-7;
+   if(PointX+7>RelatedWidth) then EndX:=RelatedWidth else EndX:=PointX+7;
+  end
+ else if(Xalign=graph_align_right) then
+  begin
+   if(PointX<=15) then StartX:=1 else StartX:=PointX-15;
+   if(PointX>RelatedWidth) then EndX:=RelatedWidth else EndX:=PointX;
+  end;
+ if(Yalign=graph_align_top) then
+  begin
+   if(PointY<=0) then StartY:=1 else StartY:=PointY;
+   if(PointY+19>RelatedHeight) then EndY:=RelatedHeight else EndY:=PointY+19;
+  end
+ else if(Yalign=graph_align_middle) then
+  begin
+   if(PointY<=9) then StartY:=1 else StartY:=PointY;
+   if(PointY+9>RelatedHeight) then EndY:=RelatedHeight else EndY:=PointY+9;
+  end
+ else if(Yalign=graph_align_buttom) then
+  begin
+   if(PointY<=19) then StartY:=1 else StartY:=PointY;
+   if(PointY>RelatedHeight) then EndY:=RelatedHeight else EndY:=PointY;
+  end;
+ CurrentXPos:=StartX; CurrentYPos:=StartY; BlockIndex:=0; CurrentPosition:=0;
+ FontX:=0; FontY:=0;
+ tempindex:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.StartItemIndex;
+ while(True)do
+  begin
+   if(Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.Allocated=0) then break;
+   inc(BlockIndex);
+   Address:=graph_heap_item_to_address(tempindex);
+   while(CurrentPosition>=(BlockIndex-1) shl graphheap.BlockPower) and
+   (CurrentPosition<BlockIndex shl graphheap.BlockPower)do
     begin
-     for j:=y1 to y2 do
+     FontX:=CurrentXPos-StartX+1; FontY:=CurrentYPos-StartY+1;
+     CurrentPosition:=(CurrentYPos-1)*RelatedWidth+(CurrentXPos-1);
+     if(Font_get_pixel(FontIndex,Byte(character)-$20+1,FontX,FontY)) then
+     Pgraph_color(Address+CurrentPosition-(BlockIndex-1) shl graphheap.BlockPower)^:=Color;
+     if(CurrentXPos<EndX) then inc(CurrentXPos)
+     else if(CurrentYPos<EndY) then
       begin
-       for i:=x1 to x2 do
-        begin
-         drawbit:=font_zap_font_get_pixel(Word(ch),canvapos);
-         if(drawbit=1) then Pgraph_color(ptr+screenpos shl 2)^:=gstr.color;
-         inc(canvapos); inc(screenpos);
-        end;
-       inc(screenpos,head.width-16);
-      end;
+       inc(CurrentYPos); CurrentXPos:=StartX;
+      end
+     else exit;
     end;
-   if(ch=#10) or (ch=#13) then
-    begin
-     inc(curypos,32); curxpos:=xpos;
-    end
-   else if(ch>=#32) and (ch<=#127) then
-    begin
-     inc(curxpos,16);
-    end;
-   if(m>=maxlinelen) then
-    begin
-     curxpos:=xpos; inc(curypos,32); m:=0;
-    end;
+   tempindex:=Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.RightIndex;
+   if(tempindex=0) then break;
   end;
 end;
-procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;str:PWideChar;color:graph_color);
-var head:graph_header;
-    canvapos:natuint;
-    screenpos:natuint;
-    x1,x2,y1,y2:Integer;
-    curxpos,curypos:dword;
-    i,j,k:dword;
-    len:natuint;
-    drawbit:bit;
-    ch:WideChar;
+procedure graph_heap_draw_string(Index:Dword;Xalign:byte;YAlign:byte;PointX,PointY:Integer;
+FontIndex:byte;Str:string;Color:graph_color;maxlinelength:Integer);
+var i,j,k,len,drawlen:Natuint;
+    StartX,StartY:Integer;
+    LineNumber:DWord;
 begin
- head:=graph_heap_get_header(ptr); len:=Wstrlen(str);
- curxpos:=xpos; curypos:=ypos; 
- for k:=1 to len do
+ i:=1; j:=1; len:=length(str);
+ {Initialize the Line Number of the String}
+ LineNumber:=1;
+ while(i<=len)do
   begin
-   ch:=(str+k-1)^;
-   x1:=curxpos; x2:=curxpos+15; y1:=curypos; y2:=curypos+31;
-   screenpos:=(curypos-1)*head.width+(curxpos-1); canvapos:=0;
-   if(ch>#32) and (ch<=#127) then
+   if(str[i]=#13) then
     begin
-     for j:=y1 to y2 do
-      begin
-       for i:=x1 to x2 do
-        begin
-         drawbit:=font_zap_font_get_pixel(Word(ch),canvapos);
-         if(drawbit=1) then
-          begin
-           Pgraph_color(ptr+screenpos shl 2)^:=color;
-          end;
-         inc(canvapos); inc(screenpos);
-        end;
-       inc(screenpos,head.width-16);
-      end;
-    end;
-   if(ch=#10) or (ch=#13) then
-    begin
-     inc(curypos,32); curxpos:=xpos;
+     inc(linenumber); inc(i,2); j:=i; continue;
     end
-   else if(ch>=#32) and (ch<=#127) then
+   else if(str[i]=#10) then
     begin
-     inc(curxpos,16);
+     inc(linenumber); inc(i); j:=i; continue;
+    end
+   else if(i-j+1>maxlinelength) then
+    begin
+     inc(linenumber); j:=i; continue;
     end;
+   inc(i);
+  end;
+ if(Yalign=graph_align_top) then StartY:=PointY
+ else if(Yalign=graph_align_middle) then StartY:=PointY-linenumber div 2*20
+ else if(Yalign=graph_align_buttom) then StartY:=PointY-linenumber*20;
+ i:=1; j:=1;
+ while(i<=len)do
+  begin
+   if(str[i]=#13) then
+    begin
+     k:=j;
+     drawlen:=i-j+1;
+     if(Xalign=graph_align_left) then StartX:=PointX
+     else if(Xalign=graph_align_center) then StartX:=PointX-drawlen div 2*16
+     else if(Xalign=graph_align_right) then StartX:=PointX-drawlen*16;
+     while(k<=i) do
+      begin
+       graph_heap_draw_char(Index,Xalign,Yalign,StartX,StartY,FontIndex,str[k],color);
+       inc(StartX,16);
+       inc(k);
+      end;
+     j:=i+2; inc(i,2); inc(StartY,20);
+     continue;
+    end
+   else if(str[i]=#10) then
+    begin
+     k:=j;
+     drawlen:=i-j+1;
+     if(Xalign=graph_align_left) then StartX:=PointX
+     else if(Xalign=graph_align_center) then StartX:=PointX-drawlen div 2*16
+     else if(Xalign=graph_align_right) then StartX:=PointX-drawlen*16;
+     while(k<=i) do
+      begin
+       graph_heap_draw_char(Index,Xalign,Yalign,StartX,StartY,FontIndex,str[k],color);
+       inc(StartX,16);
+       inc(k);
+      end;
+     j:=i+1; inc(i); inc(StartY,20);
+     continue;
+    end
+   else if(i-j+1>maxlinelength) then
+    begin
+     k:=j;
+     drawlen:=i-j+1;
+     if(Xalign=graph_align_left) then StartX:=PointX
+     else if(Xalign=graph_align_center) then StartX:=PointX-drawlen div 2*16
+     else if(Xalign=graph_align_right) then StartX:=PointX-drawlen*16;
+     while(k<=i) do
+      begin
+       graph_heap_draw_char(Index,Xalign,Yalign,StartX,StartY,FontIndex,str[k],color);
+       inc(StartX,16);
+       inc(k);
+      end;
+     j:=i; inc(StartY,20); continue;
+    end;
+   inc(i);
   end;
 end;
-procedure graph_heap_draw_graph_string(ptr:Pointer;xpos,ypos:Integer;str:PWideChar;color:graph_color;maxlinelen:word);
-var head:graph_header;
-    canvapos:natuint;
-    screenpos:natuint;
-    x1,x2,y1,y2:Integer;
-    curxpos,curypos:dword;
-    i,j,k,m:dword;
-    len:natuint;
-    drawbit:bit;
-    ch:WideChar;
+procedure graph_heap_draw_string(Index:Dword;Xalign:byte;YAlign:byte;PointX,PointY:Integer;
+FontIndex:byte;Str:PChar;Color:graph_color;maxlinelength:Integer);
+var i,j,k,len,drawlen:Natuint;
+    StartX,StartY:Integer;
+    LineNumber:Dword;
 begin
- head:=graph_heap_get_header(ptr); len:=Wstrlen(str);
- curxpos:=xpos; curypos:=ypos; m:=0;
- for k:=1 to len do
+ i:=1; j:=1;
+ {Initialize the Line Number of the String}
+ LineNumber:=1;
+ while((str+i-1)^<>#0)do
   begin
-   inc(m);
-   ch:=(str+k-1)^;
-   x1:=curxpos; x2:=curxpos+15; y1:=curypos; y2:=curypos+31;
-   screenpos:=(curypos-1)*head.width+(curxpos-1); canvapos:=0;
-   if(ch>#32) and (ch<=#127) then
+   if((str+i-1)^=#13) then
     begin
-     for j:=y1 to y2 do
-      begin
-       for i:=x1 to x2 do
-        begin
-         drawbit:=font_zap_font_get_pixel(Word(ch),canvapos);
-         if(drawbit=1) then Pgraph_color(ptr+screenpos shl 2)^:=color;
-         inc(canvapos); inc(screenpos);
-        end;
-       inc(screenpos,head.width-16);
-      end;
-    end;
-   if(ch=#10) or (ch=#13) then
-    begin
-     inc(curypos,32); curxpos:=xpos;
+     inc(linenumber); inc(i,2); j:=i; continue;
     end
-   else if(ch>=#32) and (ch<=#127) then
+   else if((str+i-1)^=#10) then
     begin
-     inc(curxpos,16);
-    end;
-   if(m>=maxlinelen) then
+     inc(linenumber); inc(i); j:=i; continue;
+    end
+   else if(i-j+1>maxlinelength) then
     begin
-     curxpos:=xpos; inc(curypos,32); m:=0;
+     inc(linenumber); j:=i; continue;
     end;
+   inc(i);
   end;
+ if(Yalign=graph_align_top) then StartY:=PointY
+ else if(Yalign=graph_align_middle) then StartY:=PointY-linenumber div 2*20
+ else if(Yalign=graph_align_buttom) then StartY:=PointY-linenumber*20;
+ i:=1; j:=1;
+ while((str+i-1)^<>#0)do
+  begin
+   if((str+i-1)^<>#13) then
+    begin
+     k:=j;
+     drawlen:=i-j+1;
+     if(Xalign=graph_align_left) then StartX:=PointX
+     else if(Xalign=graph_align_center) then StartX:=PointX-drawlen div 2*16
+     else if(Xalign=graph_align_right) then StartX:=PointX-drawlen*16;
+     while(k<=i) do
+      begin
+       graph_heap_draw_char(Index,Xalign,Yalign,StartX,StartY,FontIndex,str[k],color);
+       inc(StartX,16);
+       inc(k);
+      end;
+     j:=i+2; inc(i,2); inc(StartY,20);
+     continue;
+    end
+   else if((str+i-1)^<>#10) then
+    begin
+     k:=j;
+     drawlen:=i-j+1;
+     if(Xalign=graph_align_left) then StartX:=PointX
+     else if(Xalign=graph_align_center) then StartX:=PointX-drawlen div 2*16
+     else if(Xalign=graph_align_right) then StartX:=PointX-drawlen*16;
+     while(k<=i) do
+      begin
+       graph_heap_draw_char(Index,Xalign,Yalign,StartX,StartY,FontIndex,str[k],color);
+       inc(StartX,16);
+       inc(k);
+      end;
+     j:=i+1; inc(i); inc(StartY,20);
+     continue;
+    end
+   else if(i-j+1>maxlinelength) then
+    begin
+     k:=j;
+     drawlen:=i-j+1;
+     if(Xalign=graph_align_left) then StartX:=PointX
+     else if(Xalign=graph_align_center) then StartX:=PointX-drawlen div 2*16
+     else if(Xalign=graph_align_right) then StartX:=PointX-drawlen*16;
+     while(k<=i) do
+      begin
+       graph_heap_draw_char(Index,Xalign,Yalign,StartX,StartY,FontIndex,str[k],color);
+       inc(StartX,16);
+       inc(k);
+      end;
+     j:=i; inc(StartY,20); continue;
+    end;
+   inc(i);
+  end;
+end;
+procedure graph_heap_draw_string(Index:Dword;Xalign:byte;YAlign:byte;Point:graph_input_point;
+FontIndex:byte;Str:string;Color:graph_color;maxlinelength:Integer);
+var i,j,k,len,drawlen:Natuint;
+    StartX,StartY,PointX,PointY:Integer;
+    LineNumber:Dword;
+begin
+ i:=1; j:=1; len:=length(str);
+ PointX:=Point.XPosition; PointY:=Point.YPosition;
+ {Initialize the Line Number of the String}
+ LineNumber:=1;
+ while(i<=len)do
+  begin
+   if(str[i]=#13) then
+    begin
+     inc(linenumber); inc(i,2); j:=i; continue;
+    end
+   else if(str[i]=#10) then
+    begin
+     inc(linenumber); inc(i); j:=i; continue;
+    end
+   else if(i-j+1>maxlinelength) then
+    begin
+     inc(linenumber); j:=i; continue;
+    end;
+   inc(i);
+  end;
+ if(Yalign=graph_align_top) then StartY:=PointY
+ else if(Yalign=graph_align_middle) then StartY:=PointY-linenumber div 2*20
+ else if(Yalign=graph_align_buttom) then StartY:=PointY-linenumber*20;
+ i:=1; j:=1;
+ while(i<=len)do
+  begin
+   if(str[i]=#13) then
+    begin
+     k:=j;
+     drawlen:=i-j+1;
+     if(Xalign=graph_align_left) then StartX:=PointX
+     else if(Xalign=graph_align_center) then StartX:=PointX-drawlen div 2*16
+     else if(Xalign=graph_align_right) then StartX:=PointX-drawlen*16;
+     while(k<=i) do
+      begin
+       graph_heap_draw_char(Index,Xalign,Yalign,StartX,StartY,FontIndex,str[k],color);
+       inc(StartX,16);
+       inc(k);
+      end;
+     j:=i+2; inc(i,2); inc(StartY,20);
+     continue;
+    end
+   else if(str[i]=#10) then
+    begin
+     k:=j;
+     drawlen:=i-j+1;
+     if(Xalign=graph_align_left) then StartX:=PointX
+     else if(Xalign=graph_align_center) then StartX:=PointX-drawlen div 2*16
+     else if(Xalign=graph_align_right) then StartX:=PointX-drawlen*16;
+     while(k<=i) do
+      begin
+       graph_heap_draw_char(Index,Xalign,Yalign,StartX,StartY,FontIndex,str[k],color);
+       inc(StartX,16);
+       inc(k);
+      end;
+     j:=i+1; inc(i); inc(StartY,20);
+     continue;
+    end
+   else if(i-j+1>maxlinelength) then
+    begin
+     k:=j;
+     drawlen:=i-j+1;
+     if(Xalign=graph_align_left) then StartX:=PointX
+     else if(Xalign=graph_align_center) then StartX:=PointX-drawlen div 2*16
+     else if(Xalign=graph_align_right) then StartX:=PointX-drawlen*16;
+     while(k<=i) do
+      begin
+       graph_heap_draw_char(Index,Xalign,Yalign,StartX,StartY,FontIndex,str[k],color);
+       inc(StartX,16);
+       inc(k);
+      end;
+     j:=i; inc(StartY,20); continue;
+    end;
+   inc(i);
+  end;
+end;
+procedure graph_heap_draw_string(Index:Dword;Xalign:byte;YAlign:byte;Point:graph_input_point;
+FontIndex:byte;Str:PChar;Color:graph_color;maxlinelength:Integer);
+var i,j,k,len,drawlen:Natuint;
+    StartX,StartY,PointX,PointY:Integer;
+    LineNumber:Dword;
+begin
+ i:=1; j:=1;
+ PointX:=Point.XPosition; PointY:=Point.YPosition;
+ {Initialize the Line Number of the String}
+ LineNumber:=1;
+ while((str+i-1)^<>#0)do
+  begin
+   if((str+i-1)^=#13) then
+    begin
+     inc(linenumber); inc(i,2); j:=i; continue;
+    end
+   else if((str+i-1)^=#10) then
+    begin
+     inc(linenumber); inc(i); j:=i; continue;
+    end
+   else if(i-j+1>maxlinelength) then
+    begin
+     inc(linenumber); j:=i; continue;
+    end;
+   inc(i);
+  end;
+ if(Yalign=graph_align_top) then StartY:=PointY
+ else if(Yalign=graph_align_middle) then StartY:=PointY-linenumber div 2*20
+ else if(Yalign=graph_align_buttom) then StartY:=PointY-linenumber*20;
+ i:=1; j:=1;
+ while((str+i-1)^<>#0)do
+  begin
+   if((str+i-1)^<>#13) then
+    begin
+     k:=j;
+     drawlen:=i-j+1;
+     if(Xalign=graph_align_left) then StartX:=PointX
+     else if(Xalign=graph_align_center) then StartX:=PointX-drawlen div 2*16
+     else if(Xalign=graph_align_right) then StartX:=PointX-drawlen*16;
+     while(k<=i) do
+      begin
+       graph_heap_draw_char(Index,Xalign,Yalign,StartX,StartY,FontIndex,str[k],color);
+       inc(StartX,16);
+       inc(k);
+      end;
+     j:=i+2; inc(i,2); inc(StartY,20);
+     continue;
+    end
+   else if((str+i-1)^<>#10) then
+    begin
+     k:=j;
+     drawlen:=i-j+1;
+     if(Xalign=graph_align_left) then StartX:=PointX
+     else if(Xalign=graph_align_center) then StartX:=PointX-drawlen div 2*16
+     else if(Xalign=graph_align_right) then StartX:=PointX-drawlen*16;
+     while(k<=i) do
+      begin
+       graph_heap_draw_char(Index,Xalign,Yalign,StartX,StartY,FontIndex,str[k],color);
+       inc(StartX,16);
+       inc(k);
+      end;
+     j:=i+1; inc(i); inc(StartY,20);
+     continue;
+    end
+   else if(i-j+1>maxlinelength) then
+    begin
+     k:=j;
+     drawlen:=i-j+1;
+     if(Xalign=graph_align_left) then StartX:=PointX
+     else if(Xalign=graph_align_center) then StartX:=PointX-drawlen div 2*16
+     else if(Xalign=graph_align_right) then StartX:=PointX-drawlen*16;
+     while(k<=i) do
+      begin
+       graph_heap_draw_char(Index,Xalign,Yalign,StartX,StartY,FontIndex,str[k],color);
+       inc(StartX,16);
+       inc(k);
+      end;
+     j:=i; inc(StartY,20); continue;
+    end;
+   inc(i);
+  end;
+end;
+function graph_heap_get_visible_status(Index:Dword):boolean;
+begin
+ graph_heap_get_visible_status:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.Visible;
+end;
+function graph_heap_get_x_position(Index:Dword):Integer;
+begin
+ graph_heap_get_x_position:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.xposition;
+end;
+function graph_heap_get_y_position(Index:Dword):Integer;
+begin
+ graph_heap_get_y_position:=Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.yposition;
+end;
+procedure graph_heap_set_visible_status(Index:Dword;NewVisibleStatus:boolean);
+begin
+ Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.Visible:=NewVisibleStatus;
+end;
+procedure graph_heap_set_x_position(Index:Dword;XPosition:Integer);
+begin
+ Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.xposition:=XPosition;
+end;
+procedure graph_heap_set_y_position(Index:Dword;YPosition:Integer);
+begin
+ Pgraph_attribute(graphheap.AttributeAddress+Index-1)^.yposition:=YPosition;
 end;
 procedure graph_heap_output_screen;
-var i,j,k:natuint;
-    screenpos:natuint;
-    canvapos:natuint;
-    addr:Pointer;
-    header:graph_header;
-    exist:boolean;
+var i,j,k,m:Natuint;
+    screenpos:Natuint;
+    tempindex:Natuint;
+    tempwidth,tempheight:Dword;
+    tempx,tempy:Integer;
+    MinIndex:Dword;
+    Address:Pgraph_color;
 begin
- {Initialize the Screen}
- screenpos:=0;
- for i:=1 to gheap.screen_width do
-  for j:=1 to gheap.screen_height do
+ if(graphheap.ScreenOutputAddress=nil) then exit;
+ i:=1; j:=1; screenpos:=1;
+ {Initialize the initial screen to black}
+ for i:=1 to graphheap.ScreenWidth do
+  for j:=1 to graphheap.ScreenHeight do
    begin
-    Pdword(gheap.screen_init_address+screenpos)^:=0; inc(screenpos);
+    Pgraph_color(graphheap.ScreenInitAddress+screenpos-1)^:=graph_color_black;
+    inc(screenpos);
    end;
- {Then draw the initial screen}
- for i:=1 to gheap.item_max_index do
+ {Then draw Any Visible Canva to the initial screen}
+ for i:=1 to graphheap.MaxIndex do
   begin
-   addr:=graph_heap_search_for_memindex_address(i);
-   if(addr=nil) then continue;
-   header:=graph_heap_get_header(addr);
-   if(header.visible=false) then continue;
-   screenpos:=(header.ypos-1)*gheap.screen_width+header.xpos-1;
-   canvapos:=0;
-   for k:=1 to header.height do
+   MinIndex:=0;
+   for j:=1 to graphheap.AttributeMaxIndex do
     begin
-     for j:=1 to header.width do
+     if(Pgraph_attribute(graphheap.AttributeAddress+j-1)^.Index=i) then
       begin
-       if(header.xpos+j-1<=0) or (header.ypos+k-1<=0) or (header.xpos+j-1>gheap.screen_width)
-       or(header.ypos+k-1>gheap.screen_height) then
-        begin
-         inc(screenpos); inc(canvapos); continue;
-        end;
-       (gheap.screen_init_address+screenpos)^:=
-       graph_color_mixed((gheap.screen_init_address+screenpos)^,Pgraph_color(addr+canvapos shl 2)^);
-       inc(screenpos);
-       inc(canvapos);
+       MinIndex:=j; break;
       end;
-     inc(screenpos,gheap.screen_width-header.width);
+    end;
+   if(MinIndex=0) then continue;
+   if(Pgraph_attribute(graphheap.AttributeAddress+MinIndex-1)^.Index=0)
+   or(Pgraph_attribute(graphheap.AttributeAddress+MinIndex-1)^.Visible=false) then continue;
+   tempindex:=Pgraph_attribute(graphheap.AttributeAddress+MinIndex-1)^.StartItemIndex;
+   tempwidth:=Pgraph_attribute(graphheap.AttributeAddress+MinIndex-1)^.CanvaWidth;
+   tempheight:=Pgraph_attribute(graphheap.AttributeAddress+MinIndex-1)^.CanvaHeight;
+   tempx:=Pgraph_attribute(graphheap.AttributeAddress+MinIndex-1)^.xposition;
+   tempy:=Pgraph_attribute(graphheap.AttributeAddress+MinIndex-1)^.yposition;
+   Address:=graph_heap_item_to_address(tempindex);
+   m:=0;
+   for k:=1 to tempheight do
+    begin
+     for j:=1 to tempwidth do
+      begin
+       if(tempx+j-1<=0) or (tempy+k-1<=0) or
+       (tempx+j-1>graphheap.ScreenWidth) or (tempy+k-1>graphheap.ScreenHeight) then continue;
+       screenpos:=(tempy+k-2)*graphheap.ScreenWidth+tempx+j-2;
+       Pgraph_color(graphheap.ScreenInitAddress+screenpos)^:=
+       graph_color_mix(Pgraph_color(graphheap.ScreenInitAddress+screenpos)^,Pgraph_color(Address+m)^);
+       inc(m);
+       if(m=1 shl graphheap.BlockPower) then
+        begin
+         tempindex:=Pgraph_item(graphheap.HeapStartAddress+tempindex-1)^.RightIndex;
+         if(tempindex=0) then break;
+         Address:=graph_heap_item_to_address(tempindex); m:=0;
+        end;
+      end;
+     if(tempindex=0) then break;
     end;
   end;
- {Then draw it to the physical screen}
- screenpos:=0;
- for j:=1 to gheap.screen_height do
-  for i:=1 to gheap.screen_width do
+ {Then Draw it on the physical screen}
+ screenpos:=1;
+ for j:=1 to graphheap.ScreenHeight do
+  for i:=1 to graphheap.ScreenWidth do
    begin
-    if(gheap.screen_attribute=graph_color_type_bgr) then
+    if(graphheap.ScreenAttribute=false) then
      begin
-      Pgraph_output_color(gheap.screen_output_address+screenpos)^.BGRRed:=
-      Pgraph_color(gheap.screen_init_address+screenpos)^.Red;
-      Pgraph_output_color(gheap.screen_output_address+screenpos)^.BGRBlue:=
-      Pgraph_color(gheap.screen_init_address+screenpos)^.Blue;
-      Pgraph_output_color(gheap.screen_output_address+screenpos)^.BGRGreen:=
-      Pgraph_color(gheap.screen_init_address+screenpos)^.Green;
+      Pgraph_color(graphheap.ScreenOutputAddress+screenpos-1)^:=
+      Pgraph_color(graphheap.ScreenInitAddress+screenpos-1)^;
+      Pgraph_output_color(graphheap.ScreenOutputAddress+screenpos-1)^.RGBReserved:=0;
      end
     else
      begin
-      Pgraph_output_color(gheap.screen_output_address+screenpos)^.RGBRed:=
-      Pgraph_color(gheap.screen_init_address+screenpos)^.Red;
-      Pgraph_output_color(gheap.screen_output_address+screenpos)^.RGBGreen:=
-      Pgraph_color(gheap.screen_init_address+screenpos)^.Green;
-      Pgraph_output_color(gheap.screen_output_address+screenpos)^.RGBBlue:=
-      Pgraph_color(gheap.screen_init_address+screenpos)^.Blue;
+      Pgraph_output_color(graphheap.ScreenOutputAddress+screenpos-1)^.BGRRed:=
+      Pgraph_color(graphheap.ScreenInitAddress+screenpos-1)^.Red;
+      Pgraph_output_color(graphheap.ScreenOutputAddress+screenpos-1)^.BGRGreen:=
+      Pgraph_color(graphheap.ScreenInitAddress+screenpos-1)^.Green;
+      Pgraph_output_color(graphheap.ScreenOutputAddress+screenpos-1)^.BGRBlue:=
+      Pgraph_color(graphheap.ScreenInitAddress+screenpos-1)^.Blue;
+      Pgraph_output_color(graphheap.ScreenOutputAddress+screenpos-1)^.BGRReserved:=0;
      end;
     inc(screenpos);
    end;
 end;
 
 end.
+                                        
+

@@ -1,87 +1,27 @@
 unit system;
-{$MODE FPC}
 
-interface
+interface 
 
-{$IFDEF CPU32}
-const maxnatint=$7FFFFFFF;
-      maxnatuint=$FFFFFFFF;
-{$ELSE CPU32}
-const maxnatint=$7FFFFFFFFFFFFFFF;
-      maxnatuint=$FFFFFFFFFFFFFFFF;
-{$ENDIF CPU32}
-type
-  bit = 0..1;
-  PBit = ^bit;
-  hresult = LongInt;
-  Char = #0..#255;
-  DWord = LongWord;
-  Cardinal = LongWord;
-  {$IFDEF CPU16}
-  Integer = SmallInt;
-  {$ELSE CPU16}
-  Integer = Longint;
-  {$ENDIF CPU16}
-  UInt64 = QWord;
-  Pbyte=^byte;
-  Pchar=^char;
-  PWideChar=^WideChar;
-  PPWideChar=^PWideChar;
-  PWChar=^WideChar;
-  PPWChar=^PWChar;
-  Pword=^word;
-  Pdword=^dword;
-  Pqword=^qword;
-  PPointer=^Pointer;
-  Pboolean=^boolean;
-  Pint64=^int64;
-  Puint64=^uint64;
-  Pextended=^extended;
-  {$IFDEF CPU32}
-  NatUint=dword;
-  PNatUint=^dword;
-  Natint=integer;
-  PNatint=^integer;
-  Uint128=packed record
-          Dwords:array[1..4] of dword;
-          end;
-  Int128=packed record
-         Highdword:Integer;
-         Lowdwords:array[1..3] of dword;
-         end;
-  Uint96=packed record
-         Dwords:array[1..3] of dword;
-         end;
-  Int96=packed record
-        HighDword:Integer;
-        Dwords:array[1..2] of dword;
-        end;
-  {$ELSE CPU32}
-  NatUint=qword;
-  PNatUint=^qword;
-  Natint=int64;
-  PNatint=^int64;
-  Uint128=packed record
-          High,Low:qword;
-          end;
-  Int128=packed record
-         High:Int64;
-         Low:qword;
-         end;
-  Uint96=packed record
-         Dwords:array[1..3] of dword;
-         end;
-  Int96=packed record
-        HighDword:Integer;
-        Dwords:qword;
-        end;
-  {$ENDIF CPU32}
-  TTypeKind = (tkUnknown, tkInteger, tkChar, tkEnumeration, tkFloat, tkSet,
+{$MODE ObjFPC}{$H+}
+{$modeswitch advancedrecords}
+
+{Header for system.pas,or the compliation will fail.}
+type hresult = LongInt;
+     DWord = LongWord;
+     Cardinal = LongWord;
+     UInt64 = QWord;
+     TTypeKind = (tkUnknown, tkInteger, tkChar, tkEnumeration, tkFloat, tkSet,
     tkMethod, tkSString, tkLString, tkAString, tkWString, tkVariant, tkArray,
     tkRecord, tkInterface, tkClass, tkObject, tkWChar, tkBool, tkInt64, tkQWord,
     tkDynArray, tkInterfaceRaw, tkProcVar, tkUString, tkUChar, tkHelper, tkFile,
     tkClassRef, tkPointer);
   PTypeKind=^TTypekind;
+  TSystemCodePage=word;
+  TTypeInfo=packed record
+            Kind:TTypeKind;
+            Unused:ShortString;
+            end;
+  PTypeInfo=^TTypeInfo;
   jmp_buf = packed record
     rbx, rbp, r12, r13, r14, r15, rsp, rip: QWord;
     {$IFDEF CPU64}
@@ -107,7 +47,7 @@ type
   end;
   PGuid = ^TGuid;
   TGuid = packed record
-    case Integer of
+    case Byte of
     1:
      (Data1: DWord;
       Data2: word;
@@ -132,35 +72,159 @@ type
       node: array [0 .. 5] of byte; // The spatially unique node identifier
     );
   end;
-  sys_variant=packed record
-              vartype:byte;
-              case Byte of
-              0:(varnatuint:Natuint;);
-              1:(varnatint:Natint;);
-              2:(varextended:extended;);
-              3:(varpointer:Pointer;);
-              end; 
-  heap_item=bitpacked record
-            haveprev:boolean;
-            allocated:0..63;
-            havenext:boolean;
+{End System.pas Headers}
+type Bit=0..1;
+     PByte=^Byte;
+     PWord=^word;
+     PDword=^Dword;
+     Pqword=^Qword;
+     Psmallint=^smallint;
+     Pshortint=^shortint;
+     PInteger=^Integer;
+     PInt64=^Int64;
+     Char=#0..#255;
+     UnicodeChar=packed record
+                 case Boolean of
+                 True:(achar:Char;);
+                 False:(WChar:WideChar;);
+                 end;
+     PChar=^char;
+     PAnsiChar=^AnsiChar;
+     PWideChar=^WideChar;
+     PUnicodeChar=^UnicodeChar;
+{$IF Defined(CPU16)}
+     Integer=-$7FFF..$7FFF;
+     UnsignedInteger=0..$FFFF;
+     Natint=-$7FFF..$7FFF;
+     Natuint=0..$FFFF;
+{$ELSEIF Defined(CPU32)}
+     Integer=-$7FFFFFFF..$7FFFFFFF;
+     UnsignedInteger=0..$FFFFFFFF;
+     Natint=Integer;
+     Natuint=UnsignedInteger;
+{$ELSE Defined(CPU64)}
+     Integer=-$7FFFFFFF..$7FFFFFFF;
+     UnsignedInteger=0..$FFFFFFFF;
+     Natint=-$7FFFFFFFFFFFFFFF..$7FFFFFFFFFFFFFFF;
+     Natuint=0..$7FFFFFFFFFFFFFFF+$7FFFFFFFFFFFFFFF;
+{$ENDIF}
+     PNatint=^Natint;
+     PNatuint=^Natuint;
+     Pboolean=^boolean;
+     PPointer=^Pointer;
+     PPChar=^Char;
+     PPWideChar=^WideChar;
+     Int96=packed record
+            low11:array[1..11] of byte;
+            high1:smallint;
             end;
-  Pheap_item=^heap_item;
-  heap_record=packed record
-              mem_start:Pointer;
-              mem_end:Pointer;
-              mem_block_power:byte;
-              item_max_pos:natuint;
-              end;
-
+     PInt96=^Int96;
+     UInt96=packed record
+             low15:array[1..11] of byte;
+             high1:byte;
+             end;
+     PUint96=^Uint96;
+     Int128=packed record
+            low15:array[1..15] of byte;
+            high1:smallint;
+            end;
+     PInt128=^Int128;
+     UInt128=packed record
+             low15:array[1..15] of byte;
+             high1:byte;
+             end;
+     PUint128=^Uint128;
+     heap_record_item=bitpacked record
+                      Left:0..1;
+                      RequestLevel:0..1;
+                      Allocated:0..31;
+                      Right:0..1;
+                      end;
+     Pheap_record_item=^heap_record_item;
+     heap_record_portion=packed record
+                         startaddress:Pheap_record_item;
+                         endaddress:Pointer;
+                         ItemEnd:Natuint;
+                         blockpower:byte;
+                         RestSize:Natuint;
+                         end;
+     Pheap_record_portion=^heap_record_portion;
+     heap_record=packed record
+                 heap:Pheap_record_portion;
+                 heapcount:byte;
+                 end;
+{Then Object Free Pascal Specified}
+     dynamic_array_stub=array of byte;
+     dynamic_array_header=packed record
+                          ReferenceCount:Natint;
+                          ArrayHighest:Natint;
+                          ItemSize:Natint;
+                          end;
+     Pdynamic_array_header=^dynamic_array_header;
+     string_header=packed record
+                   ReferenceCount:Natint;
+                   ArrayHighest:Natuint;
+                   end;
+     Pstring_header=^string_header;
+     RawByteString=ansistring;
+     Pshortstring=^shortstring;
+     PVmt=^TVmt;
+     PPVmt=^PVmt;
+     TVmt = record
+         vInstanceSize: Natint;
+         vInstanceSize2: Natint;
+         vParentRef: PPVmt;
+         vClassName: Pointer;
+         vDynamicTable: Pointer;
+         vMethodTable: Pointer;
+         vFieldTable: Pointer;
+         vTypeInfo: Pointer;
+         vInitTable: Pointer;
+         vAutoTable: Pointer;
+         vIntfTable: Pointer;
+         vMsgStrPtr: Pointer;
+         vDestroy: Pointer;
+         vNewInstance: Pointer;
+         vFreeInstance: Pointer;
+         vSafeCallException: Pointer;
+         vDefaultHandler: Pointer;
+         vAfterConstruction: Pointer;
+         vBeforeDestruction: Pointer;
+         vDefaultHandlerStr: Pointer;
+         vDispatch: Pointer;
+         vDispatchStr: Pointer;
+         vEquals: Pointer;
+         vGetHashCode: Pointer;
+         vToString: Pointer;
+         private
+         function GetvParent: PVmt;
+         public
+         property vParent: PVmt read GetvParent;
+         end; 
+    PInterfaceTable=Pointer;
+    PStringMessageTable=Pointer;
+    TObject=class
+            public
+            constructor Create;
+            destructor Destroy;
+            function NewInstance:Tobject;
+            procedure FreeInstance;
+            procedure Free;
+            procedure CleanupInstance;
+            procedure AfterConstruction;
+            procedure BeforeDestruction;
+            function GetObjectSize:NatInt;
+            private
+            property ObjectSize:NatInt read GetObjectSize;
+            end;
+     
 const pi:extended=3.1415926535;
       maxextended:extended=1.7E308;
       minextended:extended=-1.7E308;
-      sys_variant_type_natuint=1;
-      sys_variant_type_natint=2;
-      sys_variant_type_extended=3;
-      sys_variant_type_pointer=4;
 
+var sysheap:heap_record;
+    sysheap_portion:array[1..11] of heap_record_portion;
+    
 procedure fpc_specific_handler;compilerproc;
 procedure fpc_handleerror;compilerproc;
 procedure fpc_lib_exit;compilerproc;
@@ -169,45 +233,14 @@ procedure fpc_initializeunits;compilerproc;
 procedure fpc_finalizeunits;compilerproc;
 procedure fpc_do_exit;compilerproc;
 procedure fpc_div_by_zero;compilerproc;
-procedure fpc_setjmp;compilerproc;
-procedure fpc_pushexceptaddr;compilerproc;
-operator := (x:natuint)res:sys_variant;
-operator := (x:natint)res:sys_variant;
-operator := (x:extended)res:sys_variant;
-operator := (x:pointer)res:sys_variant;
-function fpc_qword_to_double(q:qword):double;compilerproc;
-function fpc_int64_to_double(i:int64):double;compilerproc;
-function get_bit_from_byte(data:byte;position:byte):bit;
-function get_bit_from_word(data:word;position:byte):bit;
-function get_bit_from_dword(data:dword;position:byte):bit;
-function get_bit_from_qword(data:qword;position:byte):bit;
-procedure compheap_initialize(start,totalsize:natuint;blocksize:word);
-function fpc_getmem(size:Natuint):Pointer;compilerproc;
-function fpc_getmemsize(ptr:Pointer):Natuint;
-function fpc_allocmem(size:Natuint):Pointer;compilerproc;
-procedure fpc_freemem(var ptr:Pointer);compilerproc;
-procedure fpc_reallocmem(var ptr:Pointer;size:natuint);compilerproc;
-procedure fpc_move(Const Source;Var Dest;Size:natuint);compilerproc;
-procedure sysheap_initialize(start,totalsize:natuint;blocksize:word);
-function getmem(size:natuint):Pointer;
-function getmemsize(ptr:Pointer):natuint;
-function allocmem(size:natuint):Pointer;
-procedure freemem(var ptr:Pointer);
-procedure reallocmem(var ptr:Pointer;size:natuint);
-procedure move(const Source;var Dest;Size:natuint);
-procedure exeheap_initialize(start,totalsize:natuint;blocksize:word);
-function exeheap_getmem(size:natuint):Pointer;
-function exeheap_getmemsize(ptr:Pointer):natuint;
-function exeheap_allocmem(size:natuint):Pointer;
-procedure exeheap_freemem(var ptr:Pointer);
-procedure exeheap_reallocmem(var ptr:Pointer;size:natuint);
-procedure exeheap_move(const Source;var Dest;Size:natuint);
-function be_to_le_word(num:word):word;
-function be_to_le_dword(num:dword):dword;
-function be_to_le_qword(num:qword):qword;
-function le_to_be_word(num:word):word;
-function le_to_be_dword(num:dword):dword;
-function le_to_be_qword(num:qword):qword;
+function fpc_setjmp(var s:jmp_buf):Integer;compilerproc;
+function fpc_pushexceptaddr(FormatType:Integer;Buffer,NewAddress:Pointer):Pjmp_buf;compilerproc;
+procedure fpc_popaddrstack;compilerproc;
+procedure fpc_reraise;compilerproc;
+procedure fpc_raise_nested;compilerproc;
+procedure fpc_doneexception;compilerproc;
+function replace_divide(x:natuint;y:natuint):Natuint;
+function replace_modulo(x:natuint;y:natuint):Natuint;
 function abs(x:natint):natint;
 function abs(x:extended):extended;
 function frac(x:extended):extended;
@@ -243,643 +276,151 @@ function arctan(x:extended):extended;
 function arccot(x:extended):extended;
 function arcsec(x:extended):extended;
 function arccsc(x:extended):extended;
-function strlen(str:Pchar):natuint;
-function wstrlen(str:PWideChar):natuint;
-procedure strinit(var str:PChar;size:natuint);
-procedure wstrinit(var str:PWideChar;Size:natuint);
-function strcreate(content:PChar):PChar;
-function Wstrcreate(content:PWideChar):PWideChar;
-procedure strrealloc(var str:PChar;size:natuint);
-procedure Wstrrealloc(var str:PwideChar;size:natuint);
-procedure strset(var str:PChar;val:Pchar);
-procedure wstrset(var str:PWideChar;val:Pwidechar);
-function strcmp(str1,str2:Pchar):natint;
-function Wstrcmp(str1,str2:PwideChar):natint;
-function strpartcmp(str1:PChar;position,length:natuint;str2:PChar):natint;
-function Wstrpartcmp(str1:PWideChar;position,length:natuint;str2:PWideChar):natint; 
-function strcmpL(str1,str2:Pchar):natint;
-function WstrcmpL(str1,str2:PwideChar):natint;
-function strpartcmpL(str1:PChar;position,length:natuint;str2:PChar):natint;
-function WstrpartcmpL(str1:PWideChar;position,length:natuint;str2:PWideChar):natint; 
-procedure strcat(var dest:PChar;src:PChar);
-procedure Wstrcat(var dest:PWideChar;src:PWideChar);
-procedure strfree(var str:PChar);
-procedure Wstrfree(var str:PWideChar);
-procedure strUpperCase(var str:PChar);
-procedure strLowerCase(var str:PChar);
-procedure WstrUpperCase(var str:PWideChar);
-procedure WstrLowerCase(var str:PWideChar);
-function strcopy(str:PChar;index,count:Natuint):Pchar;
-function Wstrcopy(str:PWideChar;index,count:Natuint):PWideChar;
-function strcutout(str:PChar;left,right:Natuint):PChar;
-function Wstrcutout(str:PWideChar;left,right:Natuint):PWideChar;
-procedure strdelete(var str:PChar;index,count:Natuint);
-procedure Wstrdelete(var str:PWideChar;index,count:Natuint);
-procedure strdeleteinrange(var str:PChar;left,right:Natuint);
-procedure WStrdeleteinrange(var str:PWideChar;left,right:Natuint);
-procedure strinsert(var str:PChar;insertstr:PChar;index:natuint);
-procedure Wstrinsert(var str:PWideChar;insertstr:PWideChar;index:natuint);
-function strpos(str,substr:PChar;start:Natuint):Natuint;
-function Wstrpos(str,substr:PWideChar;start:natuint):natuint;
-function strposdir(str,substr:PChar;start:natuint;direction:shortint):natuint;
-function Wstrposdir(str,substr:PWideChar;start:natuint;direction:shortint):natuint;
-function strposorder(str,substr:PChar;start,order:natuint):natuint;
-function Wstrposorder(str,substr:PWideChar;start,order:natuint):natuint;
-function strposdirorder(str,substr:PChar;start,order:natuint;direction:shortint):natuint;
-function Wstrposdirorder(str,substr:PWideChar;start,order:natuint;direction:shortint):natuint;
-function strcount(str,substr:PChar;start:Natuint):natuint;
-function Wstrcount(str,substr:PWideChar;start:Natuint):natuint;
-function strposinverse(str,substr:PChar;start:Natuint):Natuint;
-function Wstrposinverse(str,substr:PWideChar;start:natuint):natuint;
-function IntToPChar(Int:natint):PChar;
-function UintToPChar(UInt:Natuint):Pchar;
-function ExtendedToPChar(Ext:Extended;decimal:word):PChar;
-function IntToHex(Int:natuint):PChar;
-function PCharToInt(str:PChar):natint;
-function PCharToUInt(str:PChar):natuint;
-function PCharToExtended(str:PChar):Extended;
-function HexToInt(Hex:PChar):natuint;
-function IntToPWChar(Int:natint):PWideChar;
-function UintToPWChar(UInt:Natuint):PWidechar;
-function ExtendedToPWChar(Ext:Extended;decimal:word):PWideChar;
-function IntToWHex(Int:natuint):PWideChar;
-function PWCharToInt(str:PWideChar):natint;
-function PWCharToUInt(str:PWideChar):natuint;
-function PWCharToExtended(str:PWideChar):Extended;
-function WHexToInt(Hex:PWideChar):natuint;
-procedure randomize(seed_data:Pointer;seed_data_size:natuint);
-function random(maxnum:extended):extended;
-function random_range(left,right:extended):extended;
-function irandom(maxnum:natuint):natint;
-function irandom_range(left,right:natint):natint;
+function sinh(x:extended):extended;
+function cosh(x:extended):extended;
+function tanh(x:extended):extended;
+function coth(x:extended):extended;
+function sech(x:extended):extended;
+function csch(x:extended):extended;
+function fpc_getmem(size:Natuint):Pointer;compilerproc;
+procedure fpc_freemem(var ptr:Pointer);compilerproc;
+procedure fpc_move(const Source;var Dest;Size:Natuint);compilerproc;
+function heap_initialize(startaddress,endaddress:Pointer;heapbasepower,heapstep,heapmemstep,heapcount:byte):heap_record;
+function getmem(size:Natuint):Pointer;
+function allocmem(size:Natuint):Pointer;
+function getmemsize(ptr:Pointer):Natuint;
+procedure freemem(var ptr:Pointer);  
+procedure reallocmem(var ptr:Pointer;size:Natuint);
+procedure move(Const Source;Var Dest;Size:Natuint);
+procedure FillByte(Var Dest;Size:Natuint;Data:byte);
+procedure FillChar(Var Dest;Size:Natuint;Data:char);
+procedure fpc_initialize(Data,TypeInfo:Pointer);compilerproc;
+procedure fpc_finalize(Data,TypeInfo:Pointer);compilerproc;
+procedure fpc_dynarray_assign(var Dest:Pointer;Source:Pointer;TypeInfo:Pointer);compilerproc;
+function fpc_dynarray_copy(Source:Pointer;TypeInfo:Pointer;LowIndex,Count:Natint):dynamic_array_stub;compilerproc;
+function fpc_array_to_dynarray_copy(Source:Pointer;TypeInfo:Pointer;LowIndex,Count,MaxCount:Natint;ElementSize:Natint;ElementType:Pointer):dynamic_array_stub;compilerproc;
+function fpc_dynarray_length(ptr:Pointer):Natint;compilerproc;
+function fpc_dynarray_high(ptr:Pointer):Natint;compilerproc;
+procedure fpc_dynarray_clear(var ptr:Pointer;TypeInfo:Pointer);compilerproc;
+procedure fpc_dynarray_incr_ref(ptr:Pointer);compilerproc;
+procedure fpc_dynarray_decr_ref(var ptr:Pointer;TypeInfo:Pointer);compilerproc;
+procedure fpc_dynarray_setlength(var ptr:Pointer;PtrTypeInfo:Pointer;DimensionCount:Natint;DimensionLength:PNatint);compilerproc;
+procedure fpc_dynarray_insert(var ptr:Pointer;Source:Natint;Data:Pointer;Count:Natint;PtrTypeInfo:Pointer);compilerproc;
+procedure fpc_dynarray_concat_multi(var dest:Pointer;PtrTypeInfo:Pointer;const SourceArray:array of Pointer);compilerproc;
+procedure fpc_dynarray_concat(var dest:Pointer;PtrTypeInfo:Pointer;Const Source1,Source2:Pointer);compilerproc;
+procedure fpc_dynarray_delete(var ptr:Pointer;Source,Count:Natint;PtrTypeInfo:Pointer);compilerproc;
+procedure fpc_AnsiStr_Assign(Var DestString:Pointer;Source:Pointer);compilerproc;
+procedure fpc_AnsiStr_Decr_Ref(var Ptr:Pointer);compilerproc;
+procedure fpc_AnsiStr_Incr_Ref(Ptr:Pointer);compilerproc;
+procedure fpc_AnsiStr_Concat(var DestString:ansistring;const Source1,Source2:ansistring;CodePage:TSystemCodePage);compilerproc;
+procedure fpc_AnsiStr_Concat_multi(var DestString:ansistring;const SourceArray:array of ansistring;CodePage:TSystemCodePage);compilerproc;
+function fpc_ansistr_to_ansistr(const Source:ansistring;CodePage:TSystemCodePage):ansistring;compilerproc;
+function fpc_char_to_ansistr(Const Source:AnsiChar;CodePage:TSystemCodePage):ansistring;compilerproc;
+function fpc_pchar_to_ansistr(Const Source:PAnsiChar;CodePage:TSystemCodePage):ansistring;compilerproc;
+function fpc_chararray_to_ansistr(Const CharArray:array of AnsiChar;CodePage:TSystemCodePage;Zerobased:boolean=true):ansistring;compilerproc;
+procedure fpc_ansistr_to_chararray(var res:array of AnsiChar;const Source:ansistring);compilerproc;
+function fpc_ansistr_compare(const Source1,Source2:ansistring):Natint;compilerproc;
+function fpc_ansistr_compare_equal(const Source1,Source2:ansistring):Natint;compilerproc;
+procedure fpc_ansistr_setlength(Var Source:ansistring;length:Natint;CodePage:TSystemCodePage);compilerproc;
+function fpc_ansistr_copy(var Source:ansistring;Index,Size:Natint):ansistring;compilerproc;
+procedure fpc_ansistr_insert(const Source:ansistring;var Dest:ansistring;Index:Natint);compilerproc;
+procedure fpc_ansistr_delete(var Dest:ansistring;Index,Size:Natint);compilerproc;
+function fpc_ansistr_unique(var Source:Pointer):Pointer;compilerproc;
 
-var totalmemorysize:natuint;
-    compheap,sysheap,exeheap:heap_record;
-    ranseed:natuint;
-    
 implementation
 
 procedure fpc_specific_handler;compilerproc;[public,alias:'__FPC_specific_handler'];
 begin
 end;
-procedure fpc_handleerror;compilerproc;[public,alias:'FPC_HANDLEERROR'];
+procedure fpc_handleerror;compilerproc;
 begin
 end;
-procedure fpc_lib_exit;compilerproc;[public,alias:'FPC_LIB_EXIT'];
+procedure fpc_lib_exit;compilerproc;
 begin
 end;
-procedure fpc_libinitializeunits;compilerproc;[public,alias:'FPC_LIBINITIALIZEUNITS'];
+procedure fpc_libinitializeunits;compilerproc;
 begin
 end;
-procedure fpc_initializeunits;compilerproc;[public,alias:'FPC_INITIALIZEUNITS'];
+procedure fpc_initializeunits;compilerproc;
 begin
 end;
-procedure fpc_finalizeunits;compilerproc;[public,alias:'FPC_FINALIZEUNITS'];
+procedure fpc_finalizeunits;compilerproc;
 begin
 end;
-procedure fpc_do_exit;compilerproc;[public,alias:'FPC_DI_EXIT'];
+procedure fpc_do_exit;compilerproc;
 begin
 end;
-procedure fpc_div_by_zero;compilerproc;[public,alias:'FPC_DIVBYZERO'];
+procedure fpc_div_by_zero;compilerproc;
 begin
 end;
-procedure fpc_setjmp;compilerproc;[public,alias:'FPC_SETJMP'];
+function fpc_setjmp(var s:jmp_buf):Integer;compilerproc;
+begin
+ fpc_setjmp:=0; 
+end;
+function fpc_pushexceptaddr(FormatType:Integer;Buffer,NewAddress:Pointer):Pjmp_buf;compilerproc;[public,alias:'FPC_PUSHEXCEPTADDR'];
+begin
+ fpc_pushexceptaddr:=allocmem(sizeof(jmp_buf));
+end;
+procedure fpc_popaddrstack;compilerproc;
 begin
 end;
-procedure fpc_pushexceptaddr;compilerproc;[public,alias:'FPC_PUSHEXCEPTADDR'];
+procedure fpc_reraise;compilerproc;
 begin
 end;
-function fpc_qword_to_double(q:qword):double;compilerproc;[public,alias:'FPC_QWORD_TO_DOUBLE'];
+procedure fpc_raise_nested;compilerproc;
+begin
+end;
+procedure fpc_doneexception;compilerproc;
+begin
+end;
+function fpc_qword_to_double(q:qword):double;compilerproc;
 begin
  fpc_qword_to_double:=dword(q and $ffffffff)+dword(q shr 32)*double(4294967296.0);
 end;
-function fpc_int64_to_double(i:int64):double;compilerproc;[public,alias:'FPC_INT64_TO_DOUBLE'];
+function fpc_int64_to_double(i:int64):double;compilerproc;
 begin
  fpc_int64_to_double:=dword(i and $ffffffff)+longint(i shr 32)*double(4294967296.0);
 end;
-operator := (x:natuint)res:sys_variant;
+function replace_divide(x:natuint;y:natuint):Natuint;
+var i:byte;
+    tempnum1,tempnum2,res:Natuint;
 begin
- res.vartype:=sys_variant_type_natuint;
- res.varnatuint:=x;
-end;
-operator := (x:natint)res:sys_variant;
-begin
- res.vartype:=sys_variant_type_natint;
- res.varnatint:=x;
-end;
-operator := (x:extended)res:sys_variant;
-begin
- res.vartype:=sys_variant_type_extended;
- res.varextended:=x;
-end;
-operator := (x:pointer)res:sys_variant;
-begin
- res.vartype:=sys_variant_type_pointer;
- res.varpointer:=x;
-end;
-function get_bit_from_byte(data:byte;position:byte):bit;
-begin
- get_bit_from_byte:=(data shr position) and $1;
-end;
-function get_bit_from_word(data:word;position:byte):bit;
-begin
- get_bit_from_word:=(data shr position) and $1;
-end;
-function get_bit_from_dword(data:dword;position:byte):bit;
-begin
- get_bit_from_dword:=(data shr position) and $1;
-end;
-function get_bit_from_qword(data:qword;position:byte):bit;
-begin
- get_bit_from_qword:=(data shr position) and $1;
-end;
-function heap_initialize(startpos,endpos:natuint;blockpower:byte):heap_record;
-var res:heap_record;
-begin
- res.mem_start:=Pointer(startpos); res.mem_end:=Pointer(endpos);
- res.mem_block_power:=blockpower; res.item_max_pos:=0;
- heap_initialize:=res;
-end;
-function heap_get_total_size(heap:heap_record):natuint;
-begin
- heap_get_total_size:=Natuint(heap.mem_end-heap.mem_start)+1;
-end;
-function heap_conv_addr_to_index(heap:heap_record;addr:Pointer;isitem:Boolean):natuint;
-begin
- if(isitem) then heap_conv_addr_to_index:=(heap.mem_end-addr) shr heap.mem_block_power
- else heap_conv_addr_to_index:=(addr-heap.mem_start) shr heap.mem_block_power+1;
-end;
-function heap_conv_index_to_addr(heap:heap_record;index:natuint;isitem:boolean):Pointer;
-begin
- if(isitem) then heap_conv_index_to_addr:=Pointer(heap.mem_end-index*sizeof(heap_item))
- else heap_conv_index_to_addr:=Pointer(heap.mem_start+(index-1) shl heap.mem_block_power);
-end;
-function heap_conv_index_to_item(heap:heap_record;index:natuint):heap_item;
-begin
- heap_conv_index_to_item:=Pheap_item(heap.mem_end-index*sizeof(heap_item))^;
-end;
-function heap_conv_mem_to_item(heap:heap_record;mem:Pointer):heap_item;
-var index:natuint;
-    res:heap_item;
-begin
- index:=Natuint(mem-heap.mem_start) shr heap.mem_block_power+1;
- heap_conv_mem_to_item:=Pheap_item(mem-index*sizeof(heap_item))^;
-end;
-function heap_get_mem_count(heap:heap_record;ptr:Pointer):natuint;
-var i1,i2,index:natuint;
-    tempitem:heap_item;
-begin
- if(ptr=nil) or (ptr<heap.mem_start) or (ptr>heap.mem_end) then exit(0);
- index:=heap_conv_addr_to_index(heap,ptr,false);
- i1:=index; i2:=index;
- tempitem:=heap_conv_index_to_item(heap,i1);
- if(tempitem.havenext) and (tempitem.haveprev) then
+ tempnum1:=x; tempnum2:=y; res:=0;
+ while(tempnum2<tempnum1) do tempnum2:=tempnum2 shl 1;
+ if(tempnum2>y) then tempnum2:=tempnum2 shr 1;
+ while(tempnum2>=y)do
   begin
-   while(i1<heap.item_max_pos)do
+   if(tempnum1>=tempnum2) then
     begin
-     tempitem:=heap_conv_index_to_item(heap,i1);
-     if(tempitem.havenext=false) then break;
-     inc(i1);
-    end;
-   while(i2>1)do
-    begin
-     tempitem:=heap_conv_index_to_item(heap,i2);
-     if(tempitem.haveprev=false) then break;
-     dec(i2);
-    end;
-   heap_get_mem_count:=i1-i2+1;
-  end
- else if(tempitem.havenext) then
-  begin
-   while(i1<heap.item_max_pos)do
-    begin
-     tempitem:=heap_conv_index_to_item(heap,i1);
-     if(tempitem.havenext=false) then break;
-     inc(i1);
-    end;
-   heap_get_mem_count:=(i1-index+1);
-  end
- else if(tempitem.haveprev) then
-  begin
-   while(i2>1)do
-    begin
-     tempitem:=heap_conv_index_to_item(heap,i2);
-     if(tempitem.haveprev=false) then break;
-     dec(i2);
-    end;
-   heap_get_mem_count:=(index-i2+1);
-  end
- else
-  begin
-   heap_get_mem_count:=1;
-  end;
-end;
-function heap_get_mem_size(heap:heap_record;ptr:Pointer):natuint;
-var i1,i2,index:natuint;
-    tempitem:heap_item;
-begin
- if(ptr=nil) or (ptr<heap.mem_start) or (ptr>heap.mem_end) then exit(0);
- index:=heap_conv_addr_to_index(heap,ptr,false);
- i1:=index; i2:=index;
- tempitem:=heap_conv_index_to_item(heap,i1);
- if(tempitem.havenext) and (tempitem.haveprev) then
-  begin
-   while(i1<heap.item_max_pos)do
-    begin
-     tempitem:=heap_conv_index_to_item(heap,i1);
-     if(tempitem.havenext=false) then break;
-     inc(i1);
-    end;
-   while(i2>1)do
-    begin
-     tempitem:=heap_conv_index_to_item(heap,i2);
-     if(tempitem.haveprev=false) then break;
-     dec(i2);
-    end;
-   heap_get_mem_size:=(i1-i2+1) shl heap.mem_block_power;
-  end
- else if(tempitem.havenext) then
-  begin
-   while(i1<heap.item_max_pos)do
-    begin
-     tempitem:=heap_conv_index_to_item(heap,i1);
-     if(tempitem.havenext=false) then break;
-     inc(i1);
-    end;
-   heap_get_mem_size:=(i1-index+1) shl heap.mem_block_power;
-  end
- else if(tempitem.haveprev) then
-  begin
-   while(i2>1)do
-    begin
-     tempitem:=heap_conv_index_to_item(heap,i2);
-     if(tempitem.haveprev=false) then break;
-     dec(i2);
-    end;
-   heap_get_mem_size:=(index-i2+1) shl heap.mem_block_power;
-  end
- else
-  begin
-   heap_get_mem_size:=1 shl heap.mem_block_power;
-  end;
-end;
-function heap_get_mem_start(heap:heap_record;ptr:Pointer):Pointer;
-var i1,index:natuint;
-    tempitem:heap_item;
-begin
- if(ptr=nil) or (ptr<heap.mem_start) or (ptr>heap.mem_end) then exit(nil);
- index:=heap_conv_addr_to_index(heap,ptr,false);
- tempitem:=heap_conv_index_to_item(heap,index);
- i1:=index;
- if(tempitem.haveprev) then
-  begin
-   while(i1>0)do
-    begin
-     tempitem:=heap_conv_index_to_item(heap,i1);
-     if(tempitem.haveprev=false) then break;
-     dec(i1);
-    end;
-   heap_get_mem_start:=heap.mem_start+(i1-1) shl heap.mem_block_power;
-  end
- else
-  begin
-   heap_get_mem_start:=heap.mem_start+(index-1) shl heap.mem_block_power;
-  end;
-end;
-function heap_request_mem(var heap:heap_record;size:natuint;meminit:boolean):Pointer;
-var blockcount:Natuint;
-    i1,i2,i3,i4:natuint;
-    tempptr:Pheap_item;
-    tempmemptr:Pqword;
-    totalsize:natuint;
-begin
- totalsize:=heap_get_total_size(heap);
- blockcount:=(size+1 shl heap.mem_block_power-1) shr heap.mem_block_power;
- if(blockcount=0) then heap_request_mem:=nil
- else
-  begin
-   if(heap.item_max_pos=0) and (blockcount shl heap.mem_block_power
-   +blockcount<=totalsize) then
-    begin
-     i1:=1;
-     while(i1<=blockcount)do
-      begin
-       tempptr:=heap_conv_index_to_addr(heap,i1,true);
-       tempmemptr:=heap_conv_index_to_addr(heap,i1,false);
-       if(i1>1) then tempptr^.haveprev:=true else tempptr^.haveprev:=false;
-       tempptr^.allocated:=1;
-       if(i1<blockcount) then tempptr^.havenext:=true else tempptr^.havenext:=false;
-       if(meminit) then
-        begin
-         for i2:=1 to 1 shl heap.mem_block_power shr 3 do (tempmemptr+i2-1)^:=0;
-        end;
-       inc(i1);
-      end;
-     heap_request_mem:=heap.mem_start;
-     inc(heap.item_max_pos,blockcount);
+     dec(tempnum1,tempnum2);
+     res:=res shl 1+1;
     end
-   else if(heap.item_max_pos>0) then
+   else 
     begin
-     i1:=1; i2:=0;
-     while(i1<=heap.item_max_pos)do
-      begin
-       tempptr:=heap_conv_index_to_addr(heap,i1,true);
-       if(tempptr^.allocated=0) and (i2<blockcount) then inc(i2)
-       else if(tempptr^.allocated=0) then break
-       else i2:=0;
-       inc(i1);
-      end;
-     if(i2=0) and ((heap.item_max_pos+blockcount)
-     shl heap.mem_block_power+(heap.item_max_pos+blockcount)<=totalsize) then
-      begin
-       i1:=1;
-       while(i1<=blockcount)do
-        begin
-         tempptr:=heap_conv_index_to_addr(heap,heap.item_max_pos+i1,true);
-         tempmemptr:=heap_conv_index_to_addr(heap,heap.item_max_pos+i1,false);
-         if(i1>1) then tempptr^.haveprev:=true else tempptr^.haveprev:=false;
-         tempptr^.allocated:=1;
-         if(i1<blockcount) then tempptr^.havenext:=true else tempptr^.havenext:=false;
-         if(meminit) then
-          begin
-           for i4:=1 to 1 shl heap.mem_block_power shr 3 do (tempmemptr+i4-1)^:=0;
-          end;
-         inc(i1);
-        end;
-       heap_request_mem:=heap.mem_start+heap.item_max_pos shl heap.mem_block_power;
-       inc(heap.item_max_pos,blockcount);
-      end
-     else if(i2=0) then
-      begin
-       heap_request_mem:=nil;
-      end
-     else
-      begin
-       i3:=i1-i2+1;
-       while(i3<=i1)do
-        begin
-         tempptr:=heap_conv_index_to_addr(heap,i3,true);
-         tempmemptr:=heap_conv_index_to_addr(heap,i3,false);
-         if(i3>i1-i2+1) then tempptr^.haveprev:=true else tempptr^.haveprev:=false;
-         tempptr^.allocated:=1;
-         if(i3<i1) then tempptr^.havenext:=true else tempptr^.havenext:=false;
-         if(meminit) then
-          begin
-           for i4:=1 to 1 shl heap.mem_block_power shr 3 do (tempmemptr+i4-1)^:=0;
-          end;
-         inc(i3);
-        end;
-       heap_request_mem:=heap.mem_start+(i1-i2) shl heap.mem_block_power;
-      end;
-    end
-   else heap_request_mem:=nil;
-  end;
-end;
-procedure heap_free_mem(var heap:heap_record;var ptr:Pointer;forcenil:boolean);
-var start:Pointer;
-    index,i,blockcount:natuint;
-    tempptr:Pheap_item;
-begin
- if(ptr=nil) then exit;
- start:=heap_get_mem_start(heap,ptr);
- index:=heap_conv_addr_to_index(heap,start,true);
- blockcount:=heap_get_mem_size(heap,ptr);
- i:=1;
- while(i<=blockcount)do
-  begin
-   tempptr:=heap_conv_index_to_addr(heap,index+i-1,true);
-   if(tempptr^.allocated<>0) then tempptr^.allocated:=0;
-   tempptr^.haveprev:=false; tempptr^.havenext:=false;
-   inc(i);
-  end;
- i:=heap.item_max_pos;
- while(i>0)do
-  begin
-   tempptr:=heap_conv_index_to_addr(heap,i-1,true);
-   if(tempptr^.allocated<>0) then break;
-   dec(i);
-  end;
- heap.item_max_pos:=i;
- if(forcenil) then ptr:=nil;
-end;
-procedure heap_move_mem(heap:heap_record;src,dest:Pointer);
-var start1,start2:Pqword;
-    size1,size2,i:natuint;
-begin
- if(src=nil) or (src<heap.mem_start) or (src>=heap.mem_end-heap.item_max_pos*sizeof(heap_item)) 
- or(dest=nil) or (dest<heap.mem_start) or (dest>=heap.mem_end-heap.item_max_pos*sizeof(heap_item)) then exit;
- start1:=heap_get_mem_start(heap,src);
- start2:=heap_get_mem_start(heap,dest);
- size1:=heap_get_mem_size(heap,src);
- size2:=heap_get_mem_size(heap,dest);
- if(size1<>0) and (size2<>0) then
-  begin
-   if(size1>size2) then
-    begin
-     for i:=1 to size2 shr 3 do (start2+i-1)^:=(start1+i-1)^;
-    end
-   else if(size1<=size2) then
-    begin
-     for i:=1 to size1 shr 3 do (start2+i-1)^:=(start1+i-1)^;
+     res:=res shl 1;
     end;
+   tempnum2:=tempnum2 shr 1;
   end;
+ replace_divide:=res;
 end;
-function universial_heap_initialize(startpos,endpos:natuint;blockpower:byte):heap_record;
-begin
- universial_heap_initialize:=heap_initialize(startpos,endpos,blockpower);
-end;
-function universial_getmem(var heap:heap_record;size:natuint):Pointer;
-begin
- universial_getmem:=heap_request_mem(heap,size,false);
-end;
-function universial_getmemsize(heap:heap_record;ptr:Pointer):natuint;
-begin
- universial_getmemsize:=heap_get_mem_size(heap,ptr);
-end;
-function universial_allocmem(var heap:heap_record;size:natuint):Pointer;
-begin
- universial_allocmem:=heap_request_mem(heap,size,true);
-end;
-procedure universial_freemem(var heap:heap_record;var ptr:Pointer);
-begin
- heap_free_mem(heap,ptr,true);
-end;
-procedure universial_move(const src;var dest;Size:natuint);
-var i:Natint;
-    q1,q2:Pqword;
-    d1,d2:Pdword;
-    w1,w2:Pword;
-    b1,b2:Pbyte;
-begin
- if(Size-Size shr 3 shl 3=0) then
+function replace_modulo(x:natuint;y:natuint):Natuint;
+var i:byte;
+    tempnum1,tempnum2:Natuint;
+begin 
+ tempnum1:=x; tempnum2:=y; 
+ while(tempnum2<tempnum1) do tempnum2:=tempnum2 shl 1;
+ if(tempnum2>y) then tempnum2:=tempnum2 shr 1;
+ while(tempnum2>=y)do
   begin
-   q1:=Pqword(@src); q2:=Pqword(@dest);
-   for i:=1 to Size shr 3 do (q2+i-1)^:=(q1+i-1)^;
-  end
- else if(Size-Size shr 2 shl 2=0) then
-  begin
-   d1:=Pdword(@src); d2:=Pdword(@dest);
-   for i:=1 to Size shr 2 do (d2+i-1)^:=(d1+i-1)^;
-  end
- else if(Size-Size shr 1 shl 1=0) then
-  begin
-   w1:=Pword(@src); w2:=Pword(@dest);
-   for i:=1 to Size shr 1 do (w2+i-1)^:=(w1+i-1)^;
-  end
- else
-  begin
-   b1:=Pbyte(@src); b2:=Pbyte(@dest);
-   for i:=1 to Size do (b2+i-1)^:=(b1+i-1)^;
+   if(tempnum1>=tempnum2) then
+    begin
+     dec(tempnum1,tempnum2);
+    end;
+   tempnum2:=tempnum2 shr 1;
   end;
+ replace_modulo:=tempnum1;
 end;
-function universial_reallocmem(var heap:heap_record;var ptr:Pointer;size:natuint):Pointer;
-var newptr,oldptr:Pointer;
-begin
- newptr:=heap_request_mem(heap,size,true);
- oldptr:=ptr;
- heap_move_mem(heap,oldptr,newptr);
- heap_free_mem(heap,oldptr,false);
- ptr:=newptr;
- universial_reallocmem:=newptr;
-end;
-procedure compheap_initialize(start,totalsize:natuint;blocksize:word);
-var i,tempnum:Natuint;
-begin
- tempnum:=blocksize; i:=0;
- while(tempnum>1)do
-  begin
-   tempnum:=tempnum shr 1;
-   inc(i);
-  end;
- compheap:=universial_heap_initialize(start,start+totalsize,i);
-end;
-function fpc_getmem(size:Natuint):Pointer;compilerproc;[public,alias:'FPC_GETMEM'];
-begin
- fpc_getmem:=universial_getmem(compheap,size);
-end;
-function fpc_getmemsize(ptr:Pointer):Natuint;[public,alias:'FPC_GETMEMSIZE'];
-begin
- fpc_getmemsize:=universial_getmemsize(compheap,ptr);
-end;
-function fpc_allocmem(size:Natuint):Pointer;compilerproc;[public,alias:'FPC_ALLOCMEM'];
-begin
- fpc_allocmem:=universial_allocmem(compheap,size);
-end;
-procedure fpc_freemem(var ptr:Pointer);compilerproc;[public,alias:'FPC_FREEMEM'];
-begin
- universial_freemem(compheap,ptr);
-end;
-procedure fpc_reallocmem(var ptr:Pointer;size:natuint);compilerproc;[public,alias:'FPC_REALLOCMEM'];
-begin
- universial_reallocmem(compheap,ptr,size);
-end;
-procedure fpc_move(Const Source;Var Dest;Size:natuint);compilerproc;[public,alias:'FPC_MOVE'];
-begin
- universial_move(Source,Dest,Size);
-end;
-procedure sysheap_initialize(start,totalsize:natuint;blocksize:word);
-var i,tempnum:Natuint;
-begin
- tempnum:=blocksize; i:=0;
- while(tempnum>1)do
-  begin
-   tempnum:=tempnum shr 1;
-   inc(i);
-  end;
- sysheap:=universial_heap_initialize(start,start+totalsize,i);
-end;
-function getmem(size:natuint):Pointer;[public,alias:'getmem'];
-begin
- getmem:=universial_getmem(sysheap,size);
-end;
-function getmemsize(ptr:Pointer):natuint;[public,alias:'getmemsize'];
-begin
- getmemsize:=universial_getmemsize(sysheap,ptr);
-end;
-function allocmem(size:natuint):Pointer;[public,alias:'allocmem'];
-begin
- allocmem:=universial_allocmem(sysheap,size);
-end;
-procedure freemem(var ptr:Pointer);[public,alias:'freemem'];
-begin
- universial_freemem(sysheap,ptr);
-end;
-procedure reallocmem(var ptr:Pointer;size:natuint);[public,alias:'reallocmem'];
-begin
- universial_reallocmem(sysheap,ptr,size);
-end;
-procedure move(const Source;var Dest;Size:natuint);[public,alias:'move'];
-begin
- universial_move(source,dest,size);
-end;
-procedure exeheap_initialize(start,totalsize:natuint;blocksize:word);
-var i,tempnum:Natuint;
-begin
- tempnum:=blocksize; i:=0;
- while(tempnum>1)do
-  begin
-   tempnum:=tempnum shr 1;
-   inc(i);
-  end;
- exeheap:=universial_heap_initialize(start,start+totalsize,i);
-end;
-function exeheap_getmem(size:natuint):Pointer;[public,alias:'exeheap_getmem'];
-begin
- exeheap_getmem:=universial_getmem(exeheap,size);
-end;
-function exeheap_getmemsize(ptr:Pointer):natuint;[public,alias:'exeheap_getmemsize'];
-begin
- exeheap_getmemsize:=universial_getmemsize(exeheap,ptr);
-end;
-function exeheap_allocmem(size:natuint):Pointer;[public,alias:'exeheap_allocmem'];
-begin
- exeheap_allocmem:=universial_allocmem(exeheap,size);
-end;
-procedure exeheap_freemem(var ptr:Pointer);[public,alias:'exeheap_freemem'];
-begin
- universial_freemem(exeheap,ptr);
-end;
-procedure exeheap_reallocmem(var ptr:Pointer;size:natuint);[public,alias:'exeheap_reallocmem'];
-begin
- universial_reallocmem(exeheap,ptr,size);
-end;
-procedure exeheap_move(const Source;var Dest;Size:natuint);[public,alias:'exeheap_move'];
-begin
- universial_move(source,dest,size);
-end;
-function be_to_le_word(num:word):word;
-begin
- be_to_le_word:=((num shr 8) and $FF) or ((num shl 8) and $FF00);
-end;
-function be_to_le_dword(num:dword):dword;
-begin
- be_to_le_dword:=((num shr 24) and $FF) or ((num shr 8) and $FF00)
-         or((num shl 8) and $FF0000) or ((num shl 24) and $FF000000);
-end;
-function be_to_le_qword(num:qword):qword;
-begin
- be_to_le_qword:=((num shr 56) and $FF) or ((num shr 40) and $FF00)
-         or((num shr 24) and $FF0000) or ((num shr 8) and $FF000000)
-         or((num shl 8) and $FF00000000) or ((num shl 24) and $FF0000000000)
-         or((num shl 40) and $FF000000000000) or ((num shl 56) and $FF00000000000000);
-end;
-function le_to_be_word(num:word):word;
-begin
- le_to_be_word:=((num shr 8) and $FF) or ((num shl 8) and $FF00);
-end;
-function le_to_be_dword(num:dword):dword;
-begin
- le_to_be_dword:=((num shr 24) and $FF) or ((num shr 8) and $FF00)
-         or((num shl 8) and $FF0000) or ((num shl 24) and $FF000000);
-end;
-function le_to_be_qword(num:qword):qword;
-begin
- le_to_be_qword:=((num shr 56) and $FF) or ((num shr 40) and $FF00)
-         or((num shr 24) and $FF0000) or ((num shr 8) and $FF000000)
-         or((num shl 8) and $FF00000000) or ((num shl 24) and $FF0000000000)
-         or((num shl 40) and $FF000000000000) or ((num shl 56) and $FF00000000000000);
-end;  
-function abs(x:natint):natint;[public,alias:'abs_natint'];
+function abs(x:natint):natint;
 begin
  if(x>0) then abs:=x else abs:=-x;
 end;
@@ -887,7 +428,7 @@ function abs(x:extended):extended;[public,alias:'abs_extended'];
 begin
  if(x>0) then abs:=x else abs:=-x;
 end;
-function frac(x:extended):extended;[public,alias:'frac'];
+function frac(x:extended):extended;
 var j:natuint;
     num:extended;
     procnum:natuint;
@@ -912,13 +453,13 @@ begin
   end;
  if(x>0) then frac:=num else frac:=-num;
 end;
-function ceil(x:extended):natint;[public,alias:'ceil'];
+function ceil(x:extended):natint;
 var num:extended;
     j,procnum:natuint;
     res:natint;
 begin
  if(x>0) then num:=x else num:=-x;
- procnum:=1;
+ procnum:=1; res:=0;
  while(procnum shl 4<num) do procnum:=procnum shl 4;
  while(num>=1) do
   begin
@@ -937,13 +478,13 @@ begin
  if(num>0) then inc(res);
  ceil:=res;
 end;
-function floor(x:extended):natint;[public,alias:'floor'];
+function floor(x:extended):natint;
 var num:extended;
     j,procnum:natuint;
     res:natint;
 begin
  if(x>0) then num:=x else num:=-x;
- procnum:=1;
+ procnum:=1; res:=0;
  while(procnum shl 4<num) do procnum:=procnum shl 4;
  while(num>=1) do
   begin
@@ -962,13 +503,13 @@ begin
  if(num<0) then dec(res);
  floor:=res;
 end;
-function trunc(x:extended):natint;[public,alias:'trunc'];
+function trunc(x:extended):natint;
 var num:extended;
     j,procnum:natuint;
     res:natint;
 begin
  if(x>0) then num:=x else num:=-x;
- procnum:=1;
+ procnum:=1; res:=0;
  while(procnum shl 4<num) do procnum:=procnum shl 4;
  while(num>=1) do
   begin
@@ -986,13 +527,13 @@ begin
  if(x<0) then res:=-res;
  trunc:=res;
 end;
-function round(x:extended):natint;[public,alias:'round'];
+function round(x:extended):natint;
 var num:extended;
     j,procnum:natuint;
     res:natint;
 begin
  if(x>0) then num:=x else num:=-x;
- procnum:=1;
+ procnum:=1; res:=0;
  while(procnum shl 4<num) do procnum:=procnum shl 4;
  while(num>=1) do
   begin
@@ -1011,13 +552,13 @@ begin
  if(num>=0.5) then inc(res);
  round:=res;
 end;
-function banker_round(x:extended):natint;[public,alias:'banker_round'];
+function banker_round(x:extended):natint;
 var num:extended;
     j,procnum:natuint;
     res:natint;
 begin
  if(x>0) then num:=x else num:=-x;
- procnum:=1;
+ procnum:=1; res:=0;
  while(procnum shl 4<num) do procnum:=procnum shl 4;
  while(num>=1) do
   begin
@@ -1036,15 +577,15 @@ begin
  if(num>=0.5) and (res-res shr 1 shl 1=1) then inc(res);
  banker_round:=res;
 end;
-function sqr(x:natuint):natuint;[public,alias:'sqr_natuint'];
+function sqr(x:natuint):natuint;
 begin
  sqr:=x*x;
 end;
-function sqr(x:natint):natint;[public,alias:'sqr_natint'];
+function sqr(x:natint):natint;
 begin
  sqr:=x*x;
 end;
-function sqr(x:extended):extended;[public,alias:'sqr_extended'];
+function sqr(x:extended):extended;
 begin
  sqr:=x*x;
 end;
@@ -1155,6 +696,7 @@ var i:byte;
 begin
  res:=0;
  for i:=1 to 10 do res:=res+intpower(x,i-1)/factorial(i-1);
+ exp:=res;
 end;
 function power(base:extended;exponent:extended):extended;
 var i:byte;
@@ -1275,1487 +817,1230 @@ function arccsc(x:extended):extended;
 begin
  arccsc:=arcsin(1/x);
 end;
-function strlen(str:Pchar):natuint;[public,alias:'strlen'];
-var res:natuint;
+function permutation_number(m,n:Natuint):extended;
 begin
- res:=0;
- if(str=nil) then exit(0);
- while((str+res)^<>#0) do inc(res);
- strlen:=res;
+ permutation_number:=factorial(n)/factorial(n-m);
 end;
-function wstrlen(str:PWideChar):natuint;[public,alias:'Wstrlen'];
-var res:natuint;
+function conbinartorial_number(m,n:Natuint):extended;
 begin
- res:=0;
- if(str=nil) then exit(0);
- while((str+res)^<>#0) do inc(res);
- wstrlen:=res;
+ conbinartorial_number:=factorial(n)/(factorial(m)*factorial(n-m));
 end;
-function strcmp(str1,str2:Pchar):natint;[public,alias:'strcmp'];
-var i:natint;
+function bernoulli_number(x:Natuint):extended;
+var i,j:Natuint;
+    res:extended;
 begin
- i:=0;
- if(str1=nil) and (str2=nil) then exit(0);
- if(str1=nil) then exit(-1) else if(str2=nil) then exit(1);
- while((str1+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0) do inc(i);
- if((str1+i)^>(str2+i)^) then strcmp:=1
- else if((str1+i)^<(str2+i)^) then strcmp:=-1
- else strcmp:=0;
-end;
-function Wstrcmp(str1,str2:PwideChar):natint;[public,alias:'Wstrcmp'];
-var i:natint;
-begin
- i:=0;
- if(str1=nil) and (str2=nil) then exit(0);
- if(str1=nil) then exit(-1) else if(str2=nil) then exit(1);
- while((str1+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0) do inc(i);
- if((str1+i)^>(str2+i)^) then Wstrcmp:=1
- else if((str1+i)^<(str2+i)^) then Wstrcmp:=-1
- else Wstrcmp:=0;
-end;
-function strpartcmp(str1:PChar;position,length:natuint;str2:PChar):natint;[public,alias:'strpartcmp'];
-var i,len:natuint;
-begin
- i:=0; len:=strlen(str1);
- if(str1=nil) and (str2=nil) then exit(0);
- if(str1=nil) then exit(-1) else if(str2=nil) then exit(1);
- if(position+length-1>len) then
-  begin
-   while((str1+position+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0)
-   and (i<len-position+1) do inc(i);
-   if(i>=len-position+1) then strpartcmp:=0
-   else if((str1+position+i)^<(str2+i)^) then strpartcmp:=-1
-   else if((str1+position+i)^>(str2+i)^) then strpartcmp:=1
-   else strpartcmp:=0;
-  end
+ res:=1;
+ if(x=0) then res:=1
+ else if(x=1) then res:=-0.5
+ else if(x mod 2=1) then res:=0
  else
-  begin
-   while((str1+position+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0)
-   and (i<length) do inc(i);
-   if(i>=length) then strpartcmp:=0
-   else if((str1+position+i)^<(str2+i)^) then strpartcmp:=-1
-   else if((str1+position+i)^>(str2+i)^) then strpartcmp:=1
-   else strpartcmp:=0;
-  end;
-end;
-function Wstrpartcmp(str1:PWideChar;position,length:natuint;str2:PWideChar):natint;[public,alias:'Wstrpartcmp'];
-var i,len:natuint;
-begin
- i:=0; len:=Wstrlen(str1);
- if(str1=nil) and (str2=nil) then exit(0);
- if(str1=nil) then exit(-1) else if(str2=nil) then exit(1);
- if(position+length-1>len) then
-  begin
-   while((str1+position+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0)
-   and (i<len-position+1) do inc(i);
-   if(i>=len-position+1) then Wstrpartcmp:=0
-   else if((str1+position+i)^<(str2+i)^) then Wstrpartcmp:=-1
-   else if((str1+position+i)^>(str2+i)^) then Wstrpartcmp:=1
-   else Wstrpartcmp:=0;
-  end
- else
-  begin
-   while((str1+position+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0)
-   and (i<length) do inc(i);
-   if(i>=length) then Wstrpartcmp:=0
-   else if((str1+position+i)^<(str2+i)^) then Wstrpartcmp:=-1
-   else if((str1+position+i)^>(str2+i)^) then Wstrpartcmp:=1
-   else Wstrpartcmp:=0;
-  end;
-end;  
-function strcmpL(str1,str2:Pchar):natint;[public,alias:'strcmpL'];
-var i,len1,len2:natint;
-begin
- i:=0; len1:=strlen(str1); len2:=strlen(str2);
- if(str1=nil) and (str2=nil) then exit(0);
- if(len1>len2) then exit(1) else if(len1<len2) then exit(-1);
- if(str1=nil) then exit(-1) else if(str2=nil) then exit(1);
- while((str1+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0) do inc(i);
- if((str1+i)^>(str2+i)^) then strcmpL:=1
- else if((str1+i)^<(str2+i)^) then strcmpL:=-1
- else strcmpL:=0;
-end;
-function WstrcmpL(str1,str2:PwideChar):natint;[public,alias:'WstrcmpL'];
-var i,len1,len2:natint;
-begin
- i:=0; len1:=Wstrlen(str1); len2:=Wstrlen(str2);
- if(str1=nil) and (str2=nil) then exit(0);
- if(len1>len2) then exit(1) else if(len1<len2) then exit(-1);
- if(str1=nil) then exit(-1) else if(str2=nil) then exit(1);
- while((str1+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0) do inc(i);
- if((str1+i)^>(str2+i)^) then WstrcmpL:=1
- else if((str1+i)^<(str2+i)^) then WstrcmpL:=-1
- else WstrcmpL:=0;
-end;
-function strpartcmpL(str1:PChar;position,length:natuint;str2:PChar):natint;[public,alias:'strpartcmpL'];
-var i,len,sublen:natuint;
-begin
- i:=0; len:=strlen(str1); sublen:=strlen(str2);
- if(str1=nil) and (str2=nil) then exit(0);
- if(str1=nil) then exit(-1) else if(str2=nil) then exit(1);
- if(position+length-1>len) then
-  begin
-   if(len-position+1>sublen) then exit(1) else if(len-position+1<sublen) then exit(-1);
-   while((str1+position+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0)
-   and (i<len-position+1) do inc(i);
-   if(i>=len-position+1) then strpartcmpL:=0
-   else if((str1+position+i)^<(str2+i)^) then strpartcmpL:=-1
-   else if((str1+position+i)^>(str2+i)^) then strpartcmpL:=1
-   else strpartcmpL:=0;
-  end
- else
-  begin
-   if(length>sublen) then exit(1) else if(length<sublen) then exit(-1);
-   while((str1+position+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0)
-   and (i<length) do inc(i);
-   if(i>=length) then strpartcmpL:=0
-   else if((str1+position+i)^<(str2+i)^) then strpartcmpL:=-1
-   else if((str1+position+i)^>(str2+i)^) then strpartcmpL:=1
-   else strpartcmpL:=0;
-  end;
-end;
-function WstrpartcmpL(str1:PWideChar;position,length:natuint;str2:PWideChar):natint;[public,alias:'WstrpartcmpL'];
-var i,len,sublen:natuint;
-begin
- i:=0; len:=Wstrlen(str1); sublen:=Wstrlen(str2);
- if(str1=nil) and (str2=nil) then exit(0);
- if(str1=nil) then exit(-1) else if(str2=nil) then exit(1);
- if(position+length-1>len) then
-  begin
-   if(len-position+1>sublen) then exit(1) else if(len-position+1<sublen) then exit(-1);
-   while((str1+position+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0)
-   and (i<len-position+1) do inc(i);
-   if(i>=len-position+1) then WstrpartcmpL:=0
-   else if((str1+position+i)^<(str2+i)^) then WstrpartcmpL:=-1
-   else if((str1+position+i)^>(str2+i)^) then WstrpartcmpL:=1
-   else WstrpartcmpL:=0;
-  end
- else
-  begin
-   if(length>sublen) then exit(1) else if(length<sublen) then exit(-1);
-   while((str1+position+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0)
-   and (i<length) do inc(i);
-   if(i>=length) then WstrpartcmpL:=0
-   else if((str1+position+i)^<(str2+i)^) then WstrpartcmpL:=-1
-   else if((str1+position+i)^>(str2+i)^) then WstrpartcmpL:=1
-   else WstrpartcmpL:=0;
-  end;
-end;
-procedure strinit(var str:PChar;size:natuint);[public,alias:'strinit'];
-begin
- str:=allocmem(sizeof(char)*(size+1));
-end;
-procedure wstrinit(var str:PWideChar;Size:natuint);[public,alias:'wstrinit'];
-begin
- str:=allocmem(sizeof(WideChar)*(size+1));
-end;
-function strcreate(content:PChar):PChar;[public,alias:'strcreate'];
-var i,len:natuint;
-    res:PChar;
-begin
- len:=strlen(content);
- res:=allocmem(sizeof(char)*(len+1));
- for i:=1 to len do (res+i-1)^:=(content+i-1)^;
- (res+len)^:=#0;
- strcreate:=res;
-end;
-function Wstrcreate(content:PWideChar):PWideChar;[public,alias:'wstrcreate'];
-var i,len:natuint;
-    res:PWideChar;
-begin
- len:=Wstrlen(content);
- res:=allocmem(sizeof(WideChar)*(len+1));
- for i:=1 to len do (res+i-1)^:=(content+i-1)^;
- (res+len)^:=#0;
- Wstrcreate:=res;
-end;
-procedure strrealloc(var str:PChar;size:natuint);[public,alias:'strrealloc'];
-begin
- ReallocMem(str,sizeof(char)*(size+1));
- (str+size)^:=#0;
-end;
-procedure Wstrrealloc(var str:PwideChar;size:natuint);[public,alias:'Wstrrealloc'];
-begin
- ReallocMem(str,sizeof(WideChar)*(size+1));
- (str+size)^:=#0;
-end;
-procedure strset(var str:PChar;val:Pchar);[public,alias:'strset'];
-var i:natuint;
-begin
- i:=0;
- while((val+i)^<>#0) do
-  begin
-   (str+i)^:=(val+i)^; inc(i);
-  end;
- (str+i)^:=#0;
-end;
-procedure wstrset(var str:PWideChar;val:Pwidechar);[public,alias:'Wstrset'];
-var i:natuint;
-begin
- i:=0;
- while((val+i)^<>#0) do
-  begin
-   (str+i)^:=(val+i)^; inc(i);
-  end;
- (str+i)^:=#0;
-end;
-procedure strcat(var dest:PChar;src:PChar);[public,alias:'strcat'];
-var i,len:natuint;
-begin
- if(src=nil) then exit;
- len:=strlen(dest);
- for i:=1 to strlen(src) do
-  begin
-   (dest+len+i-1)^:=(src+i-1)^;
-  end;
- (dest+len+strlen(src))^:=#0;
-end;
-procedure Wstrcat(var dest:PWideChar;src:PWideChar);[public,alias:'Wstrcat'];
-var i,len:natuint;
-begin
- if(src=nil) then exit;
- len:=Wstrlen(dest);
- for i:=1 to Wstrlen(src) do
-  begin
-   (dest+len+i-1)^:=(src+i-1)^;
-  end;
- (dest+len+Wstrlen(src))^:=#0;
-end;
-procedure strfree(var str:PChar);[public,alias:'strfree'];
-begin
- freemem(str); if(str<>nil) then str:=nil;
-end;
-procedure Wstrfree(var str:PWideChar);[public,alias:'Wstrfree'];
-begin
- freemem(str); if(str<>nil) then str:=nil;
-end;
-procedure strUpperCase(var str:PChar);[public,alias:'strUpperCase'];
-var i,len:natuint;
-begin
- len:=strlen(str);
- for i:=1 to len do
-  begin
-   if(str^>='a') and (str^<='z') then str^:=Char(Byte(str^)-32);
-  end;
-end;
-procedure strLowerCase(var str:PChar);[public,alias:'strLowerCase'];
-var i,len:natuint;
-begin
- len:=strlen(str);
- for i:=1 to len do
-  begin
-   if(str^>='A') and (str^<='Z') then str^:=Char(Byte(str^)+32);
-  end;
-end;
-procedure WstrUpperCase(var str:PWideChar);[public,alias:'WstrUpperCase'];
-var i,len:natuint;
-begin
- len:=Wstrlen(str);
- for i:=1 to len do
-  begin
-   if(str^>='a') and (str^<='z') then str^:=WideChar(Word(str^)-32);
-  end;
-end;
-procedure WstrLowerCase(var str:PWideChar);[public,alias:'WstrLowerCase'];
-var i,len:natuint;
-begin
- len:=Wstrlen(str);
- for i:=1 to len do
-  begin
-   if(str^>='A') and (str^<='Z') then str^:=WideChar(Word(str^)+32);
-  end;
-end;  
-function strcopy(str:PChar;index,count:Natuint):Pchar;[public,alias:'strcopy'];
-var newstr:PChar;
-    i,len:natuint;
-begin
- len:=strlen(str);
- if(index>len) then exit(nil);
- if(index+count-1>len) then
-  begin
-   strinit(newstr,len-index+1);
-   for i:=1 to len-index+1 do
-    begin
-     (newstr+i-1)^:=(str+index-1+i-1)^;
-    end;
-   (newstr+len-index+1)^:=#0;
-  end
- else
-  begin
-   strinit(newstr,count);
-   for i:=1 to count do
-    begin
-     (newstr+i-1)^:=(str+index-1+i-1)^;
-    end;
-   (newstr+count)^:=#0;
-  end;
- strcopy:=newstr;
-end;
-function Wstrcopy(str:PWideChar;index,count:Natuint):PWideChar;[public,alias:'Wstrcopy'];
-var newstr:PWideChar;
-    i,len:natuint;
-begin
- len:=Wstrlen(str);
- if(index>len) then exit(nil);
- if(index+count-1>len) then
-  begin
-   Wstrinit(newstr,len-index+1);
-   for i:=1 to len-index+1 do
-    begin
-     (newstr+i-1)^:=(str+index-1+i-1)^;
-    end;
-   (newstr+len-index+1)^:=#0;
-  end
- else
-  begin
-   Wstrinit(newstr,count);
-   for i:=1 to count do
-    begin
-     (newstr+i-1)^:=(str+index-1+i-1)^;
-    end;
-   (newstr+count)^:=#0;
-  end;
- Wstrcopy:=newstr;
-end;
-function strcutout(str:PChar;left,right:Natuint):PChar;[public,alias:'strcutout'];
-var newstr:Pchar;
-    i,len:natuint;
-begin
- len:=strlen(str); 
- if(left>len) or (left>right) then exit(nil);
- if(right<=len) then
-  begin
-   strinit(newstr,right-left+1);
-   for i:=left to right do
-    begin
-     (newstr+i-left)^:=(str+i-1)^;
-    end;
-   (newstr+right-left+1)^:=#0;
-  end
- else if(right>len) then
-  begin
-   strinit(newstr,len-left+1);
-   for i:=left to len do
-    begin
-     (newstr+i-1)^:=(str+i-1)^;
-    end;
-   (newstr+len-left+1)^:=#0;
-  end;
- strcutout:=newstr;
-end;
-function Wstrcutout(str:PWideChar;left,right:Natuint):PWideChar;[public,alias:'Wstrcutout'];
-var newstr:PWidechar;
-    i,len:natuint;
-begin
- len:=Wstrlen(str); 
- if(left>len) or (left>right) then exit(nil);
- if(right<=len) then
-  begin
-   Wstrinit(newstr,right-left+1);
-   for i:=left to right do
-    begin
-     (newstr+i-left)^:=(str+i-1)^;
-    end;
-   (newstr+right-left+1)^:=#0;
-  end
- else if(right>len) then
-  begin
-   Wstrinit(newstr,len-left+1);
-   for i:=left to len do
-    begin
-     (newstr+i-1)^:=(str+i-1)^;
-    end;
-   (newstr+len-left+1)^:=#0;
-  end;
- Wstrcutout:=newstr;
-end;
-procedure strdelete(var str:PChar;index,count:Natuint);[public,alias:'strdelete'];
-var i,len:natuint;
-begin
- len:=strlen(str);
- for i:=index+count to len do
-  begin
-   (str+i-1-count)^:=(str+i-1)^;
-   (str+i-1)^:=#0;
-  end;
- (str+len-count)^:=#0;
-end;
-procedure Wstrdelete(var str:PWideChar;index,count:Natuint);[public,alias:'Wstrdelete'];
-var i,len:natuint;
-begin
- len:=Wstrlen(str);
- for i:=index+count to len do
-  begin
-   (str+i-1-count)^:=(str+i-1)^;
-   (str+i-1)^:=#0;
-  end;
- (str+len-count)^:=#0;
-end;
-procedure strdeleteinrange(var str:PChar;left,right:Natuint);[public,alias:'strdeleteinrange'];
-var i,len,distance:natuint;
-begin
- len:=strlen(str); distance:=right-left+1;
- for i:=right+1 to len do
-  begin
-   (str+i-1-distance)^:=(str+i-1)^;
-   (str+i-1)^:=#0;
-  end;
- (str+len-distance)^:=#0;
-end;
-procedure WStrdeleteinrange(var str:PWideChar;left,right:Natuint);[public,alias:'Wstrdeleteinrange'];
-var i,len,distance:natuint;
-begin
- len:=Wstrlen(str); distance:=right-left+1;
- for i:=right+1 to len do
-  begin
-   (str+i-1-distance)^:=(str+i-1)^;
-   (str+i-1)^:=#0;
-  end;
- (str+len-distance)^:=#0;
-end;
-procedure strinsert(var str:PChar;insertstr:PChar;index:natuint);[public,alias:'strinsert'];
-var strlength,partlength,i:natuint;
-begin
- strlength:=strlen(str);
- partlength:=strlen(insertstr);
- for i:=strlength downto index do
-  begin
-   (str+i-1+partlength)^:=(str+i-1)^;
-  end;
- for i:=1 to partlength do
-  begin
-   (str+index-1+i-1)^:=(insertstr+i-1)^;
-  end;
- (str+strlength+partlength)^:=#0;
-end;
-procedure Wstrinsert(var str:PWideChar;insertstr:PWideChar;index:natuint);[public,alias:'Wstrinsert'];
-var strlength,partlength,i:natuint;
-begin
- strlength:=Wstrlen(str);
- partlength:=Wstrlen(insertstr);
- for i:=strlength downto index do
-  begin
-   (str+i-1+partlength)^:=(str+i-1)^;
-  end;
- for i:=1 to partlength do
-  begin
-   (str+index-1+i-1)^:=(insertstr+i-1)^;
-  end;
- (str+strlength+partlength)^:=#0;
-end;
-function strpos(str,substr:PChar;start:Natuint):Natuint;[public,alias:'strpos'];
-var i,mylen,mysublen:natuint;
-    partstr:PChar;
-begin
- if(str=nil) or (substr=nil) then exit(0);
- mylen:=strlen(str)-strlen(substr)+1; mysublen:=strlen(substr);
- if(start>=mylen) then exit(0);
- i:=start;
- while(i<=mylen) do
-  begin
-   partstr:=strcopy(str,i,mysublen);
-   if(strcmp(substr,partstr)=0) then 
-    begin
-     strfree(partstr); break;
-    end;
-   strfree(partstr);
-   inc(i);
-  end;
- if(i>mylen) then strpos:=0 else strpos:=i;
-end;
-function Wstrpos(str,substr:PWideChar;start:natuint):natuint;[public,alias:'Wstrpos'];
-var i,mylen,mysublen:natuint;
-    partstr:PWideChar;
-begin
- if(str=nil) or (substr=nil) then exit(0);
- mylen:=Wstrlen(str)-Wstrlen(substr)+1; mysublen:=Wstrlen(substr);
- if(start>mylen) then exit(0);
- i:=start;
- while(i<=mylen) do
-  begin
-   partstr:=Wstrcopy(str,i,mysublen);
-   if(Wstrcmp(substr,partstr)=0) then 
-    begin
-     Wstrfree(partstr);
-     break;
-    end;
-   Wstrfree(partstr);
-   inc(i);
-  end;
- if(i>mylen) then Wstrpos:=0 else Wstrpos:=i;
-end;
-function strposdir(str,substr:PChar;start:natuint;direction:shortint):natuint;[public,alias:'strposdir'];
-var i,mylen,mysublen:natuint;
-    partstr:PChar;
-begin
- if(str=nil) or (substr=nil) then exit(0);
- mylen:=strlen(str)-strlen(substr)+1; mysublen:=strlen(substr);
- if(start>mylen) and (direction=1) then exit(0);
- if(start<1) and (direction=-1) then exit(0);
- if(direction=1) then
-  begin
-   i:=start;
-   while(i<=mylen) do 
-    begin
-     partstr:=strcopy(str,i,mysublen);
-     if(strcmp(substr,partstr)=0) then 
-      begin
-       strfree(partstr);
-       break;
-      end;
-     strfree(partstr);
-     inc(i);
-    end;
-   if(i>mylen) then strposdir:=0 else strposdir:=i;
-  end
- else if(direction=-1) then
-  begin
-   i:=start;
-   while(i>=1) do
-    begin
-     partstr:=strcopy(str,i,mysublen);
-     if(strcmp(substr,partstr)=0) then 
-      begin
-       strfree(partstr);
-       break;
-      end;
-     strfree(partstr);
-     dec(i);
-    end;
-   if(i=0) then strposdir:=0 else strposdir:=i;
-  end
- else if(direction=0) then strposdir:=0;
-end;
-function Wstrposdir(str,substr:PWideChar;start:natuint;direction:shortint):natuint;[public,alias:'Wstrposdir'];
-var i,mylen,mysublen:natuint;
-    partstr:PWideChar;
-begin
- if(str=nil) or (substr=nil) then exit(0);
- mylen:=Wstrlen(str)-Wstrlen(substr)+1; mysublen:=Wstrlen(substr);
- if(start>mylen) and (direction=1) then exit(0);
- if(start<1) and (direction=-1) then exit(0);
- if(direction=1) then
-  begin
-   i:=start;
-   while(i<=mylen) do 
-    begin
-     partstr:=Wstrcopy(str,i,mysublen);
-     if(Wstrcmp(substr,partstr)=0) then 
-      begin
-       Wstrfree(partstr);
-       break;
-      end;
-     Wstrfree(partstr);
-     inc(i);
-    end;
-   if(i>mylen) then Wstrposdir:=0 else Wstrposdir:=i;
-  end
- else if(direction=-1) then
-  begin
-   i:=start;
-   while(i>=1) do
-    begin
-     partstr:=Wstrcopy(str,i,mysublen);
-     if(Wstrcmp(substr,partstr)=0) then 
-      begin
-       Wstrfree(partstr);
-       break;
-      end;
-     Wstrfree(partstr);
-     dec(i);
-    end;
-   if(i=0) then Wstrposdir:=0 else Wstrposdir:=i;
-  end
- else if(direction=0) then Wstrposdir:=0;
-end;
-function strposorder(str,substr:PChar;start,order:natuint):natuint;[public,alias:'strposorder'];
-var i,forder,mylen,mysublen:natuint;
-    partstr:Pchar;
-begin
- if(str=nil) or (substr=nil) then exit(0);
- mylen:=strlen(str)-strlen(substr)+1; mysublen:=strlen(substr);
- if(start>mylen) then exit(0);
- if(order=0) then exit(0);
- i:=start; forder:=0;
- while(i<=mylen) do
-  begin 
-   partstr:=strcopy(str,i,mysublen);
-   if(strcmp(substr,partstr)=0) then
-    begin
-     inc(forder);
-     strfree(partstr);
-     if(forder>=order) then break else inc(i,mysublen);
-    end
-   else 
-    begin
-     strfree(partstr);
-     inc(i);
-    end;
-  end;
- if(i>mylen) then strposorder:=0 else strposorder:=i;
-end;
-function Wstrposorder(str,substr:PWideChar;start,order:natuint):natuint;[public,alias:'Wstrposorder'];
-var i,forder,mylen,mysublen:natuint;
-    partstr:PWideChar;
-begin
- if(str=nil) or (substr=nil) then exit(0);
- mylen:=Wstrlen(str)-Wstrlen(substr)+1; mysublen:=Wstrlen(substr);
- if(start>mylen) then exit(0);
- if(order=0) then exit(0);
- i:=start; forder:=0;
- while(i<=mylen) do
-  begin 
-   partstr:=Wstrcopy(str,i,mysublen);
-   if(Wstrcmp(substr,partstr)=0) then
-    begin
-     inc(forder);
-     Wstrfree(partstr);
-     if(forder>=order) then break else inc(i,mysublen);
-    end
-   else 
-    begin
-     Wstrfree(partstr);
-     inc(i);
-    end;
-  end;
- if(i>mylen) then Wstrposorder:=0 else Wstrposorder:=i;
-end;
-function strposdirorder(str,substr:PChar;start,order:natuint;direction:shortint):natuint;[public,alias:'strposdirorder'];
-var i,forder,mylen,mysublen:natuint;
-    partstr:PChar;
-begin
- if(str=nil) or (substr=nil) then exit(0);
- mylen:=strlen(str)-strlen(substr)+1; mysublen:=strlen(substr);
- if(start>mylen) and (direction=1) then exit(0);
- if(start<1) and (direction=-1) then exit(0);
- if(direction=0) then exit(0);
- if(order=0) then exit(0);
- i:=start; forder:=0;
- if(direction=1) then
-  begin
-   while(i<=mylen) do
-    begin
-     partstr:=strcopy(str,i,mysublen);
-     if(strcmp(substr,partstr)=0) then
-      begin
-       inc(forder);
-       strfree(partstr);
-       if(forder>=order) then break else inc(i,mysublen);
-      end
-     else 
-      begin
-       strfree(partstr);
-       inc(i);
-      end;
-    end;
-   if(i>mylen) then strposdirorder:=0 else strposdirorder:=i;
-  end
- else if(direction=-1) then
-  begin
-   while(i>=1) do
-    begin
-     partstr:=strcopy(str,i,mysublen);
-     if(strcmp(substr,partstr)=0) then
-      begin
-       inc(forder);
-       strfree(partstr);
-       if(forder>=order) then break else dec(i,mysublen);
-      end
-     else 
-      begin
-       strfree(partstr);
-       dec(i);
-      end;
-    end;
-   if(i=0) then strposdirorder:=0 else strposdirorder:=i;
-  end;
-end;
-function Wstrposdirorder(str,substr:PWideChar;start,order:natuint;direction:shortint):natuint;[public,alias:'Wstrposdirorder'];
-var i,forder,mylen,mysublen:natuint;
-    partstr:PWideChar;
-begin
- if(str=nil) or (substr=nil) then exit(0);
- mylen:=Wstrlen(str)-Wstrlen(substr)+1; mysublen:=Wstrlen(substr);
- if(start>mylen) and (direction=1) then exit(0);
- if(start<1) and (direction=-1) then exit(0);
- if(direction=0) then exit(0);
- if(order=0) then exit(0);
- i:=start; forder:=0;
- if(direction=1) then
-  begin
-   while(i<=mylen) do
-    begin
-     partstr:=Wstrcopy(str,i,mysublen);
-     if(Wstrcmp(substr,partstr)=0) then
-      begin
-       inc(forder);
-       Wstrfree(partstr);
-       if(forder>=order) then break else inc(i,mysublen);
-      end
-     else 
-      begin
-       Wstrfree(partstr);
-       inc(i);
-      end;
-    end;
-   if(i>mylen) then Wstrposdirorder:=0 else Wstrposdirorder:=i;
-  end
- else if(direction=-1) then
-  begin
-   while(i>=1) do
-    begin
-     partstr:=Wstrcopy(str,i,mysublen);
-     if(Wstrcmp(substr,partstr)=0) then
-      begin
-       inc(forder);
-       Wstrfree(partstr);
-       if(forder>=order) then break else dec(i,mysublen);
-      end
-     else 
-      begin
-       Wstrfree(partstr);
-       dec(i);
-      end;
-    end;
-   if(i=0) then Wstrposdirorder:=0 else Wstrposdirorder:=i;
-  end;
-end;
-function strcount(str,substr:PChar;start:Natuint):natuint;[public,alias:'strcount'];
-var i,len1,len2,res:natuint;
-    partstr:PChar;
-begin
- if(str=nil) or (substr=nil) then exit(0);
- len1:=strlen(str); len2:=strlen(substr);
- if(len1=0) or (len2=0) then res:=0
- else if(len2>len1) then
   begin
    res:=0;
-  end
- else if(len2=len1) then
-  begin
-   if(start>1) then res:=0
-   else 
-    begin
-     if(StrCmp(str,substr)=0) then res:=1 else res:=0;
-    end;
-  end
- else
-  begin
-   res:=0; i:=start;
-   while(i<=len1-len2+1) do
-    begin
-     partstr:=strcopy(str,i,len2);
-     if(StrCmp(substr,partstr)=0) then 
-      begin
-       strfree(partstr); inc(i,len2); inc(res);
-      end
-     else 
-      begin
-       strfree(partstr); inc(i);
-      end;
-    end;
+   for i:=0 to x div 2-1 do res:=res+conbinartorial_number(2*i,x+1)*bernoulli_number(2*i);
+   res:=0.5-res/(x+1);
   end;
- strcount:=res;
+ bernoulli_number:=res;
 end;
-function Wstrcount(str,substr:PWideChar;start:Natuint):natuint;[public,alias:'Wstrcount'];
-var i,len1,len2,res:natuint;
-    partstr:PWideChar;
+function euler_number(x:Natuint):extended;
+var i,j:Natuint;
+    res:extended;
 begin
- if(str=nil) or (substr=nil) then exit(0);
- len1:=Wstrlen(str); len2:=Wstrlen(substr);
- if(len1=0) or (len2=0) then res:=0
- else if(len2>len1) then
+ if(x=0) then res:=1
+ else
   begin
    res:=0;
-  end
- else if(len2=len1) then
-  begin
-   if(start>1) then res:=0
-   else 
+   for i:=0 to x-1 do
     begin
-     if(WStrCmp(str,substr)=0) then res:=1 else res:=0;
+     if(i mod 2=0) then res:=res+conbinartorial_number(2*i,2*x)*euler_number(i)
+     else res:=res-conbinartorial_number(2*i,2*x)*euler_number(i);
     end;
-  end
- else
-  begin
-   res:=0; i:=start;
-   while(i<=len1-len2+1) do
-    begin
-     partstr:=Wstrcopy(str,i,len2);
-     if(WStrCmp(substr,partstr)=0) then 
-      begin
-       Wstrfree(partstr); inc(i,len2); inc(res);
-      end
-     else 
-      begin
-       Wstrfree(partstr); inc(i);
-      end;
-    end;
+   res:=-res;
   end;
- Wstrcount:=res;
+ euler_number:=res;
 end;
-function strposinverse(str,substr:PChar;start:Natuint):Natuint;[public,alias:'strposinverse'];
-var i,mylen,mysublen:natuint;
-    partstr:Pchar;
+function sinh(x:extended):extended;
+var n:byte;
+    res:extended;
 begin
- if(str=nil) or (substr=nil) then exit(0);
- mylen:=strlen(str)-strlen(substr)+1; i:=mylen; mysublen:=strlen(substr);
- while(i>=start) do
+ res:=0;
+ for n:=1 to 10 do
   begin
-   partstr:=strcopy(str,i,mysublen);
-   if(strcmp(substr,partstr)=0) then 
-    begin
-     strfree(partstr);
-     break;
-    end;
-   strfree(partstr);
+   res:=res+intpower(x,2*n-1)/factorial(2*n-1);
+  end;
+ sinh:=res;
+end;
+function cosh(x:extended):extended;
+var n:byte;
+    res:extended;
+begin
+ res:=0;
+ for n:=1 to 10 do
+  begin
+   res:=res+intpower(x,2*(n-1))/factorial(2*(n-1));
+  end;
+ cosh:=res;
+end;
+function tanh(x:extended):extended;
+var n:byte;
+    res:extended;
+begin
+ res:=0;
+ for n:=1 to 10 do
+  begin
+   res:=res+(intpower(2,2*n)-1)*intpower(2,2*n)*bernoulli_number(2*n)/factorial(2*n)*intpower(x,2*n-1);
+  end;
+ tanh:=res;
+end;
+function coth(x:extended):extended;
+var n:byte;
+    res:extended;
+begin
+ res:=0;
+ for n:=1 to 10 do
+  begin
+   res:=res+(intpower(2,2*n)*bernoulli_number(2*n))/factorial(2*n)*intpower(x,2*n-1);
+  end;
+ coth:=res;
+end;
+function sech(x:extended):extended;
+var n:byte;
+    res:extended;
+begin
+ res:=0;
+ for n:=1 to 10 do
+  begin
+   res:=res+(intpower(-1,n))/factorial(2*n)*euler_number(n)*intpower(x,2*n-1);
+  end;
+ sech:=res;
+end;
+function csch(x:extended):extended;
+var n:byte;
+    res:extended;
+begin
+ res:=0;
+ for n:=1 to 10 do
+  begin
+   res:=res+2*(1-intpower(2,2*n-1))/factorial(2*n)*bernoulli_number(2*n)*intpower(x,2*n-1);
+  end;
+ csch:=res;
+end;
+function system_align(value:Pointer;align:Natuint):Pointer;
+begin
+ system_align:=Pointer((Natuint(value)+align-1) div align*align);
+end;
+function check_type_need_finalize(TypeInfo:Pointer):boolean;
+begin
+ case PTypeKind(TypeInfo)^ of
+ tkDynArray,tkSString,tkLString,tkAString,tkWString,tkUString,tkInterface,tkClassRef,tkObject,
+ tkVariant,tkClass,tkRecord:check_type_need_finalize:=true;
+ else check_type_need_finalize:=false;
+ end;
+end;
+function check_type_need_size(TypeInfo:Pointer):Natint;
+begin
+ check_type_need_size:=PNatint(system_align(TypeInfo+2+Pbyte(TypeInfo+1)^,8))^;
+end;
+function heap_initialize(startaddress,endaddress:Pointer;heapbasepower,heapstep,heapmemstep,heapcount:byte):heap_record;
+var resrec:heap_record;
+    i:byte;
+    blockcount,blockcounttotal,blockblock,needblock:Natuint;
+    tempstartaddress,tempendaddress:Pointer;
+begin
+ {Initialize the Heap Fundamental Content}
+ resrec.heap:=@sysheap_portion[1];
+ resrec.heapcount:=heapcount;
+ {Initialize the heap base block}
+ i:=1; blockcount:=0; blockcounttotal:=0;
+ while(i<=heapcount)do
+  begin
+   blockcount:=blockcount*heapmemstep+1;
+   inc(blockcounttotal,blockcount);
+   inc(i);
+  end;
+ blockblock:=Natuint(endaddress-startaddress+1) div blockcounttotal;
+ {Initialize the Heap Portion}
+ i:=1; tempstartaddress:=startaddress; needblock:=0;
+ while(i<=heapcount)do
+  begin
+   Pheap_record_portion(resrec.heap+i-1)^.startaddress:=tempstartaddress;
+   needblock:=needblock*heapmemstep+1;
+   tempendaddress:=tempstartaddress+blockblock*needblock-1;
+   Pheap_record_portion(resrec.heap+i-1)^.endaddress:=tempendaddress;
+   Pheap_record_portion(resrec.heap+i-1)^.blockpower:=heapbasepower+heapstep*(i-1);
+   Pheap_record_portion(resrec.heap+i-1)^.ItemEnd:=0;
+   Pheap_record_portion(resrec.heap+i-1)^.RestSize:=blockblock*needblock;
+   inc(i);
+   tempstartaddress:=tempendaddress+1;
+  end;
+ heap_initialize:=resrec;
+end;
+function heap_item_to_address(portion:heap_record_portion;itemindex:Natuint):Pointer;
+begin
+ heap_item_to_address:=portion.endaddress+1-itemindex shl portion.blockpower;
+end;
+function heap_address_to_item(portion:heap_record_portion;address:Pointer):Natuint;
+var block:Natuint;
+begin
+ block:=Natuint(portion.endaddress-address+1 shl portion.blockpower) shr portion.blockpower;
+ heap_address_to_item:=block;
+end;
+function heap_get_start_index(portion:heap_record_portion;itemindex:Natuint):Natuint;
+var i:Natuint;
+begin
+ i:=itemindex;
+ if(i*(1 shl portion.blockpower+1)>(portion.endaddress-portion.startaddress+1)) then exit(0);
+ while(i>0)do
+  begin
+   if(Pheap_record_item(portion.startaddress+i-1)^.Left=0) and 
+   (Pheap_record_item(portion.startaddress+i-1)^.Allocated>0) then break;
    dec(i);
   end;
- if(i<start) then strposinverse:=0 else strposinverse:=i;
+ if(i<>0) then heap_get_start_index:=i else heap_get_start_index:=0;
 end;
-function Wstrposinverse(str,substr:PWideChar;start:natuint):natuint;[public,alias:'Wstrposinverse'];
-var i,mylen,mysublen:natuint;
-    partstr:PWideChar;
+function heap_get_start_address(portion:heap_record_portion;address:Pointer):Pointer;
+var index:Natuint;
 begin
- if(str=nil) or (substr=nil) then exit(0);
- mylen:=Wstrlen(str)-Wstrlen(substr)+1; i:=mylen; mysublen:=Wstrlen(substr);
- while(i>=start) do
+ if(address<portion.startaddress) or (address>portion.endaddress) then exit(nil);
+ index:=heap_address_to_item(portion,address);
+ if(index*(1 shl portion.blockpower+1)>(portion.endaddress-portion.startaddress+1)) then exit(nil);
+ while(index>0)do
   begin
-   partstr:=Wstrcopy(str,i,mysublen);
-   if(Wstrcmp(substr,partstr)=0) then 
-    begin
-     Wstrfree(partstr);
-     break;
-    end;
-   Wstrfree(partstr);
+   if(Pheap_record_item(portion.startaddress+index-1)^.Left=0) and
+   (Pheap_record_item(portion.startaddress+index-1)^.Allocated>0) then break;
+   dec(index);
+  end;
+ if(index<>0) then heap_get_start_address:=heap_item_to_address(portion,index)
+ else heap_get_start_address:=portion.startaddress;
+end;
+function heap_get_block_count(portion:heap_record_portion;itemindex:Natuint):Natuint;
+var i,j:Natuint;
+begin
+ i:=itemindex; j:=itemindex;
+ while(i>0) do
+  begin
+   if(Pheap_record_item(portion.startaddress+i-1)^.Left=0) and
+   (Pheap_record_item(portion.startaddress+i-1)^.Allocated>0) then break;
    dec(i);
   end;
- if(i<start) then Wstrposinverse:=0 else Wstrposinverse:=i;
+ if(i=0) then exit(0);
+ while(j<=portion.ItemEnd)do
+  begin
+   if(Pheap_record_item(portion.startaddress+j-1)^.Right=0) and
+   (Pheap_record_item(portion.startaddress+j-1)^.Allocated>0) then break;
+   inc(j);
+  end;
+ if(j>portion.ItemEnd) then exit(0);
+ heap_get_block_count:=j-i+1;
 end;
-function PCharToPWChar(orgstr:PChar):PWideChar;[public,alias:'PCharToPWChar'];
-var res:PWideChar;
-    len,i:natuint;
+function heap_get_size(portion:heap_record_portion;itemindex:Natuint):Natuint;
+var i,j:Natuint;
 begin
-  len:=strlen(orgstr); i:=1;
-  Wstrinit(res,len);
-  while(i<=len+1) do
-   begin
-    (res+i-1)^:=WideChar(Word((orgstr+i-1)^)); inc(i);
-   end;
-  PCharToPWChar:=res;
+ i:=itemindex; j:=itemindex;
+ while(i>0) do
+  begin
+   if(Pheap_record_item(portion.startaddress+i-1)^.Left=0) and
+   (Pheap_record_item(portion.startaddress+i-1)^.Allocated>0) then break;
+   dec(i);
+  end;
+ if(i=0) then exit(0);
+ while(j<=portion.ItemEnd)do
+  begin
+   if(Pheap_record_item(portion.startaddress+j-1)^.Right=0) and
+   (Pheap_record_item(portion.startaddress+j-1)^.Allocated>0) then break;
+   inc(j);
+  end;
+ if(j>portion.ItemEnd) then exit(0);
+ heap_get_size:=(j-i+1) shl portion.blockpower;
 end;
-function PWCharToPChar(orgstr:PWideChar):PChar;[public,alias:'PWCharToPChar'];
-var res:PChar;
-    len,i:natuint;
+function heap_request_memory(var portion:heap_record_portion;size:Natuint;RequestLevel:boolean;meminit:boolean):Pointer;
+var i,j,k,m:Natuint;
+    blockcount:Natuint;
+    startaddress:Pointer;
 begin
-  len:=Wstrlen(orgstr); i:=1;
-  strinit(res,len);
-  while(i<=len+1) do
-   begin
-    (res+i-1)^:=Char(Byte((orgstr+i-1)^)); inc(i);
-   end;
-  PWCharToPChar:=res;
-end;
-function PCharIsInt(str:PChar):boolean;[public,alias:'PCharIsInt'];
-const numchar:PChar='0123456789';
-var i,j,len:natuint;
-begin
- len:=strlen(str);
- for i:=1 to len do
+ blockcount:=(size+1 shl portion.blockpower-1) shr portion.blockpower;
+ {If cannot allocate,return nil}
+ if((1 shl portion.blockpower+1)*blockcount>portion.RestSize) or (blockcount=0) then
   begin
-   j:=0;
-   while(j<=9) do if((str+i-1)^=(numchar+j)^) then break else inc(j);
-   if(j>9) then break;
+   exit(nil);
   end;
- if(j>9) then PCharIsInt:=false else PCharIsInt:=true;
-end;
-function PWCharIsInt(str:PWideChar):boolean;[public,alias:'PWCharIsInt'];
-const numchar:PWideChar='0123456789';
-var i,j,len:natuint;
-begin
- len:=Wstrlen(str);
- for i:=1 to len do
+ dec(portion.RestSize,blockcount shl portion.blockpower+blockcount);
+ {Then allocate the memory for request}
+ if(portion.ItemEnd=0) then
   begin
-   j:=0;
-   while(j<=9) do if((str+i-1)^=(numchar+j)^) then break else inc(j);
-   if(j>9) then break;
-  end;
- if(j>9) then PWCharIsInt:=false else PWCharIsInt:=true;
-end;
-function IntToPChar(Int:natint):PChar;
-const numchar:PChar='0123456789';
-var negative:boolean;
-    tempnum1,tempnum2:Natuint;
-    numlength,i,starti,endi:byte;
-    res:PChar;
-begin
- if(Int>=0) then
-  begin
-   negative:=false; tempnum1:=int;
-  end
- else
-  begin
-   negative:=true; tempnum1:=-int;
-  end;
- numlength:=0; tempnum2:=1;
- while(tempnum2<=tempnum1)do
-  begin
-   tempnum2:=tempnum2 shl 3+tempnum2 shl 1;
-   inc(numlength);
-  end;
- tempnum2:=tempnum2 shr 1 div 5;
- if(negative)then
-  begin
-   res:=allocmem(numlength+2); starti:=2; endi:=numlength+1; res^:='-';
-  end
- else if(Int=0) then
-  begin
-   res:=allocmem(2); res^:='0'; exit(res);
-  end
- else
-  begin
-   res:=allocmem(numlength+1); starti:=1; endi:=numlength;
-  end;
- i:=starti;
- while(i<=endi)do
-  begin
-   (res+i-1)^:=(numchar+tempnum1 div tempnum2)^;
-   tempnum1:=tempnum1 mod tempnum2;
-   tempnum2:=tempnum2 shr 1 div 5;
-   inc(i);
-  end;
- IntToPChar:=res;
-end;
-function UintToPChar(UInt:Natuint):Pchar;
-const numchar:PChar='0123456789';
-var tempnum1,tempnum2:natuint;
-    numlength,i:byte;
-    res:PChar;
-begin
- tempnum1:=Uint; tempnum2:=1; numlength:=0;
- while(tempnum2<=tempnum1)do
-  begin
-   tempnum2:=tempnum2 shl 3+tempnum2 shl 1;
-   inc(numlength);
-  end;
- tempnum2:=tempnum2 shr 1 div 5;
- if(UInt=0) then
-  begin
-   res:=allocmem(2); res^:='0'; exit(res);
-  end
- else res:=allocmem(numlength+1);
- i:=1;
- while(i<=numlength)do
-  begin
-   (res+i-1)^:=(numchar+tempnum1 div tempnum2)^;
-   tempnum1:=tempnum1 mod tempnum2;
-   tempnum2:=tempnum2 shr 1 div 5;
-   inc(i);
-  end;
- UintToPChar:=res;
-end;
-function ExtendedToPChar(Ext:Extended;decimal:word):PChar;
-const numchar:PChar='0123456789';
-var negative:boolean;
-    tempnum1,tempnum2,intpart,decpart:extended;
-    intstr,decstr:PChar;
-    i,intlen,declen:word;
-    res:PChar;
-begin
- if(Ext>=0) then
-  begin
-   negative:=false; decpart:=frac(Ext); intpart:=Ext-decpart;
-  end
- else
-  begin
-   negative:=true; decpart:=frac(-Ext); intpart:=(-Ext)-decpart;
-  end;
- intstr:=allocmem(512); tempnum1:=1; intlen:=0;
- while(tempnum1<=intpart)do
-  begin
-   tempnum1:=tempnum1*10;
-   inc(intlen);
-  end;
- if(intlen=0) then intstr^:='0'; 
- tempnum1:=tempnum1/10; i:=1;
- while(i<=intlen)do
-  begin
-   (intstr+i-1)^:=(numchar+floor(intpart/tempnum1))^;
-   intpart:=intpart-floor(intpart/tempnum1)*tempnum1;
-   tempnum1:=tempnum1/10;
-   inc(i);
-  end;
- decstr:=allocmem(512); tempnum2:=1; declen:=decimal; i:=1;
- while(i<=decimal)do
-  begin
-   tempnum2:=tempnum2*10; decpart:=decpart*10; inc(i);
-  end;
- tempnum2:=tempnum2/10; i:=1;
- while(i<=declen)do
-  begin
-   (decstr+i-1)^:=(numchar+floor(decpart/tempnum2))^;
-   decpart:=decpart-floor(decpart/tempnum2)*tempnum2;
-   tempnum2:=tempnum2/10;
-   inc(i);
-  end;
- res:=allocmem(1024);
- if(negative) then res^:='-';
- StrCat(res,intstr);
- if(decimal>0) then
-  begin
-   StrCat(res,'.');
-   StrCat(res,decstr);
-  end;
- FreeMem(intstr); FreeMem(decstr);
- ExtendedToPChar:=res;
-end;
-function IntToHex(Int:natuint):PChar;
-const hexchar:PChar='0123456789ABCDEF';
-var tempnum1,tempnum2:Natuint;
-    hexlen,i:byte;
-    res:PChar;
-begin
- hexlen:=0; tempnum1:=Int; tempnum2:=1; i:=1;
- while(tempnum2<=tempnum1)do
-  begin
-   tempnum2:=tempnum2 shl 4; inc(hexlen);
-  end;
- if(tempnum2 shl 4<>0) and (tempnum2 shr 4<>0) then tempnum2:=tempnum2 shr 4;
- res:=allocmem(17);
- while(i<=hexlen)do
-  begin
-   (res+i-1)^:=(hexchar+tempnum1 div tempnum2)^;
-   tempnum1:=tempnum1-(tempnum1 div tempnum2)*tempnum2;
-   tempnum2:=tempnum2 shr 4;
-   inc(i);
-  end;
- if(Int=0) then
-  begin
-   res^:='0';
-  end;
- IntToHex:=res;
-end;
-function PCharToInt(str:PChar):natint;
-const numchar:PChar='0123456789';
-var negative:boolean;
-    i,j,len:byte;
-    res:natint;
-begin
- len:=strlen(str); res:=0;
- if(len>0) and (str^='-') then
-  begin
-   negative:=true; i:=2;
-  end
- else
-  begin
-   negative:=false; i:=1;
-  end;
- while(i<=len)do
-  begin
-   j:=0;
-   while(j<10)do
+   for i:=1 to blockcount do
     begin
-     if((str+i-1)^=(numchar+j-1)^) then break;
-     inc(j);
-    end;
-   if(j=10) then break;
-   res:=res*10+j;
-   inc(i);
-  end;
- if(negative) then PCharToInt:=-res else PCharToInt:=res;
-end;
-function PCharToUInt(str:PChar):natuint;
-const numchar:PChar='0123456789';
-var i,j,len:byte;
-    res:natuint;
-begin
- i:=1; len:=strlen(str); res:=0;
- while(i<=len)do
-  begin
-   j:=0;
-   while(j<10)do
-    begin
-     if((str+i-1)^=(numchar+j-1)^) then break;
-     inc(j);
-    end;
-   if(j=10) then break;
-   res:=res*10+j;
-   inc(i);
-  end;
- PCharToUint:=res;
-end;
-function PCharToExtended(str:PChar):Extended;
-const numchar:PChar='0123456789';
-var negative,decbool:boolean;
-    intpart,decpart:extended;
-    i,k,len:word;
-    j:byte;
-begin
- len:=strlen(str);
- if(len>0) and (str^='-') then
-  begin
-   negative:=true; i:=2;
-  end
- else
-  begin
-   negative:=false; i:=1;
-  end;
- intpart:=0; decpart:=0; decbool:=false;
- while(i<=len)do
-  begin
-   if((str+i-1)^='.') then
-    begin
-     inc(i); k:=i; decbool:=true; continue;
-    end
-   else
-    begin
-     j:=0;
-     while(j<10)do
+     if(i>1) then Pheap_record_item(portion.startaddress+i-1)^.Left:=1
+     else Pheap_record_item(portion.startaddress+i-1)^.Left:=0;
+     if(RequestLevel) then Pheap_record_item(portion.startaddress+i-1)^.RequestLevel:=1
+     else Pheap_record_item(portion.startaddress+i-1)^.RequestLevel:=0;
+     if(i<blockcount) then Pheap_record_item(portion.startaddress+i-1)^.Right:=1
+     else Pheap_record_item(portion.startaddress+i-1)^.Right:=0;
+     Pheap_record_item(portion.startaddress+i-1)^.Allocated:=1;
+     startaddress:=heap_item_to_address(portion,i);
+     if(meminit) then
       begin
-       if((str+i-1)^=(numchar+j-1)^) then break;
-       inc(j);
-      end;
-     if(j=10) then break;
-     if(decbool) then
-      begin
-       decpart:=decpart+j/IntPower(10,i-k);
-      end
-     else
-      begin
-       intpart:=intpart*10+j;
+       for j:=1 to (1 shl portion.blockpower) div Sizeof(Natuint) do (PNatuint(startaddress)+j-1)^:=0;
       end;
     end;
-   inc(i);
-  end;
- if(negative=false) then PCharToExtended:=intpart+decpart
- else PCharToExtended:=-(intpart+decpart);
-end;
-function HexToInt(Hex:PChar):natuint;
-const hexchar1:PChar='0123456789ABCDEF';
-      hexchar2:PChar='0123456789abcdef';
-var i,j,len:byte;
-    res:natuint;
-begin
- i:=1; len:=strlen(Hex); res:=0;
- while(i<=len)do
-  begin
-   j:=0;
-   while(j<16)do
-    begin
-     if((hex+i-1)^=(hexchar1+j)^) then break;
-     if((hex+i-1)^=(hexchar2+j)^) then break;
-     inc(j);
-    end;
-   if(j=16) then break;
-   res:=res shl 4+j;
-   inc(i);
-  end;
- HexToInt:=res;
-end;
-function IntToPWChar(Int:natint):PWideChar;
-const numchar:PWideChar='0123456789';
-var negative:boolean;
-    tempnum1,tempnum2:Natuint;
-    numlength,i,starti,endi:byte;
-    res:PWideChar;
-begin
- if(Int>=0) then
-  begin
-   negative:=false; tempnum1:=int;
+   portion.ItemEnd:=blockcount;
+   heap_request_memory:=heap_item_to_address(portion,portion.ItemEnd);
   end
  else
   begin
-   negative:=true; tempnum1:=-int;
-  end;
- numlength:=0; tempnum2:=1;
- while(tempnum2<=tempnum1)do
-  begin
-   tempnum2:=tempnum2 shl 3+tempnum2 shl 1;
-   inc(numlength);
-  end;
- tempnum2:=tempnum2 shr 1 div 5;
- if(negative) then
-  begin
-   res:=allocmem((numlength+2)*sizeof(WideChar)); starti:=2; endi:=numlength+1; res^:='-';
-  end
- else if(Int=0) then
-  begin
-   res:=allocmem(2*sizeof(WideChar)); res^:='0'; exit(res);
-  end
- else
-  begin
-   res:=allocmem((numlength+1)*sizeof(WideChar)); starti:=1; endi:=numlength;
-  end;
- i:=starti;
- while(i<=endi)do
-  begin
-   (res+i-1)^:=(numchar+tempnum1 div tempnum2)^;
-   tempnum1:=tempnum1 mod tempnum2;
-   tempnum2:=tempnum2 shr 1 div 5;
-   inc(i);
-  end;
- IntToPWChar:=res;
-end;
-function UintToPWChar(UInt:Natuint):PWideChar;
-const numchar:PWideChar='0123456789';
-var tempnum1,tempnum2:natuint;
-    numlength,i:byte;
-    res:PWideChar;
-begin
- tempnum1:=Uint; tempnum2:=1; numlength:=0;
- while(tempnum2<=tempnum1)do
-  begin
-   tempnum2:=tempnum2 shl 3+tempnum2 shl 1;
-   inc(numlength);
-  end;
- tempnum2:=tempnum2 shr 1 div 5;
- if(UInt=0) then
-  begin
-   res:=allocmem(2*sizeof(WideChar)); res^:='0'; exit(res);
-  end
- else res:=allocmem((numlength+1)*sizeof(WideChar));
- i:=1;
- while(i<=numlength)do
-  begin
-   (res+i-1)^:=(numchar+tempnum1 div tempnum2)^;
-   tempnum1:=tempnum1 mod tempnum2;
-   tempnum2:=tempnum2 shr 1 div 5;
-   inc(i);
-  end;
- UintToPWChar:=res;
-end;
-function ExtendedToPWChar(Ext:Extended;decimal:word):PWideChar;
-const numchar:PWideChar='0123456789';
-var negative:boolean;
-    tempnum1,tempnum2,intpart,decpart:extended;
-    intstr,decstr:PWideChar;
-    i,intlen,declen:word;
-    res:PWideChar;
-begin
- if(Ext>=0) then
-  begin
-   negative:=false; decpart:=frac(Ext); intpart:=Ext-decpart;
-  end
- else
-  begin
-   negative:=true; decpart:=frac(-Ext); intpart:=(-Ext)-decpart;
-  end;
- intstr:=allocmem(1024); tempnum1:=1; intlen:=0;
- while(tempnum1<=intpart)do
-  begin
-   tempnum1:=tempnum1*10;
-   inc(intlen);
-  end;
- if(intlen=0) then intstr^:='0'; 
- tempnum1:=tempnum1/10; i:=1;
- while(i<=intlen)do
-  begin
-   (intstr+i-1)^:=(numchar+floor(intpart/tempnum1))^;
-   intpart:=intpart-floor(intpart/tempnum1)*tempnum1;
-   tempnum1:=tempnum1/10;
-   inc(i);
-  end;
- decstr:=allocmem(1024); tempnum2:=1; declen:=decimal; i:=1;
- while(i<=decimal)do
-  begin
-   tempnum2:=tempnum2*10; decpart:=decpart*10; inc(i);
-  end;
- tempnum2:=tempnum2/10; i:=1;
- while(i<=declen)do
-  begin
-   (decstr+i-1)^:=(numchar+floor(decpart/tempnum2))^;
-   decpart:=decpart-floor(decpart/tempnum2)*tempnum2;
-   tempnum2:=tempnum2/10;
-   inc(i);
-  end;
- res:=allocmem(2048);
- if(negative) then res^:='-';
- WStrCat(res,intstr);
- if(decimal>0) then
-  begin
-   WStrCat(res,'.');
-   WStrCat(res,decstr);
-  end;
- FreeMem(intstr); FreeMem(decstr);
- ExtendedToPWChar:=res;
-end;
-function IntToWHex(Int:natuint):PWideChar;
-const Hexchar:PWideChar='0123456789ABCDEF';
-var tempnum1,tempnum2:Natuint;
-    Hexlen,i:byte;
-    res:PWideChar;
-begin
- Hexlen:=0; tempnum1:=Int; tempnum2:=1; i:=1;
- while(tempnum2<=tempnum1)do
-  begin
-   tempnum2:=tempnum2 shl 4; inc(Hexlen);
-  end;
- if(tempnum2 shl 4<>0) and (tempnum2 shr 4<>0) then tempnum2:=tempnum2 shr 4;
- res:=allocmem(34);
- while(i<=Hexlen)do
-  begin
-   (res+i-1)^:=(Hexchar+tempnum1 div tempnum2)^;
-   tempnum1:=tempnum1-(tempnum1 div tempnum2)*tempnum2;
-   tempnum2:=tempnum2 shr 4;
-   inc(i);
-  end;
- if(Int=0) then res^:='0';
- IntToWHex:=res;
-end;
-function PWCharToInt(str:PWideChar):natint;
-const numchar:PWideChar='0123456789';
-var negative:boolean;
-    i,j,len:byte;
-    res:natint;
-begin
- len:=Wstrlen(str); res:=0;
- if(len>0) and (str^='-') then
-  begin
-   negative:=true; i:=2;
-  end
- else
-  begin
-   negative:=false; i:=1;
-  end;
- while(i<=len)do
-  begin
-   j:=0;
-   while(j<10)do
+   {Search for the empty block to allocate memory}
+   i:=1; j:=1;
+   while(i<=portion.ItemEnd)do
     begin
-     if((str+i-1)^=(numchar+j-1)^) then break;
-     inc(j);
-    end;
-   if(j=10) then break;
-   res:=res*10+j;
-   inc(i);
-  end;
- if(negative) then PWCharToInt:=-res else PWCharToInt:=res;
-end;
-function PWCharToUInt(str:PWideChar):natuint;
-const numchar:PWideChar='0123456789';
-var i,j,len:byte;
-    res:natuint;
-begin
- i:=1; len:=Wstrlen(str); res:=0;
- while(i<=len)do
-  begin
-   j:=0;
-   while(j<10)do
-    begin
-     if((str+i-1)^=(numchar+j-1)^) then break;
-     inc(j);
-    end;
-   if(j=10) then break;
-   res:=res*10+j;
-   inc(i);
-  end;
- PWCharToUint:=res;
-end;
-function PWCharToExtended(str:PWideChar):Extended;
-const numchar:PWideChar='0123456789';
-var negative,decbool:boolean;
-    intpart,decpart:extended;
-    i,k,len:word;
-    j:byte;
-begin
- len:=Wstrlen(str);
- if(len>0) and (str^='-') then
-  begin
-   negative:=true; i:=2;
-  end
- else
-  begin
-   negative:=false; i:=1;
-  end;
- intpart:=0; decpart:=0; decbool:=false;
- while(i<=len)do
-  begin
-   if((str+i-1)^='.') then
-    begin
-     inc(i); k:=i; decbool:=true; continue;
-    end
-   else
-    begin
-     j:=0;
-     while(j<10)do
+     if(Pheap_record_item(portion.startaddress+i-1)^.Allocated=0) then
       begin
-       if((str+i-1)^=(numchar+j-1)^) then break;
-       inc(j);
+       j:=i;
+       while(j<=portion.ItemEnd) and (Pheap_record_item(portion.startaddress+j-1)^.Allocated=0) do inc(j);
+       if(j-i+1>=blockcount) then break;
       end;
-     if(j=10) then break;
-     if(decbool) then
+     inc(i);
+    end;
+   if(i>portion.ItemEnd) then
+    begin
+     j:=portion.ItemEnd+blockcount; inc(portion.ItemEnd,blockcount);
+    end;
+   {Initialize the block}
+   for k:=i to j do
+    begin
+     if(k>i) then Pheap_record_item(portion.startaddress+k-1)^.Left:=1
+     else Pheap_record_item(portion.startaddress+k-1)^.Left:=0;
+     if(RequestLevel) then Pheap_record_item(portion.startaddress+k-1)^.RequestLevel:=1
+     else Pheap_record_item(portion.startaddress+k-1)^.RequestLevel:=0;
+     if(k<j) then Pheap_record_item(portion.startaddress+k-1)^.Right:=1
+     else Pheap_record_item(portion.startaddress+k-1)^.Right:=0;
+     Pheap_record_item(portion.startaddress+k-1)^.Allocated:=1;
+     startaddress:=heap_item_to_address(portion,k);
+     if(meminit) then
       begin
-       decpart:=decpart+j/IntPower(10,i-k);
-      end
-     else
-      begin
-       intpart:=intpart*10+j;
+       for m:=1 to (1 shl portion.blockpower) div Sizeof(Natuint) do (PNatuint(startaddress)+m-1)^:=0;
       end;
     end;
-   inc(i);
+   heap_request_memory:=heap_item_to_address(portion,j);
   end;
- if(negative=false) then PWCharToExtended:=intpart+decpart
- else PWCharToExtended:=-(intpart+decpart);
 end;
-function WHexToInt(Hex:PWideChar):natuint;
-const Hexchar1:PWideChar='0123456789ABCDEF';
-      Hexchar2:PWideChar='0123456789abcdef';
-var i,j,len:byte;
-    res:natuint;
+procedure heap_free_memory(var portion:heap_record_portion;var ptr:Pointer;RequestLevel:boolean;NeedNull:boolean);
+var blockstart,blockcount,i:Natuint;
 begin
- i:=1; len:=Wstrlen(Hex); res:=0;
- while(i<=len)do
+ blockstart:=heap_get_start_index(portion,heap_address_to_item(portion,ptr));
+ if(blockstart=0) or
+ (Pheap_record_item(portion.startaddress+blockstart-1)^.RequestLevel>Byte(RequestLevel)) then exit;
+ blockcount:=heap_get_block_count(portion,blockstart);
+ inc(portion.RestSize,blockcount*(1 shl portion.blockpower+1));
+ for i:=blockstart to blockstart+blockcount-1 do
   begin
-   j:=0;
-   while(j<16)do
+   Pbyte(portion.startaddress+i-1)^:=0;
+  end;
+ if(blockstart+blockcount-1=portion.ItemEnd) then
+  begin
+   i:=portion.ItemEnd;
+   while(i>0)do
     begin
-     if((Hex+i-1)^=(Hexchar1+j)^) then break;
-     if((Hex+i-1)^=(Hexchar2+j)^) then break;
-     inc(j);
+     if(Pheap_record_item(portion.startaddress+i-1)^.Allocated>0) then
+      begin
+       portion.ItemEnd:=i; break;
+      end;
+     dec(i);
     end;
-   if(j=16) then break;
-   res:=res shl 4+j;
+  end;
+ if(NeedNull) then ptr:=nil;
+end;
+procedure heap_move_memory(portion1:heap_record_portion;portion2:heap_record_portion;Source:Pointer;Dest:Pointer);
+var start1,start2:Pointer;
+    index1,index2:Natuint;
+    count1,count2,mincount:Natuint;
+    i:Natuint;
+begin
+ start1:=heap_get_start_address(portion1,Source);
+ if(start1=nil) then exit;
+ index1:=heap_address_to_item(portion1,start1);
+ count1:=heap_get_block_count(portion1,index1);
+ start2:=heap_get_start_address(portion2,Dest);
+ if(start2=nil) then exit;
+ index2:=heap_address_to_item(portion2,start2);
+ count2:=heap_get_block_count(portion2,index2);
+ if(count1>count2) then mincount:=count2 else mincount:=count1;
+ if(Pheap_record_item(portion1.startaddress+index1-1)^.RequestLevel<
+ Pheap_record_item(portion2.startaddress+index2-1)^.RequestLevel) then exit;
+ for i:=1 to mincount div sizeof(Natuint) do
+  begin
+   PNatuint(start2+i-1)^:=PNatuint(start1+i-1)^;
+  end;
+end;
+procedure heap_move(const Source;var Dest;Size:Natuint);
+var i,j,offset,total,rest:Natuint;
+    {$IFDEF CPU64}
+    q1,q2:Pqword;
+    {$ENDIF}
+    d1,d2:Pdword;
+    w1,w2:Pword;
+    b1,b2:Pbyte;
+    conflict:boolean;
+begin
+ conflict:=false;
+ if(Size=0) then exit;
+ if(Pointer(@Dest)=nil) or (Pointer(@Source)=nil) then exit;
+ if((Pointer(@Dest)>=Pointer(@Source)) and (Pointer(@Dest)<=Pointer(@Source)+Size))
+ or((Pointer(@Source)>=Pointer(@Dest)) and (Pointer(@Source)<=Pointer(@Dest)+Size)) then
+ conflict:=true;
+ if(conflict=false) then
+  begin
+   {$IFDEF CPU64}
+   total:=size shr 3; rest:=size-total shl 3;
+   q1:=Pqword(@Source); q2:=Pqword(@Dest);
+   for i:=1 to total do (q2+i-1)^:=(q1+i-1)^;
+   offset:=i shl 3;
+   if(rest>=4) then
+    begin
+     d1:=PDword(Pointer(q1)+offset); d2:=PDword(Pointer(q2)+offset); d2^:=d1^;
+     inc(offset,4); dec(rest,4);
+    end;
+   if(rest>=2) then
+    begin
+     w1:=Pword(Pointer(q1)+offset); w2:=Pword(Pointer(q2)+offset); w2^:=w1^;
+     inc(offset,2); dec(rest,2);
+    end;
+   if(rest>=1) then
+    begin
+     b1:=Pbyte(Pointer(q1)+offset); b2:=Pbyte(Pointer(q2)+offset); b2^:=b1^;
+     inc(offset); dec(rest);
+    end;
+   {$ELSE}
+   total:=size shr 2; rest:=size-total shl 2;
+   d1:=Pdword(@Source); d2:=Pdword(@Dest);
+   for i:=1 to total do (d2+i-1)^:=(d1+i-1)^;
+   offset:=i shl 2;
+   if(rest>=2) then
+    begin
+     w1:=Pword(Pointer(q1)+offset); w2:=Pword(Pointer(q2)+offset); w2^:=w1^;
+     inc(offset,2); dec(rest,2);
+    end;
+   if(rest>=1) then
+    begin
+     b1:=Pbyte(Pointer(q1)+offset); b2:=Pbyte(Pointer(q2)+offset); b2^:=b1^;
+     inc(offset); dec(rest);
+    end;
+   {$ENDIF}
+  end
+ else
+  begin
+   {$IFDEF CPU64}
+   total:=size shr 3; rest:=size-total shl 3;
+   q1:=Pqword(@Source); q2:=Pqword(@Dest);
+   offset:=size;
+   if(rest>=4) then
+    begin
+     d1:=PDword(Pointer(q1)+offset); d2:=PDword(Pointer(q2)+offset); d2^:=d1^;
+     dec(offset,4); dec(rest,4);
+    end;
+   if(rest>=2) then
+    begin
+     w1:=Pword(Pointer(q1)+offset); w2:=Pword(Pointer(q2)+offset); w2^:=w1^;
+     dec(offset,2); dec(rest,2);
+    end;
+   if(rest>=1) then
+    begin
+     b1:=Pbyte(Pointer(q1)+offset); b2:=Pbyte(Pointer(q2)+offset); b2^:=b1^;
+     dec(offset); dec(rest);
+    end;
+   for i:=total downto 1 do (q2+i-1)^:=(q1+i-1)^;
+   {$ELSE}
+   total:=size shr 2; rest:=size-total shl 2;
+   d1:=Pdword(@Source); d2:=Pdword(@Dest);
+   offset:=size;
+   if(rest>=2) then
+    begin
+     w1:=Pword(Pointer(q1)+offset); w2:=Pword(Pointer(q2)+offset); w2^:=w1^;
+     dec(offset,2); dec(rest,2);
+    end;
+   if(rest>=1) then
+    begin
+     b1:=Pbyte(Pointer(q1)+offset); b2:=Pbyte(Pointer(q2)+offset); b2^:=b1^;
+     dec(offset); dec(rest);
+    end;
+   for i:=total downto 1 do (d2+i-1)^:=(d1+i-1)^;
+   {$ENDIF}
+  end;
+end;
+function heap_getmem(var heap:heap_record;size:Natuint;RequestLevel:boolean):Pointer;
+var i:Natuint;
+    ptr:Pointer;
+begin
+ i:=heap.heapcount; ptr:=nil;
+ while(i>0)do
+  begin
+   if(i=1) or (size>=1 shl Pheap_record_portion(heap.heap+i-1)^.blockpower) then
+    begin
+     ptr:=heap_request_memory(Pheap_record_portion(heap.heap+i-1)^,size,RequestLevel,false);
+     if(ptr<>nil) then exit(ptr);
+    end;
+   dec(i);
+  end;
+ heap_getmem:=ptr;
+end;
+function heap_allocmem(var heap:heap_record;size:Natuint;RequestLevel:boolean):Pointer;
+var i:Natuint;
+    ptr:Pointer;
+begin
+ i:=heap.heapcount; ptr:=nil;
+ while(i>0)do
+  begin
+   if(i=1) or (size>=1 shl Pheap_record_portion(heap.heap+i-1)^.blockpower) then
+    begin
+     ptr:=heap_request_memory(Pheap_record_portion(heap.heap+i-1)^,size,RequestLevel,true);
+     if(ptr<>nil) then exit(ptr);
+    end;
+   dec(i);
+  end;
+ heap_allocmem:=ptr;
+end;
+procedure heap_freemem(var heap:heap_record;var ptr:Pointer;RequestLevel:boolean);
+var i:Natuint;
+begin
+ i:=heap.heapcount;
+ while(i>0)do
+  begin
+   if(ptr>=Pheap_record_portion(heap.heap+i-1)^.startaddress) and
+   (ptr<=Pheap_record_portion(heap.heap+i-1)^.endaddress) then
+    begin
+     heap_free_memory(Pheap_record_portion(heap.heap+i-1)^,ptr,RequestLevel,false); exit;
+    end;
+   dec(i);
+  end;
+end;
+function heap_getmemsize(var heap:heap_record;ptr:Pointer;RequestLevel:boolean):Natuint;
+var i,size:Natuint;
+    tempptr:Pointer;
+    index:Natuint;
+begin
+ i:=heap.heapcount;
+ while(i>0)do
+  begin
+   if(ptr>=Pheap_record_portion(heap.heap+i-1)^.startaddress) and
+   (ptr<=Pheap_record_portion(heap.heap+i-1)^.endaddress) then
+    begin
+     tempptr:=heap_get_start_address(Pheap_record_portion(heap.heap+i-1)^,ptr);
+     if(tempptr<>nil) then
+      begin
+       index:=heap_address_to_item(Pheap_record_portion(heap.heap+i-1)^,tempptr);
+       if(Pheap_record_item(Pheap_record_portion(heap.heap+i-1)^.startaddress+index-1)^.RequestLevel>
+       Byte(RequestLevel)) then exit(0);
+       size:=heap_get_size(Pheap_record_portion(heap.heap+i-1)^,index);
+       exit(size);
+      end;
+    end;
+   dec(i);
+  end;
+ heap_getmemsize:=0;
+end;
+function heap_getmemindex(var heap:heap_record;ptr:Pointer):Natuint;
+var i:Natuint;
+begin
+ i:=heap.heapcount;
+ while(i>0)do
+  begin
+   if(Pheap_record_portion(heap.heap+i-1)^.startaddress<=ptr) and
+   (Pheap_record_portion(heap.heap+i-1)^.endaddress>=ptr) then exit(i);
+   dec(i);
+  end;
+ heap_getmemindex:=i;
+end;
+procedure heap_reallocmem(var heap:heap_record;var ptr:Pointer;size:Natuint;RequestLevel:boolean);
+var oldptr,newptr:Pointer;
+    oldsize,newsize:Natuint;
+    oldindex,newindex:Natuint;
+begin
+ oldindex:=heap_getmemindex(heap,ptr);
+ oldptr:=heap_get_start_address(Pheap_record_portion(heap.heap+oldindex-1)^,ptr);
+ newptr:=heap_allocmem(heap,size,RequestLevel);
+ newindex:=heap_getmemindex(heap,newptr);
+ oldsize:=heap_getmemsize(heap,oldptr,RequestLevel);
+ newsize:=heap_getmemsize(heap,newptr,RequestLevel);
+ if(oldindex=0) and (newindex=0) then exit;
+ if(oldindex<>0) and (newindex<>0) and (oldsize<>0) and (newsize<>0) then
+  begin
+   heap_move_memory(Pheap_record_portion(heap.heap+oldindex-1)^,Pheap_record_portion(heap.heap+newindex-1)^,oldptr,newptr);
+   heap_freemem(heap,oldptr,true);
+   ptr:=newptr;
+  end
+ else if(oldsize=newsize) and (oldsize<>0) then
+  begin
+   heap_freemem(heap,newptr,true);
+  end
+ else if(oldsize<>0) and (newsize=0) then
+  begin
+   heap_freemem(heap,oldptr,true);
+   ptr:=nil;
+  end;
+end; 
+function fpc_getmem(size:Natuint):Pointer;compilerproc;
+begin
+ fpc_getmem:=heap_getmem(sysheap,size,true);
+end;
+procedure fpc_freemem(var ptr:Pointer);compilerproc;
+begin
+ heap_freemem(sysheap,ptr,true); ptr:=nil;
+end;
+procedure fpc_move(const Source;var Dest;Size:Natuint);compilerproc;[public,alias:'FPC_MOVE'];
+begin
+ heap_move(Source,Dest,Size);
+end;
+function getmem(size:Natuint):Pointer;
+begin
+ getmem:=heap_getmem(sysheap,size,true);
+end;
+function allocmem(size:Natuint):Pointer;
+begin
+ allocmem:=heap_allocmem(sysheap,size,true);
+end;
+function getmemsize(ptr:Pointer):Natuint;
+begin
+ getmemsize:=heap_getmemsize(sysheap,ptr,true);
+end;
+procedure freemem(var ptr:Pointer);       
+begin
+ heap_freemem(sysheap,ptr,true); ptr:=nil;
+end;
+procedure reallocmem(var ptr:Pointer;size:Natuint);
+begin
+ heap_reallocmem(sysheap,ptr,size,true);
+end;
+procedure move(Const Source;Var Dest;Size:Natuint);
+begin
+ heap_move(Source,Dest,Size);
+end;
+procedure FillByte(Var Dest;Size:Natuint;Data:byte);
+var tempptr:Pointer;
+    i:Natuint;
+begin
+ tempptr:=Pointer(@Dest);
+ for i:=1 to Size do Pbyte(tempptr+i-1)^:=Data;
+end;
+procedure FillChar(Var Dest;Size:Natuint;Data:char);
+var tempptr:Pointer;
+    i:Natuint;
+begin
+ tempptr:=Pointer(@Dest);
+ for i:=1 to Size do PChar(tempptr+i-1)^:=Data;
+end;
+procedure fpc_initialize(Data,TypeInfo:Pointer);compilerproc;
+begin
+ PPointer(@Data)^:=nil;
+end;
+procedure fpc_finalize(Data,TypeInfo:Pointer);compilerproc;
+begin
+ freemem(Data); PPointer(@Data)^:=nil;
+end;
+function fpc_dynamic_array_get_length(ptr:Pointer):Natint;
+begin
+ if(ptr=nil) then exit(0);
+ fpc_dynamic_array_get_length:=Pdynamic_array_header(ptr-sizeof(dynamic_array_header))^.ArrayHighest+1;
+end;
+function fpc_dynamic_array_get_reference(ptr:Pointer):Natint;
+begin
+ if(ptr=nil) then exit(0);
+ fpc_dynamic_array_get_reference:=Pdynamic_array_header(ptr-sizeof(dynamic_array_header))^.ReferenceCount;
+end;
+procedure fpc_dynamic_array_increase_reference(ptr:Pointer);
+begin
+ if(ptr=nil) then exit;
+ inc(Pdynamic_array_header(ptr-sizeof(dynamic_array_header))^.ReferenceCount);
+end;
+procedure fpc_dynamic_array_decrease_reference(ptr:Pointer);
+begin
+ if(ptr=nil) then exit;
+ dec(Pdynamic_array_header(ptr-sizeof(dynamic_array_header))^.ReferenceCount);
+end;
+function fpc_dynamic_array_get_high(ptr:Pointer):Natint;
+begin
+ if(ptr=nil) then exit(-1);
+ fpc_dynamic_array_get_high:=Pdynamic_array_header(ptr-sizeof(dynamic_array_header))^.ArrayHighest;
+end;
+function fpc_dynamic_array_get_element_size(ptr:Pointer):Natint;
+begin
+ if(ptr=nil) then exit(0);
+ fpc_dynamic_array_get_element_size:=Pdynamic_array_header(ptr-sizeof(dynamic_array_header))^.ItemSize;
+end;
+procedure fpc_dynarray_assign(var Dest:Pointer;Source:Pointer;TypeInfo:Pointer);compilerproc;
+begin
+ if(Source=nil) then
+  begin
+   Dest:=getmem(sizeof(dynamic_array_header));
+   Pdynamic_array_header(Dest)^.ReferenceCount:=1;
+   Pdynamic_array_header(Dest)^.ArrayHighest:=-1;
+   Pdynamic_array_header(Dest)^.ItemSize:=check_type_need_size(TypeInfo);
+   inc(Dest,sizeof(dynamic_array_header));
+  end
+ else
+  begin
+   freemem(Dest); Dest:=Source;
+   Pdynamic_array_header(Dest)^.ReferenceCount:=1;
+  end;
+end;
+function fpc_dynarray_copy(Source:Pointer;TypeInfo:Pointer;LowIndex,Count:Natint):dynamic_array_stub;compilerproc;
+var tempptr:Pointer;
+    elementsize:Natint;
+    arrayhighest:Natint;
+begin 
+ elementsize:=fpc_dynamic_array_get_element_size(Source);
+ if(elementsize=0) then elementsize:=check_type_need_size(TypeInfo);
+ arrayhighest:=fpc_dynamic_array_get_high(Source);
+ if(LowIndex+Count-1>ArrayHighest) then
+  begin
+   tempptr:=getmem(sizeof(dynamic_array_header)+elementsize*(ArrayHighest-LowIndex+1));
+   Pdynamic_array_header(tempptr)^.ReferenceCount:=1;
+   Pdynamic_array_header(tempptr)^.ArrayHighest:=ArrayHighest-LowIndex;
+   Pdynamic_array_header(tempptr)^.ItemSize:=fpc_dynamic_array_get_element_size(Source);
+   inc(tempptr,sizeof(dynamic_array_header));
+   Move(Source^,tempptr^,elementsize*(ArrayHighest-LowIndex+1));
+  end
+ else if(LowIndex>0) then
+  begin
+   tempptr:=getmem(sizeof(dynamic_array_header)+elementsize*Count);
+   Pdynamic_array_header(tempptr)^.ReferenceCount:=1;
+   Pdynamic_array_header(tempptr)^.ArrayHighest:=Count-1;
+   Pdynamic_array_header(tempptr)^.ItemSize:=fpc_dynamic_array_get_element_size(Source);
+   inc(tempptr,sizeof(dynamic_array_header));
+   Move(Source^,tempptr^,elementsize*Count);
+  end
+ else if(LowIndex+Count-1>0) then
+  begin
+   tempptr:=getmem(sizeof(dynamic_array_header)+elementsize*(LowIndex+Count-1));
+   Pdynamic_array_header(tempptr)^.ReferenceCount:=1;
+   Pdynamic_array_header(tempptr)^.ArrayHighest:=(LowIndex+Count-2);
+   Pdynamic_array_header(tempptr)^.ItemSize:=ElementSize;
+   inc(tempptr,sizeof(dynamic_array_header));
+   Move(Source^,tempptr^,elementsize*(LowIndex+Count-1));
+  end
+ else tempptr:=nil;
+ fpc_dynarray_copy:=Dynamic_array_stub(tempptr);
+end;
+function fpc_array_to_dynarray_copy(Source:Pointer;TypeInfo:Pointer;LowIndex,Count,MaxCount:Natint;ElementSize:Natint;ElementType:Pointer):dynamic_array_stub;compilerproc;
+var tempptr:Pointer;
+begin 
+ if(LowIndex+Count-1>MaxCount) then
+  begin
+   tempptr:=getmem(sizeof(dynamic_array_header)+elementsize*(MaxCount-LowIndex));
+   Pdynamic_array_header(tempptr)^.ReferenceCount:=1;
+   Pdynamic_array_header(tempptr)^.ArrayHighest:=MaxCount-LowIndex;
+   Pdynamic_array_header(tempptr)^.ItemSize:=ElementSize;
+   inc(tempptr,sizeof(dynamic_array_header));
+   Move(Source^,tempptr^,elementsize*(MaxCount-LowIndex+1));
+  end
+ else if(LowIndex>0) then
+  begin
+   tempptr:=getmem(sizeof(dynamic_array_header)+elementsize*Count);
+   Pdynamic_array_header(tempptr)^.ReferenceCount:=1;
+   Pdynamic_array_header(tempptr)^.ArrayHighest:=Count-1;
+   Pdynamic_array_header(tempptr)^.ItemSize:=ElementSize;
+   inc(tempptr,sizeof(dynamic_array_header));
+   Move(Source^,tempptr^,elementsize*Count);
+  end
+ else if(LowIndex+Count-1>0) then
+  begin
+   tempptr:=getmem(sizeof(dynamic_array_header)+elementsize*(LowIndex+Count-1));
+   Pdynamic_array_header(tempptr)^.ReferenceCount:=1;
+   Pdynamic_array_header(tempptr)^.ArrayHighest:=(LowIndex+Count-2);
+   Pdynamic_array_header(tempptr)^.ItemSize:=ElementSize;
+   inc(tempptr,sizeof(dynamic_array_header));
+   Move(Source^,tempptr^,elementsize*(LowIndex+Count-2));
+  end
+ else tempptr:=nil;
+ fpc_array_to_dynarray_copy:=Dynamic_array_stub(tempptr);
+end;
+function fpc_dynarray_length(ptr:Pointer):Natint;compilerproc;
+begin
+ fpc_dynarray_length:=fpc_dynamic_array_get_length(ptr);
+end;
+function fpc_dynarray_high(ptr:Pointer):Natint;compilerproc;
+begin
+ fpc_dynarray_high:=fpc_dynamic_array_get_high(ptr);
+end;
+procedure fpc_dynarray_clear(var ptr:Pointer;TypeInfo:Pointer);compilerproc;
+var bool:boolean;
+    count,elementsize,i:Natint;
+begin
+ bool:=check_type_need_finalize(TypeInfo); 
+ if(ptr=nil) then 
+  begin
+   ptr:=nil; exit;
+  end;
+ count:=fpc_dynamic_array_get_high(ptr); if(count<0) then exit;
+ elementsize:=fpc_dynamic_array_get_element_size(ptr); if(elementsize=0) then exit;
+ if(bool) then for i:=0 to count do freemem(PPointer(ptr+i*elementsize)^);
+ freemem(ptr); ptr:=nil;
+end;
+procedure fpc_dynarray_incr_ref(ptr:Pointer);compilerproc;
+begin
+ if(fpc_dynamic_array_get_reference(ptr)>0) then 
+ Pdynamic_array_header(ptr-sizeof(dynamic_array_header))^.ReferenceCount:=1;
+end;
+procedure fpc_dynarray_decr_ref(var ptr:Pointer;TypeInfo:Pointer);compilerproc;
+var bool:boolean;
+    count,elementsize,i:Natint;
+begin
+ bool:=check_type_need_finalize(TypeInfo); 
+ if(ptr=nil) then exit;
+ count:=fpc_dynamic_array_get_high(ptr); if(count<0) then exit;
+ elementsize:=fpc_dynamic_array_get_element_size(ptr); if(elementsize=0) then exit;
+ if(bool) then for i:=0 to count do freemem(PPointer(ptr+i*elementsize)^);
+ freemem(ptr); ptr:=nil;
+end;
+procedure fpc_dynamic_array_setlength(var ptr:Pointer;PtrTypeInfo:Pointer;DimensionCount:Natint;DimensionLength:PNatint);
+var oldptr,newptr:Pointer;
+    oldlen,newlen,minlen:Natint;
+    elementsize,i:Natint;
+begin
+ newlen:=DimensionLength^; 
+ if(newlen<=0) then 
+  begin
+   freemem(ptr); ptr:=nil; exit;
+  end;
+ oldlen:=fpc_dynamic_array_get_length(ptr); 
+ oldptr:=ptr; elementsize:=fpc_dynamic_array_get_element_size(ptr);
+ if(oldlen=newlen) then exit;
+ if(elementsize=0) then elementsize:=check_type_need_size(PtrTypeInfo);
+ newptr:=allocmem(sizeof(dynamic_array_header)+elementsize*newlen);
+ Pdynamic_array_header(newptr)^.ReferenceCount:=1;
+ Pdynamic_array_header(newptr)^.ArrayHighest:=Newlen-1;
+ Pdynamic_array_header(newptr)^.ItemSize:=elementsize;
+ inc(newptr,sizeof(dynamic_array_header));
+ if(oldlen>newlen) then minlen:=newlen else minlen:=oldlen;
+ Move(oldptr^,newptr^,elementsize*minlen);
+ if(DimensionCount>1) then
+  begin
+   for i:=0 to newlen-1 do
+   fpc_dynamic_array_setlength(PPointer(newptr+i*elementsize)^,PtrTypeInfo,DimensionCount-1,DimensionLength+1);
+  end;
+ ptr:=newptr; freemem(oldptr); oldptr:=nil;
+end;
+procedure fpc_dynarray_setlength(var ptr:Pointer;PtrTypeInfo:Pointer;DimensionCount:Natint;DimensionLength:PNatint);compilerproc;
+begin
+ fpc_dynamic_array_setlength(ptr,ptrtypeinfo,DimensionCount,DimensionLength);
+end;
+procedure fpc_dynarray_delete(var ptr:Pointer;Source,Count:Natint;PtrTypeInfo:Pointer);compilerproc;
+var bool:boolean;
+    oldptr,newptr:Pointer;
+    realstart,realend:Natint;
+    i,index,oldlen,newlen:Natint;
+    elementsize:Natint;
+begin
+ bool:=check_type_need_finalize(PtrTypeInfo); 
+ if(Count=0) then exit;
+ oldlen:=fpc_dynamic_array_get_length(ptr); elementsize:=fpc_dynamic_array_get_element_size(ptr);
+ if(Source>oldlen) or (Source+Count-1<0) then exit
+ else 
+  begin
+   realstart:=Source; realend:=Source+Count-1;
+   if(realstart<0) then realstart:=0;
+   if(realend>oldlen-1) then realend:=oldlen-1;
+  end;
+ oldptr:=ptr; newlen:=oldlen-(realend-realstart+1);
+ if(newlen=0) then 
+  begin
+   freemem(ptr); ptr:=nil; exit;
+  end;
+ newptr:=getmem(sizeof(dynamic_array_header)+elementsize*newlen);
+ Pdynamic_array_header(newptr)^.ReferenceCount:=1;
+ Pdynamic_array_header(newptr)^.ArrayHighest:=Newlen-1;
+ Pdynamic_array_header(newptr)^.ItemSize:=elementsize;
+ inc(newptr,sizeof(dynamic_array_header));
+ move(oldptr^,newptr^,elementsize*realstart);
+ move((oldptr+(realend+1)*elementsize)^,(newptr+realstart*elementsize)^,elementsize*(oldlen-realend));
+ i:=realstart; 
+ while(i<=realend)do
+  begin
+   if(bool) then 
+    begin
+     freemem(PPointer(oldptr+i*elementsize)^); PPointer(oldptr+i*elementsize)^:=nil;
+    end;
    inc(i);
   end;
- WHexToInt:=res;
+ freemem(oldptr); oldptr:=nil; ptr:=newptr;
 end;
-procedure randomize(seed_data:Pointer;seed_data_size:natuint);[public,alias:'randomize'];
-var i:natuint;
-    ptr:Pbyte;
+procedure fpc_dynarray_insert(var ptr:Pointer;Source:Natint;Data:Pointer;Count:Natint;PtrTypeInfo:Pointer);compilerproc;
+var oldlen,newlen,newindex,elementsize:Natint;
+    oldptr,newptr:Pointer;
 begin
- ptr:=PByte(seed_data);
- ranseed:=0;
- for i:=1 to seed_data_size do
+ if(count=0) then exit;
+ oldlen:=fpc_dynamic_array_get_length(ptr); elementsize:=fpc_dynamic_array_get_element_size(ptr);
+ if(Source<0) then Newindex:=0 else if(Source>oldlen-1) then Newindex:=oldlen-1 else Newindex:=Source;
+ if(elementsize=0) then elementsize:=check_type_need_size(PtrTypeInfo);
+ newlen:=oldlen+Count; oldptr:=ptr;
+ newptr:=getmem(sizeof(dynamic_array_header)+Pdynamic_array_header(ptr)^.ItemSize*newlen);
+ Pdynamic_array_header(newptr)^.ReferenceCount:=1;
+ Pdynamic_array_header(newptr)^.ArrayHighest:=Newlen-1;
+ Pdynamic_array_header(newptr)^.ItemSize:=elementsize;
+ inc(newptr,sizeof(dynamic_array_header));
+ move(oldptr^,newptr^,elementsize*NewIndex);
+ move(Data^,(newptr+NewIndex*elementsize)^,elementsize*Count);
+ move((oldptr+NewIndex*elementsize)^,(newptr+(NewIndex+Count)*elementsize)^,elementsize*(oldlen-NewIndex));
+ freemem(oldptr); oldptr:=nil; ptr:=newptr;
+end;
+procedure fpc_dynarray_concat_multi(var dest:Pointer;PtrTypeInfo:Pointer;const SourceArray:array of Pointer);compilerproc;
+var totallen,elementsize,realoffset,i:Natint;
+    newptr,tempptr:Pointer;
+begin
+ if(dest<>nil) then
   begin
-   if(i mod 7=1) then ranseed:=ranseed+(ptr+i-1)^*7+21
-   else if(i mod 7=2) then ranseed:=ranseed-(ptr+i-1)^*6-18
-   else if(i mod 7=3) then ranseed:=ranseed+(ptr+i-1)^*5+16
-   else if(i mod 7=4) then ranseed:=ranseed-(ptr+i-1)^*4-13
-   else if(i mod 7=5) then ranseed:=ranseed+(ptr+i-1)^*3+10
-   else if(i mod 7=6) then ranseed:=ranseed-(ptr+i-1)^*2-8
-   else ranseed:=ranseed+(ptr+i-1)^+5;
+   freemem(dest); dest:=nil;
   end;
+ {Calculate the Total Length}
+ totallen:=0; elementsize:=fpc_dynamic_array_get_element_size(SourceArray[0]);
+ for i:=1 to length(SourceArray) do 
+  begin
+   inc(totallen,fpc_dynamic_array_get_length(SourceArray[i-1]));
+  end;
+ {Request the Total Memory}
+ newptr:=getmem(sizeof(dynamic_array_header)+elementsize*totallen);
+ Pdynamic_array_header(newptr)^.ReferenceCount:=1;
+ Pdynamic_array_header(newptr)^.ArrayHighest:=totallen-1;
+ Pdynamic_array_header(newptr)^.ItemSize:=elementsize;
+ inc(newptr,sizeof(dynamic_array_header));
+ {Then Fill the Dynamic Array with Source Array}
+ realoffset:=0;
+ for i:=1 to length(SourceArray) do
+  begin
+   if(SourceArray[i-1]=nil) then continue;
+   Move(SourceArray[i-1]^,(newptr+realoffset)^,fpc_dynamic_array_get_length(SourceArray[i-1])*elementsize);
+   inc(realoffset,fpc_dynamic_array_get_length(SourceArray[i-1])*elementsize);
+   tempptr:=SourceArray[i-1]; freemem(tempptr);
+  end;
+ tempptr:=Dest; FreeMem(Dest); Dest:=nil;
+ Dest:=newptr;
 end;
-function random(maxnum:extended):extended;[public,alias:'random'];
+procedure fpc_dynarray_concat(var dest:Pointer;PtrTypeInfo:Pointer;Const Source1,Source2:Pointer);compilerproc;
+var totallen,elementsize,realoffset,i:Natint;
+    newptr,tempptr:Pointer;
 begin
- random:=maxnum*(ranseed/maxnatuint)*0.55;
- ranseed:=ranseed*2+7;
+ if(dest<>nil) then
+  begin
+   freemem(dest); dest:=nil;
+  end;
+ {Calculate the Total Length}
+ totallen:=fpc_dynamic_array_get_length(Source1)+fpc_dynamic_array_get_length(Source2);
+ elementsize:=fpc_dynamic_array_get_element_size(Source1);
+ {Request the Total Memory}
+ newptr:=getmem(sizeof(dynamic_array_header)+elementsize*totallen);
+ Pdynamic_array_header(newptr)^.ReferenceCount:=1;
+ Pdynamic_array_header(newptr)^.ArrayHighest:=totallen-1;
+ Pdynamic_array_header(newptr)^.ItemSize:=elementsize;
+ inc(newptr,sizeof(dynamic_array_header));
+ realoffset:=0;
+ if(Source1<>nil) then Move(Source1^,newptr^,fpc_dynamic_array_get_length(Source1)*elementsize);
+ inc(realoffset,fpc_dynamic_array_get_length(Source1)*elementsize);
+ if(Source2<>nil) then Move(Source2^,(newptr+realoffset)^,fpc_dynamic_array_get_length(Source2)*elementsize);
+ tempptr:=Dest; FreeMem(Dest); Dest:=nil;
+ Dest:=newptr;
 end;
-function random_range(left,right:extended):extended;[public,alias:'random_range'];
+function fpc_ansistring_get_reference_count(ptr:Pointer):Natint;
 begin
- random_range:=left+(right-left)*(ranseed/maxnatuint)*0.52;
- ranseed:=ranseed*2+7;
+ if(ptr=nil) then exit(0);
+ fpc_ansistring_get_reference_count:=Pstring_header(ptr-sizeof(string_header))^.ReferenceCount;
 end;
-function irandom(maxnum:natuint):natint;[public,alias:'irandom'];
+function fpc_ansistring_get_length(ptr:Pointer):Natuint;
 begin
- irandom:=floor(maxnum*(ranseed/maxnatuint)*0.57);
- ranseed:=ranseed*2+7;
+ if(ptr=nil) then exit(0);
+ fpc_ansistring_get_length:=Pstring_header(ptr-sizeof(string_header))^.ArrayHighest;
 end;
-function irandom_range(left,right:natint):natint;[public,alias:'irandom_range'];
+procedure fpc_AnsiStr_Assign(Var DestString:Pointer;Source:Pointer);compilerproc;
 begin
- irandom_range:=floor(left+(right-left)*(ranseed/maxnatuint)*0.54);
- ranseed:=ranseed*2+7;
+ if(DestString=Source) then exit;
+ if(DestString<>nil) then
+  begin
+   freemem(DestString); DestString:=nil;
+  end;
+ if(Source=nil) then
+  begin
+   DestString:=getmem(sizeof(string_header));
+   Pstring_header(DestString)^.ReferenceCount:=1;
+   Pstring_header(DestString)^.ArrayHighest:=0;
+   inc(DestString,sizeof(string_header));
+  end
+ else DestString:=Source;
+end;
+procedure fpc_AnsiStr_Decr_Ref(var Ptr:Pointer);compilerproc;
+begin
+ freemem(Ptr); ptr:=nil;
+end;
+procedure fpc_AnsiStr_Incr_Ref(Ptr:Pointer);compilerproc;
+begin
+ if(Ptr<>nil) and (fpc_ansistring_get_reference_count(ptr)>0) then
+ Pstring_header(ptr-sizeof(string_header))^.ReferenceCount:=1;
+end;
+procedure fpc_AnsiStr_Concat(var DestString:ansistring;const Source1,Source2:ansistring;CodePage:TSystemCodePage);compilerproc;
+var newptr,ptr1,ptr2,tempptr:Pointer;
+    len1,len2:Natuint;
+begin 
+ ptr1:=PPointer(@Source1)^; ptr2:=PPointer(@Source2)^;
+ len1:=fpc_ansistring_get_length(ptr1); len2:=fpc_ansistring_get_length(ptr2);
+ newptr:=getmem(sizeof(string_header)+len1+len2);
+ Pstring_header(newptr)^.ReferenceCount:=1;
+ Pstring_header(newptr)^.ArrayHighest:=len1+len2;
+ inc(newptr,sizeof(string_header));
+ if(ptr1<>nil) then Move(ptr1^,newptr^,len1);
+ if(ptr2<>nil) then Move(ptr2^,(newptr+len1)^,len2);
+ tempptr:=PPointer(@DestString)^;
+ if(tempptr<>nil) then
+  begin
+   freemem(tempptr); tempptr:=nil; PPointer(@DestString)^:=nil;
+  end;
+ PPointer(@DestString)^:=newptr;
+end;
+procedure fpc_AnsiStr_Concat_multi(var DestString:ansistring;const SourceArray:array of ansistring;CodePage:TSystemCodePage);compilerproc;
+var newptr,ptr,tempptr:Pointer;
+    i,offset,len:Natuint;
+begin
+ i:=1; len:=0; 
+ for i:=1 to length(SourceArray) do 
+  begin
+   ptr:=PPointer(@SourceArray[i-1])^;
+   inc(len,fpc_ansistring_get_length(ptr));
+  end;
+ newptr:=getmem(sizeof(string_header)+len); 
+ Pstring_header(newptr)^.ReferenceCount:=1; 
+ Pstring_header(newptr)^.ArrayHighest:=len; 
+ inc(newptr,sizeof(string_header));
+ offset:=0;
+ for i:=1 to length(SourceArray) do
+  begin
+   ptr:=PPointer(@SourceArray[i-1])^;
+   Move(ptr^,(newptr+offset)^,fpc_ansistring_get_length(ptr));
+   inc(offset,fpc_ansistring_get_length(ptr));
+  end;
+ tempptr:=PPointer(@DestString)^;
+ if(tempptr<>nil) then
+  begin
+   freemem(tempptr); tempptr:=nil; PPointer(@DestString)^:=nil;
+  end;
+ PPointer(@DestString)^:=newptr;
+end;
+function fpc_ansistr_to_ansistr(const Source:ansistring;CodePage:TSystemCodePage):ansistring;compilerproc;
+var ptr,newptr:Pointer;
+    len:Natuint;
+begin
+ ptr:=PPointer(@Source)^; len:=fpc_ansistring_get_length(ptr);
+ if(ptr=nil) then exit('');
+ newptr:=getmem(sizeof(string_header)+len);
+ Pstring_header(newptr)^.ReferenceCount:=1;
+ Pstring_header(newptr)^.ArrayHighest:=len;
+ inc(newptr,sizeof(string_header));
+ Move(ptr^,newptr^,len);
+ PPointer(@Result)^:=newptr;
+end;
+function fpc_char_to_ansistr(Const Source:AnsiChar;CodePage:TSystemCodePage):ansistring;compilerproc;
+var newptr:Pointer;
+begin
+ newptr:=getmem(sizeof(string_header)+1);
+ Pstring_header(newptr)^.ReferenceCount:=1;
+ Pstring_header(newptr)^.ArrayHighest:=1;
+ inc(newptr,sizeof(string_header));
+ PChar(newptr)^:=Source;
+ PPointer(@Result)^:=newptr;
+end;
+function fpc_pchar_to_ansistr(Const Source:PAnsiChar;CodePage:TSystemCodePage):ansistring;compilerproc;
+var i,len:Natuint;
+    newptr:Pointer;
+begin
+ len:=0;
+ while((Source+len)^<>#0) do inc(len);
+ newptr:=getmem(sizeof(string_header)+len);
+ Pstring_header(newptr)^.ReferenceCount:=1;
+ Pstring_header(newptr)^.ArrayHighest:=len;
+ inc(newptr,sizeof(string_header));
+ Move(Source^,newptr^,len);
+ PPointer(@Result)^:=newptr;
+end;
+function fpc_chararray_to_ansistr(Const CharArray:array of AnsiChar;CodePage:TSystemCodePage;Zerobased:boolean=true):ansistring;compilerproc;
+var len:Natuint;
+    oldptr,newptr:Pointer;
+begin
+ len:=length(CharArray);
+ newptr:=getmem(sizeof(string_header)+len);
+ Pstring_header(newptr)^.ReferenceCount:=1;
+ Pstring_header(newptr)^.ArrayHighest:=len;
+ inc(newptr,sizeof(string_header));
+ oldptr:=PPointer(@CharArray)^;
+ Move(oldptr^,newptr^,len);
+ PPointer(@Result)^:=newptr;
+end;
+procedure fpc_ansistr_to_chararray(var res:array of AnsiChar;const Source:ansistring);compilerproc;
+var len:Natuint; 
+    oldptr,newptr:Pointer;
+begin
+ oldptr:=PPointer(@Source)^;
+ len:=fpc_ansistring_get_length(oldptr);
+ newptr:=getmem(sizeof(dynamic_array_header)+len);
+ Pdynamic_array_header(newptr)^.ReferenceCount:=1;
+ Pdynamic_array_header(newptr)^.ArrayHighest:=len;
+ Pdynamic_array_header(newptr)^.ItemSize:=1;
+ inc(newptr,sizeof(dynamic_array_header));
+ Move(oldptr^,newptr^,len);
+ PPointer(@res)^:=newptr;
+end;
+function fpc_ansistr_compare(const Source1,Source2:ansistring):Natint;compilerproc;
+var ptr1,ptr2:Pointer;
+    len1,len2,minlen,i:Natuint;
+begin
+ ptr1:=PPointer(@Source1)^; ptr2:=PPointer(@Source2)^;
+ len1:=fpc_ansistring_get_length(ptr1); len2:=fpc_ansistring_get_length(ptr2); 
+ if(len1>len2) then minlen:=len2 else minlen:=len1;
+ for i:=1 to minlen do
+  begin
+   if(Source1[i]<>Source2[i]) then exit(Natint(Source1[i])-Natint(Source2[i]));
+  end;
+ Result:=len1-len2; 
+end;
+function fpc_ansistr_compare_equal(const Source1,Source2:ansistring):Natint;compilerproc;
+var ptr1,ptr2:Pointer;
+    len1,len2,minlen,i:Natuint;
+begin
+ ptr1:=PPointer(@Source1)^; ptr2:=PPointer(@Source2)^;
+ len1:=fpc_ansistring_get_length(ptr1); len2:=fpc_ansistring_get_length(ptr2); 
+ if(len1>len2) then minlen:=len2 else minlen:=len1;
+ for i:=1 to minlen do
+  begin
+   if(Source1[i]<>Source2[i]) then exit(Natint(Source1[i])-Natint(Source2[i]));
+  end;
+ Result:=len1-len2; 
+end;
+procedure fpc_ansistr_rangecheck(ptr:Pointer;Index:Natint);compilerproc;
+begin
+end;
+procedure fpc_ansistr_zerobased_rangecheck(ptr:Pointer;Index:Natint);compilerproc;
+begin
+end;
+procedure fpc_ansistr_setlength(Var Source:ansistring;length:Natint;CodePage:TSystemCodePage);compilerproc;
+var oldptr,newptr:Pointer;
+    oldlen,minlen:Natuint;
+begin
+ if(length=0) then 
+  begin
+   freemem(oldptr); oldptr:=nil; PPointer(@Source)^:=oldptr; exit;
+  end;
+ oldptr:=PPointer(@Source)^;
+ oldlen:=fpc_ansistring_get_length(oldptr); 
+ if(oldlen>length) then minlen:=length else minlen:=oldlen;
+ newptr:=getmem(sizeof(string_header)+length);
+ Pstring_header(newptr)^.ReferenceCount:=1;
+ Pstring_header(newptr)^.ArrayHighest:=length;
+ inc(newptr,sizeof(string_header));
+ Move(oldptr^,newptr^,minlen);
+ freemem(oldptr); oldptr:=nil;
+ PPointer(@Source)^:=newptr;
+end;
+function fpc_ansistr_copy(var Source:ansistring;Index,Size:Natint):ansistring;compilerproc;
+var oldptr,newptr:Pointer;
+    oldlen,newlen,StartX,EndX:Natuint;
+begin
+ oldptr:=PPointer(@Source)^; oldlen:=fpc_ansistring_get_length(oldptr);
+ if(oldlen=0) then exit;
+ if(Index+Size-1>oldlen) then EndX:=oldlen else EndX:=Index+Size-1;
+ if(Index+Size-1<1) then StartX:=1 else StartX:=Index;
+ if(StartX>EndX) then exit;
+ newlen:=EndX-StartX+1;
+ newptr:=getmem(sizeof(string_header)+newlen);
+ Pstring_header(newptr)^.ReferenceCount:=1;
+ Pstring_header(newptr)^.ArrayHighest:=newlen;
+ inc(newptr,sizeof(string_header));
+ Move((oldptr+StartX-1)^,newptr^,EndX-StartX+1);
+ PPointer(@Result)^:=newptr;
+end;
+procedure fpc_ansistr_insert(const Source:ansistring;var Dest:ansistring;Index:Natint);compilerproc;
+var oldptr,tempptr,newptr:Pointer;
+    oldlen,templen,newlen,StartX:Natuint;
+begin
+ oldptr:=PPointer(@Dest)^; oldlen:=fpc_ansistring_get_length(oldptr);
+ tempptr:=PPointer(@Source)^; templen:=fpc_ansistring_get_length(tempptr);
+ if(templen=0) then exit;
+ if(Index<=oldlen) then StartX:=oldlen else if(Index>1) then StartX:=Index else StartX:=1;
+ newlen:=oldlen+templen;
+ newptr:=getmem(sizeof(string_header)+newlen);
+ Pstring_header(newptr)^.ReferenceCount:=1;
+ Pstring_header(newptr)^.ArrayHighest:=newlen;
+ inc(newptr,sizeof(string_header));
+ Move(oldptr^,newptr^,StartX);
+ Move(tempptr^,(newptr+StartX-1)^,templen);
+ Move((oldptr+StartX-1)^,(newptr+StartX+templen-2)^,oldlen-StartX+1);
+ freemem(oldptr); oldptr:=nil;
+ PPointer(@Dest)^:=newptr;
+end;
+procedure fpc_ansistr_delete(var Dest:ansistring;Index,Size:Natint);compilerproc;
+var oldptr,newptr:Pointer;
+    oldlen,newlen,StartX,EndX:Natuint;
+begin
+ oldptr:=PPointer(@Dest)^; oldlen:=fpc_ansistring_get_length(oldptr);
+ if(oldlen=0) then exit;
+ if(Index+Size-1>oldlen) then EndX:=oldlen else EndX:=Index+Size-1;
+ if(Index+Size-1<1) then StartX:=1 else StartX:=Index;
+ if(StartX>EndX) then exit;
+ newlen:=oldlen-(EndX-StartX+1);
+ if(newlen=0) then
+  begin
+   freemem(oldptr); oldptr:=nil; PPointer(@Dest)^:=oldptr; exit;
+  end;
+ newptr:=getmem(sizeof(string_header)+newlen);
+ Pstring_header(newptr)^.ReferenceCount:=1;
+ Pstring_header(newptr)^.ArrayHighest:=newlen;
+ inc(newptr,sizeof(string_header));
+ Move(oldptr^,newptr^,StartX-1);
+ Move((oldptr+EndX)^,(newptr+StartX-1)^,oldlen-EndX);
+ freemem(oldptr); oldptr:=nil;
+ PPointer(@Dest)^:=newptr;
+end;
+function fpc_ansistr_unique(var Source:Pointer):Pointer;compilerproc;
+begin
+ fpc_ansistr_unique:=Source; Source:=nil;
+end;
+function TVmt.GetvParent:PVmt;
+begin
+ Result:=vParentRef^;
+end;
+constructor TObject.Create;
+begin
+ PPointer(@Self)^:=allocmem(ObjectSize);
+end;
+destructor TObject.Destroy;
+var tempptr:Pointer;
+begin 
+ tempptr:=PPointer(@Self)^;
+ freemem(tempptr); PPointer(@Self)^:=nil;
+end;
+function TObject.NewInstance:Tobject;
+begin
+ PPointer(@Self)^:=allocmem(ObjectSize);
+ Result:=Self;
+end;
+procedure TObject.FreeInstance;
+var tempptr:Pointer;
+begin 
+ tempptr:=PPointer(@Self)^;
+ freemem(tempptr); PPointer(@Self)^:=nil;
+end;
+procedure TObject.Free;
+var tempptr:Pointer;
+begin 
+ tempptr:=PPointer(@Self)^;
+ freemem(tempptr); PPointer(@Self)^:=nil;
+end;
+procedure TObject.CleanupInstance;
+var tempptr:Pointer;
+begin 
+ tempptr:=PPointer(@Self)^;
+ freemem(tempptr); PPointer(@Self)^:=nil;
+end;
+procedure TObject.AfterConstruction;
+begin
+end;
+procedure TObject.BeforeDestruction;
+begin
+end;
+function TObject.GetObjectSize:NatInt;
+begin
+ Result:=PVmt(PPointer(@Self)^)^.vInstanceSize;
 end;
 
 end.
-

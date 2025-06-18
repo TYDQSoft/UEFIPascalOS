@@ -1,6 +1,6 @@
 unit uefi;
 
-{$MODE FPC}
+{$MODE objFPC}{$H+}
 
 interface
 
@@ -2897,6 +2897,7 @@ function bis_get_siginfo_count(bisdataPtr:Pefi_bis_data):dword;
 function bis_get_siginfo_array(bisdataPtr:Pefi_bis_data):Pefi_bis_signature_info; 
 function efi_pci_address(bus:byte;dev:byte;func:byte;reg:byte):natuint;
 procedure efi_initialize(InputImageHandle:efi_handle;InputSystemTable:Pefi_system_table);
+function efi_getmem(size:Natuint):Pointer;
 function efi_allocmem(size:natuint):Pointer;
 procedure efi_move(Source:Pointer;Dest:Pointer;Size:natuint);
 procedure efi_freemem(var Ptr:Pointer);
@@ -2907,20 +2908,12 @@ procedure efi_console_clear_screen;
 procedure efi_console_output_string(outputstring:PWideChar);
 procedure efi_console_output_number(number:natint;endline:boolean);
 procedure efi_console_output_hex(number:natuint;endline:boolean);
-procedure efi_console_output_string_with_colour(Outputstring:PWideChar;backgroundcolour:byte;textcolour:byte);
-procedure efi_console_output_number_with_colour(number:natint;endline:boolean;bckcolour:byte;texcolour:byte);
-procedure efi_console_output_hex_with_colour(number:natuint;endline:boolean;bckcolour:byte;texcolour:byte);
 procedure efi_set_watchdog_timer_to_nil;
-procedure efi_console_read_string(var ReadString:PWideChar);
-procedure efi_console_read_string_with_colour(var ReadString:PWideChar;backgroundcolour:byte;textcolour:byte);
-procedure efi_console_read_password_string(var ReadString:PWideChar);
 procedure efi_console_enable_mouse;
 procedure efi_console_set_global_colour(backgroundcolour:byte;textcolour:byte);
 procedure efi_console_set_cursor_position(column,row:natuint);
 procedure efi_console_get_cursor_position(var column,row:natuint);
 procedure efi_console_get_max_row_and_max_column;
-function efi_list_all_file_system(isreadonly:byte):efi_file_system_list;
-function efi_list_all_file_system_ext:efi_file_system_list_ext;
 procedure efi_console_initialize(bck_colour,text_colour:byte;blinkmiliseconds:qword);
 function efi_graphics_initialize:efi_graphics_list;
 procedure efi_graphics_get_maxwidth_maxheight_and_maxdepth(egl:efi_graphics_list;eglindex:natuint);
@@ -2929,11 +2922,9 @@ function efi_loader_get_memory_map:efi_memory_map;
 function efi_loader_handle_memory_map(memorymap:efi_memory_map):efi_memory_map_simple;
 function efi_loader_find_suitable_memory_map(var smm:efi_memory_map_simple;size:natuint):efi_memory_map_result;
 procedure efi_loader_exit_boot_services;
-function efi_device_list_initialize:efi_device_list;
-procedure efi_device_list_free(var list:efi_device_list);
 function efi_smbios_list_initialize:efi_smbios_list;
 procedure efi_smbios_list_free(var res:efi_smbios_list);
-function efi_get_cpu_info_from_acpi_table:acpi_cpu_info;
+function efi_get_cpu_info_from_acpi_table:Pointer;
 
 var maxcolumn:Natuint=80;
     maxrow:Natuint=25;
@@ -2949,11 +2940,11 @@ var maxcolumn:Natuint=80;
     
 implementation
 
-function bis_get_siginfo_count(bisdataPtr:Pefi_bis_data):dword;[public,alias:'BIS_GET_SIGINFO_COUNT'];
+function bis_get_siginfo_count(bisdataPtr:Pefi_bis_data):dword;
 begin
  bis_get_siginfo_count:=bisdataPtr^.Length div sizeof(efi_bis_signature_info);
 end;
-function bis_get_siginfo_array(bisdataPtr:Pefi_bis_data):Pefi_bis_signature_info;[public,alias:'BIS_GET_SIGINFO_ARRAY'];
+function bis_get_siginfo_array(bisdataPtr:Pefi_bis_data):Pefi_bis_signature_info;
 begin
  bis_get_siginfo_array:=Pefi_bis_signature_info(bisdataPtr^.Data);
 end;
@@ -2961,7 +2952,7 @@ function efi_pci_address(bus:byte;dev:byte;func:byte;reg:byte):natuint;
 begin
  efi_pci_address:=bus shl 24+dev shl 16+func shl 8+reg;
 end;
-function efi_guid_compare(guid1,guid2:efi_guid):boolean;[public,alias:'EFI_GUID_COMPARE'];
+function efi_guid_compare(guid1,guid2:efi_guid):boolean;
 var res:boolean;
     i:byte;
 begin
@@ -2975,36 +2966,45 @@ begin
   end;
  efi_guid_compare:=res;
 end;
-procedure efi_initialize(InputImageHandle:efi_handle;InputSystemTable:Pefi_system_table);[public,alias:'EFI_INITIALIZE'];
+procedure efi_initialize(InputImageHandle:efi_handle;InputSystemTable:Pefi_system_table);
 begin
  ParentImageHandle:=InputImageHandle; GlobalSystemTable:=InputSystemTable;
 end;
-function efi_allocmem(size:natuint):Pointer;[public,alias:'EFI_ALLOCMEM'];
+function efi_getmem(size:natuint):Pointer;
 var res:Pointer;
 begin
  GlobalSystemTable^.BootServices^.AllocatePool(EfiLoaderData,Size,res);
+ efi_getmem:=res;
+end;
+function efi_allocmem(size:natuint):Pointer;
+var res:Pointer;
+    i:Natuint;
+begin
+ GlobalSystemTable^.BootServices^.AllocatePool(EfiLoaderData,Size,res);
+ for i:=1 to size do Pbyte(res+i-1)^:=0;
  efi_allocmem:=res;
 end;
-procedure efi_move(Source:Pointer;Dest:Pointer;Size:natuint);[public,alias:'EFI_MOVE'];
+procedure efi_move(Source:Pointer;Dest:Pointer;Size:natuint);
 var i:natuint;
     ptr1,ptr2:PByte;
 begin
  ptr1:=Source; ptr2:=Dest;
+ if(ptr1=nil) or (ptr2=nil) then exit;
  for i:=1 to Size do (ptr2+i-1)^:=(ptr1+i-1)^;
 end;
-procedure efi_freemem(var Ptr:Pointer);[public,alias:'EFI_FREEMEM'];
+procedure efi_freemem(var Ptr:Pointer);
 begin
  GlobalSystemTable^.BootServices^.FreePool(ptr); ptr:=nil;
 end;
-function efi_error(status:efi_status):boolean;[public,alias:'EFI_ERROR'];
+function efi_error(status:efi_status):boolean;
 begin
  {$IFDEF CPU64}
- if(status<$8000000000000000) then efi_error:=false else efi_error:=true;
+ if(status<Natuint($8000000000000000)) then efi_error:=false else efi_error:=true;
  {$ELSE CPU64}
- if(status<$80000000) then efi_error:=false else efi_error:=true;
+ if(status<Natuint($80000000)) then efi_error:=false else efi_error:=true;
  {$ENDIF CPU64}
 end;
-procedure efi_show_error(status:efi_status);[public,alias:'EFI_SHOW_ERROR'];
+procedure efi_show_error(status:efi_status);
 var i:natuint;
     error:boolean;
 begin
@@ -3051,12 +3051,12 @@ begin
  else if(i=efi_warn_reset_required) and (error=false) then efi_console_output_string('EFI_WARN_RESET_REQUIRED'#10)
  else if(i=0) and (error=false) then efi_console_output_string('EFI_SUCCESS'#10);
 end;
-procedure efi_console_clear_screen;[public,alias:'EFI_CONSOLE_CLEAR_SCREEN'];
+procedure efi_console_clear_screen;
 begin
  GlobalSystemTable^.ConOut^.ClearScreen(GlobalSystemTable^.ConOut);
  currentcolumn:=0; currentrow:=0;
 end;
-function efi_get_platform:byte;[public,alias:'EFI_GET_PLATFORM'];
+function efi_get_platform:byte;
 begin
  {$IFDEF CPUX86_64}
  efi_get_platform:=0;
@@ -3080,7 +3080,7 @@ begin
  efi_get_platform:=6;
  {$endif}
 end;
-procedure efi_console_output_string(outputstring:PWideChar);[public,alias:'EFI_CONSOLE_OUTPUT_STRING'];
+procedure efi_console_output_string(outputstring:PWideChar);
 var mychar:array[1..2] of WideChar;
     i,currentcolumn,currentrow,len:natuint;
 begin
@@ -3135,12 +3135,13 @@ begin
   end;
  efi_console_set_cursor_position(currentcolumn,currentrow);
 end;
-procedure efi_console_output_number(number:natint;endline:boolean);[public,alias:'EFI_CONSOLE_OUTPUT_NUMBER'];
-const decstr:PWideChar='0123456789';
+procedure efi_console_output_number(number:natint;endline:boolean);
+const numstr:PWideChar='0123456789';
 var outstr:PWideChar;
     orgnum:natuint;
     multiplenum:natuint;
     numlength:byte;
+    tempnum:byte;
     isnegative:boolean;
     i,j,start:natuint;
 begin
@@ -3166,8 +3167,8 @@ begin
  i:=start;
  while(i<=start+numlength-1)do
   begin
-   (outstr+i-1)^:=(decstr+orgnum div multiplenum)^;
-   orgnum:=orgnum mod multiplenum;
+   (outstr+i-1)^:=(numstr+replace_divide(orgnum,multiplenum))^;
+   orgnum:=replace_modulo(orgnum,multiplenum);
    multiplenum:=multiplenum div 10;
    inc(i);
   end;
@@ -3177,7 +3178,7 @@ begin
  if(endline) then efi_console_output_string(#10);
  efi_freemem(outstr);
 end;
-procedure efi_console_output_hex(number:natuint;endline:boolean);[public,alias:'EFI_CONSOLE_OUTPUT_HEX'];
+procedure efi_console_output_hex(number:natuint;endline:boolean);
 const hexstr:PWideChar='0123456789ABCDEF';
 var outstr:PWideChar;
     orgnum:natuint;
@@ -3200,8 +3201,8 @@ begin
  i:=1;
  while(i<=hexlength)do
   begin
-   (outstr+i-1)^:=(hexstr+orgnum div multiplenum)^;
-   orgnum:=orgnum mod multiplenum;
+   (outstr+i-1)^:=(hexstr+replace_divide(orgnum,multiplenum))^;
+   orgnum:=replace_modulo(orgnum,multiplenum);
    multiplenum:=multiplenum shr 4;
    inc(i);
   end;
@@ -3211,320 +3212,28 @@ begin
  if(endline) then efi_console_output_string(#10);
  efi_freemem(outstr);
 end;
-procedure efi_console_output_string_with_colour(Outputstring:PWideChar;backgroundcolour:byte;textcolour:byte);[public,alias:'EFI_CONSOLE_OUTPUT_STRING_WITH_COLOUR'];
-var mychar:array[1..2] of WideChar;
-    i,len:Natuint;
-begin
- GlobalSystemTable^.ConOut^.SetAttribute(GlobalSystemTable^.ConOut,backgroundcolour shl 4+textcolour);
- i:=1; len:=0;
- while((outputstring+len)^<>#0) do inc(len);
- while(i<=len) do
-  begin
-   if(i<=len-1) then
-    begin
-     if((outputstring+i-1)^=#13) and ((outputstring+i)^=#10) then 
-      begin
-       GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,#13#10);
-       inc(currentrow); currentcolumn:=0; inc(i,2);
-      end
-     else if((outputstring+i-1)^=#13) and ((outputstring+i)^<>#10) then
-      begin
-       GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,#13#10);
-       inc(currentrow); currentcolumn:=0; inc(i,1);
-      end
-     else if((outputstring+i-1)^=#10) and ((outputstring+i)^<>#13) then
-      begin
-       GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,#13#10);
-       inc(currentrow); currentcolumn:=0; inc(i,1);
-      end
-     else
-      begin
-       mychar[1]:=(outputstring+i-1)^;
-       mychar[2]:=#0;
-       GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,@mychar);
-       inc(currentcolumn); inc(i,1);
-      end;
-    end
-   else
-    begin
-     if((outputstring+i-1)^=#13) or ((outputstring+i-1)^=#10) then
-      begin
-       GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,#13#10);
-       inc(currentrow); currentcolumn:=0; inc(i,1);
-      end
-     else
-      begin
-       mychar[1]:=(outputstring+i-1)^;
-       mychar[2]:=#0;
-       GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,@mychar);
-       inc(currentcolumn); inc(i,1);
-      end;
-    end;
-   if(currentcolumn>=maxcolumn) then 
-    begin
-     currentcolumn:=0; inc(currentrow,1); 
-    end;
-  end;
- efi_console_set_cursor_position(currentcolumn,currentrow);
- GlobalSystemTable^.ConOut^.SetAttribute(GlobalSystemTable^.ConOut,consolebck shl 4+consoletex);
-end;
-procedure efi_console_output_number_with_colour(number:natint;endline:boolean;bckcolour:byte;texcolour:byte);[public,alias:'EFI_CONSOLE_OUTPUT_NUMBER_WITH_COLOUR'];
-const decstr:PWideChar='0123456789';
-var outstr:PWideChar;
-    orgnum:natuint;
-    multiplenum:natuint;
-    numlength:byte;
-    isnegative:boolean;
-    i,j,start:natuint;
-begin
- {Check the number is negative or not}
- outstr:=efi_allocmem(128);
- if(number>=0) then
-  begin
-   isnegative:=false; orgnum:=number; start:=1;
-  end
- else
-  begin
-   isnegative:=true; orgnum:=-number;
-   outstr^:='-'; start:=2;
-  end;
- {Translate the number to PWideChar}
- multiplenum:=1; numlength:=0;
- while(orgnum>=multiplenum) do 
-  begin
-   multiplenum:=multiplenum*10; inc(numlength);
-  end;
- if(multiplenum>1) then multiplenum:=multiplenum div 10;
- for i:=start to start+numlength-1 do (outstr+i-1)^:='0';
- i:=start;
- while(i<=start+numlength-1)do
-  begin
-   (outstr+i-1)^:=(decstr+orgnum div multiplenum)^;
-   orgnum:=orgnum mod multiplenum;
-   multiplenum:=multiplenum div 10;
-   inc(i);
-  end;
- (outstr+start+numlength-1)^:=#0;
- {Output the number(decimal)}
- if(number=0) then efi_console_output_string_with_colour('0',bckcolour,texcolour)
- else efi_console_output_string_with_colour(outstr,bckcolour,texcolour);
- if(endline) then 
- efi_console_output_string_with_colour(#10,bckcolour,texcolour);
- efi_freemem(outstr);
-end;
-procedure efi_console_output_hex_with_colour(number:natuint;endline:boolean;bckcolour:byte;texcolour:byte);[public,alias:'EFI_CONSOLE_OUTPUT_HEX_WITH_COLOUR'];
-const hexstr:PWideChar='0123456789ABCDEF';
-var outstr:PWideChar;
-    orgnum:natuint;
-    multiplenum:natuint;
-    hexlength:byte;
-    i,j:Natuint;
-begin
- {It must be a positive number,so do not check negative}
- i:=1; orgnum:=number; outstr:=efi_allocmem(128);
- {Translate the number to hex}
- multiplenum:=1; hexlength:=0;
- while(orgnum>=multiplenum)do
-  begin
-   if(multiplenum shl 4=0) then break;
-   multiplenum:=multiplenum shl 4;
-   inc(hexlength);
-  end;
- if(multiplenum shl 4<>0) and (multiplenum shr 4<>0) then multiplenum:=multiplenum shr 4;
- for i:=1 to hexlength do (outstr+i-1)^:='0';
- i:=1;
- while(i<=hexlength)do
-  begin
-   (outstr+i-1)^:=(hexstr+orgnum div multiplenum)^;
-   orgnum:=orgnum mod multiplenum;
-   multiplenum:=multiplenum shr 4;
-   inc(i);
-  end;
- (outstr+hexlength)^:=#0;
- {Output the hex}
- if(number=0) then efi_console_output_string_with_colour('0',bckcolour,texcolour) 
- else efi_console_output_string_with_colour(outstr,bckcolour,texcolour);
- if(endline) then efi_console_output_string_with_colour(#10,bckcolour,texcolour);
- efi_freemem(outstr);
-end;
-procedure efi_set_watchdog_timer_to_nil;[public,alias:'EFI_SET_WATCHDOG_TIMER_TO_nil'];
+procedure efi_set_watchdog_timer_to_nil;
 begin
  GlobalSystemTable^.bootservices^.SetWatchDogTimer(0,0,0,nil);
 end;
-procedure efi_console_read_string(var ReadString:PWideChar);[public,alias:'EFI_CONSOLE_READ_STRING'];
-var key:efi_input_key;
-    waitidx,i,j:natuint;
-    procstring:PWideChar;
-begin
- if(ReadString<>nil) then efi_freemem(ReadString);
- Readstring:=efi_allocmem(sizeof(WideChar)); i:=0;
- while (True) do
-  begin
-   inc(i);
-   procstring:=efi_allocmem(sizeof(WideChar)*(i+1));
-   efi_move(ReadString,procstring,sizeof(WideChar)*(i+1));
-   efi_freemem(ReadString); ReadString:=procstring;
-   GlobalSystemTable^.BootServices^.WaitForEvent(1,@GlobalSystemTable^.ConIn^.WaitForKey,waitidx);
-   GlobalSystemTable^.ConIn^.ReadKeyStroke(GlobalSystemTable^.ConIn,key);
-   if(key.ScanCode=0) then (ReadString+i-1)^:=key.UnicodeChar else (ReadString+i-1)^:=#0;
-   if((ReadString+i-1)^=#10) or ((ReadString+i-1)^=#13) then
-    begin
-     (ReadString+i-1)^:=#0; 
-     GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,#13#10);
-     currentcolumn:=0; inc(currentrow);
-     if(currentrow>=maxrow) then efi_console_clear_screen;
-     break;
-    end
-   else if((ReadString+i-1)^=#8) then
-    begin
-     if(i>0) then
-      begin 
-       (ReadString+i-1)^:=#0; dec(i);  
-       if(i>0) then
-        begin
-         (ReadString+i-1)^:=#0; dec(i);
-         GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,#8);
-         if(currentcolumn>0) then dec(currentcolumn) 
-          else
-           begin
-           if(currentrow>0) then dec(currentrow);
-           currentcolumn:=maxcolumn-1;
-          end;
-        end;
-      end;
-    end
-   else if((ReadString+i-1)^<>#0) then
-    begin
-     inc(currentcolumn);
-     if(currentcolumn>=maxcolumn) then
-      begin
-       currentcolumn:=0; inc(currentrow);
-      end;
-     if(currentrow>=maxrow) then efi_console_clear_screen;
-     GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,@(ReadString+i-1)^);
-    end
-   else dec(i);
-   efi_console_set_cursor_position(currentcolumn,currentrow);
-  end;
-end;
-procedure efi_console_read_string_with_colour(var ReadString:PWideChar;backgroundcolour:byte;textcolour:byte);[public,alias:'EFI_CONSOLE_READ_STRING_WITH_COLOUR'];
-var key:efi_input_key;
-    waitidx,i,j:natuint;
-    procstring:PWideChar;
-begin
- GlobalSystemTable^.ConOut^.SetAttribute(GlobalSystemTable^.ConOut,backgroundcolour shl 4+textcolour);
- if(ReadString<>nil) then efi_freemem(ReadString);
- Readstring:=efi_allocmem(sizeof(WideChar)); i:=0;
- while (True) do
-  begin
-   inc(i);
-   procstring:=efi_allocmem(sizeof(WideChar)*(i+1));
-   efi_move(ReadString,procstring,sizeof(WideChar)*(i+1));
-   efi_freemem(ReadString); ReadString:=procstring;
-   GlobalSystemTable^.BootServices^.WaitForEvent(1,@GlobalSystemTable^.ConIn^.WaitForKey,waitidx);
-   GlobalSystemTable^.ConIn^.ReadKeyStroke(GlobalSystemTable^.ConIn,key);
-   if(key.ScanCode=0) then (ReadString+i-1)^:=key.UnicodeChar else (ReadString+i-1)^:=#0;
-   if((ReadString+i-1)^=#10) or ((ReadString+i-1)^=#13) then
-    begin
-     (ReadString+i-1)^:=#0; 
-     GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,#13#10);
-     currentcolumn:=0; inc(currentrow);
-     if(currentrow>=maxrow) then efi_console_clear_screen;
-     break;
-    end
-   else if((ReadString+i-1)^=#8) then
-    begin
-     if(i>0) then
-      begin 
-       (ReadString+i-1)^:=#0; dec(i);  
-       if(i>0) then
-        begin
-         (ReadString+i-1)^:=#0; dec(i);
-         GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,#8);
-         if(currentcolumn>0) then dec(currentcolumn) 
-          else
-           begin
-           if(currentrow>0) then dec(currentrow);
-           currentcolumn:=maxcolumn-1;
-          end;
-        end;
-      end;
-    end
-   else if((ReadString+i-1)^<>#0) then
-    begin
-     inc(currentcolumn);
-     if(currentcolumn>=maxcolumn) then
-      begin
-       currentcolumn:=0; inc(currentrow);
-      end;
-     if(currentrow>=maxrow) then efi_console_clear_screen;
-     GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,@(ReadString+i-1)^);
-    end
-   else dec(i);
-   efi_console_set_cursor_position(currentcolumn,currentrow);
-  end;
- GlobalSystemTable^.ConOut^.SetAttribute(GlobalSystemTable^.ConOut,consolebck shl 4+consoletex);
-end;
-procedure efi_console_read_password_string(var ReadString:PWideChar);[public,alias:'EFI_CONSOLE_READ_PASSWORD_STRING'];
-var key:efi_input_key;
-    waitidx,i,j:natuint;
-    procstring:PWideChar;
-begin
- if(ReadString<>nil) then efi_freemem(ReadString);
- Readstring:=efi_allocmem(sizeof(WideChar)); i:=0;
- while (True) do
-  begin
-   inc(i);
-   procstring:=efi_allocmem(sizeof(WideChar)*(i+1));
-   efi_move(ReadString,procstring,sizeof(WideChar)*(i+1));
-   efi_freemem(ReadString); ReadString:=procstring;
-   GlobalSystemTable^.BootServices^.WaitForEvent(1,@GlobalSystemTable^.ConIn^.WaitForKey,waitidx);
-   GlobalSystemTable^.ConIn^.ReadKeyStroke(GlobalSystemTable^.ConIn,key);
-   if(key.ScanCode=0) then (ReadString+i-1)^:=key.UnicodeChar else (ReadString+i-1)^:=#0;
-   if((ReadString+i-1)^=#10) or ((ReadString+i-1)^=#13) then
-    begin
-     (ReadString+i-1)^:=#0; 
-     GlobalSystemTable^.ConOut^.OutputString(GlobalSystemTable^.ConOut,#13#10);
-     currentcolumn:=0; inc(currentrow);
-     if(currentrow>=maxrow) then efi_console_clear_screen;
-     break;
-    end
-   else if((ReadString+i-1)^=#8) then
-    begin
-     if(i>0) then
-      begin 
-       (ReadString+i-1)^:=#0; dec(i);  
-       if(i>0) then
-        begin
-         (ReadString+i-1)^:=#0; dec(i);
-        end;
-      end;
-    end
-   else if((ReadString+i-1)^<>#0) then
-    begin
-    end
-   else dec(i);
-   efi_console_set_cursor_position(currentcolumn,currentrow);
-  end;
-end;
-procedure efi_console_enable_mouse;[public,alias:'EFI_CONSOLE_ENABLE_MOUSE'];
+procedure efi_console_enable_mouse;
 begin
  GlobalSystemTable^.ConOut^.EnableCursor(GlobalSystemTable^.ConOut,true);
 end;
-procedure efi_console_set_global_colour(backgroundcolour:byte;textcolour:byte);[public,alias:'EFI_CONSOLE_SET_GLOBAL_COLOUR'];
+procedure efi_console_set_global_colour(backgroundcolour:byte;textcolour:byte);
 begin
  consolebck:=backgroundcolour; consoletex:=textcolour;
 end;
-procedure efi_console_set_cursor_position(column,row:natuint);[public,alias:'EFI_CONSOLE_SET_CURSOR_POSITION'];
+procedure efi_console_set_cursor_position(column,row:natuint);
 begin
  GlobalSystemTable^.ConOut^.SetCursorPosition(GlobalSystemTable^.ConOut,column,row);
 end;
-procedure efi_console_get_cursor_position(var column,row:natuint);[public,alias:'EFI_CONSOLE_GET_CURSOR_POSITION'];
+procedure efi_console_get_cursor_position(var column,row:natuint);
 begin
  column:=GlobalSystemTable^.ConOut^.Mode^.Cursorcolumn;
  row:=GlobalSystemTable^.ConOut^.Mode^.CursorRow;
 end;
-procedure efi_console_get_max_row_and_max_column;[public,alias:'EFI_CONSOLE_GET_MAX_ROW_AND_MAX_COLUMN'];
+procedure efi_console_get_max_row_and_max_column;
 var maxc,maxr:Natuint;
     maxcharsize,rescolumn,resrow:Natuint;
     maxcharindex:Natuint;
@@ -3546,7 +3255,7 @@ begin
  GlobalSystemTable^.ConOut^.SetMode(GlobalSystemTable^.ConOut,maxcharindex-1);
  maxcolumn:=rescolumn; maxrow:=resrow; 
 end;
-procedure efi_console_timer_mouse_blink(Event:efi_event;Context:Pointer);{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif}[public,alias:'EFI_CONSOLE_TIMER_MOUSE_BLINK'];
+procedure efi_console_timer_mouse_blink(Event:efi_event;Context:Pointer);{$ifdef cpux86_64}MS_ABI_Default;{$endif}{$ifdef cpui386}cdecl;{$endif}
 begin
  if(CursorBlinkVisible=true) then 
   begin 
@@ -3559,7 +3268,7 @@ begin
    CursorBlinkVisible:=true;
   end;
 end;
-procedure efi_console_enable_mouse_blink(enableblink:boolean;blinkmilliseconds:qword);[public,alias:'EFI_CONSOLE_ENABLE_MOUSE_BLINK'];
+procedure efi_console_enable_mouse_blink(enableblink:boolean;blinkmilliseconds:qword);
 begin
  if(enableblink=true) and (Cursorblinkevent=nil) then
   begin
@@ -3573,87 +3282,7 @@ begin
    Cursorblinkevent:=nil;
   end;
 end;
-function efi_list_all_file_system(isreadonly:byte):efi_file_system_list;[public,alias:'EFI_LIST_ALL_FILE_SYSTEM'];
-var totalnum,i:natuint;
-    totalbuf:Pefi_handle;
-    sfsp:Pefi_simple_file_system_protocol;
-    fsinfo:efi_file_system_info;
-    fp:Pefi_file_protocol;
-    data:efi_file_system_list;
-    realsize:natuint;
-begin
- GlobalSystemTable^.BootServices^.LocateHandleBuffer(ByProtocol,@efi_simple_file_system_protocol_guid,nil,totalnum,totalbuf);
- data.file_system_content:=efi_allocmem(totalnum*sizeof(Pointer)); data.file_system_count:=0;
- for i:=1 to totalnum do
-  begin
-   GlobalSystemTable^.BootServices^.HandleProtocol((totalbuf+i-1)^,@efi_simple_file_system_protocol_guid,sfsp);
-   sfsp^.OpenVolume(sfsp,fp);
-   realsize:=sizeof(efi_file_system_info);
-   fp^.GetInfo(fp,@efi_file_system_info_id,realsize,fsinfo);
-   if(isreadonly=1) and (fsinfo.ReadOnly=true) then
-    begin
-     inc(data.file_system_count);
-     (data.file_system_content+data.file_system_count-1)^:=sfsp;
-    end
-   else if(isreadonly=0) and (fsinfo.ReadOnly=false) then
-    begin
-     inc(data.file_system_count);
-     (data.file_system_content+data.file_system_count-1)^:=sfsp;
-    end
-   else if(isreadonly>=2) then
-    begin
-     inc(data.file_system_count);
-     (data.file_system_content+data.file_system_count-1)^:=sfsp;
-    end;
-  end;
- efi_list_all_file_system:=data;
-end;
-function efi_list_all_file_system_ext:efi_file_system_list_ext;[public,alias:'EFI_LIST_ALL_FILE_SYSTEM_EXT'];
-var totalnum,i,j,size:natuint;
-    status:efi_status;
-    totalbuf:Pefi_handle;
-    sfspp:Pefi_simple_file_system_protocol;
-    fp:Pefi_file_protocol;
-    data:efi_file_system_list_ext;
-    fsinfo:efi_file_system_info;
-    realsize:natuint;
-begin
- GlobalSystemTable^.BootServices^.LocateHandleBuffer(ByProtocol,@efi_simple_file_system_protocol_guid,nil,totalnum,totalbuf);
- data.fsrcontent:=efi_allocmem(sizeof(Pointer)*totalnum); data.fsrcount:=0;
- data.fsrwcontent:=efi_allocmem(sizeof(Pointer)*totalnum); data.fsrwcount:=0;
- for i:=1 to totalnum do
-  begin
-   GlobalSystemTable^.BootServices^.HandleProtocol((totalbuf+i-1)^,@efi_simple_file_system_protocol_guid,sfspp);
-   sfspp^.OpenVolume(sfspp,fp);
-   realsize:=sizeof(efi_file_system_info);
-   fp^.GetInfo(fp,@efi_file_system_info_id,realsize,fsinfo);
-   if(fsinfo.ReadOnly) then
-    begin
-     inc(data.fsrcount);
-     (data.fsrcontent+data.fsrcount-1)^:=Pefi_simple_file_system_protocol(sfspp);
-     fp^.Close(fp);
-    end
-   else
-    begin
-     j:=1;
-     while(j<=4) do
-      begin
-       status:=fp^.Open(fp,fp,'\',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
-       if(status=efi_success) then break;
-       inc(j,1);
-      end;
-     if (j<=4) then
-      begin
-       inc(data.fsrwcount);
-       (data.fsrwcontent+data.fsrwcount-1)^:=Pefi_simple_file_system_protocol(sfspp);
-       fp^.Delete(fp);
-      end
-     else fp^.Close(fp);
-    end;
-  end;
- efi_list_all_file_system_ext:=data;
-end;
-procedure efi_console_initialize(bck_colour,text_colour:byte;blinkmiliseconds:qword);[public,alias:'EFI_CONSOLE_INITIALIZE'];
+procedure efi_console_initialize(bck_colour,text_colour:byte;blinkmiliseconds:qword);
 begin
  efi_console_set_global_colour(bck_colour,text_colour);
  efi_console_clear_screen;
@@ -3670,7 +3299,7 @@ begin
   end;
  efi_set_watchdog_timer_to_nil;
 end;
-function efi_graphics_initialize:efi_graphics_list;[public,alias:'EFI_GRAPHICS_INITITALIZE'];
+function efi_graphics_initialize:efi_graphics_list;
 var i:natuint;
     res:efi_graphics_list;
     ptr:Pefi_handle;
@@ -3681,7 +3310,7 @@ begin
  for i:=1 to res.graphics_count do GlobalSystemTable^.BootServices^.HandleProtocol((ptr+i-1)^,@efi_graphics_output_protocol_guid,(res.graphics_item+i-1)^);
  efi_graphics_initialize:=res;
 end;
-procedure efi_graphics_get_maxwidth_maxheight_and_maxdepth(egl:efi_graphics_list;eglindex:natuint);[public,alias:'EFI_GRAPHICS_GET_MAXWIDTH_MAXHEIGHT_AND_MAXDEPTH'];
+procedure efi_graphics_get_maxwidth_maxheight_and_maxdepth(egl:efi_graphics_list;eglindex:natuint);
 var ptr:Pefi_graphics_output_protocol;
     maxmode,i:natuint;
     screensize:natuint;
@@ -3701,11 +3330,11 @@ begin
   end;
  ptr^.SetMode(ptr,graphicsindex);
 end;
-procedure efi_graphics_free(var egl:efi_graphics_list);[public,alias:'EFI_GRAPHICS_FREE'];
+procedure efi_graphics_free(var egl:efi_graphics_list);
 begin
  efi_freemem(egl.graphics_item); egl.graphics_count:=0;
 end;
-function efi_loader_get_memory_map:efi_memory_map;[public,alias:'EFI_LOADER_GET_MEMORY_MAP'];
+function efi_loader_get_memory_map:efi_memory_map;
 var ptr:Pointer;
     size:natuint;
     descriptorSize:natuint;
@@ -3722,7 +3351,7 @@ begin
    status:=GlobalSystemTable^.BootServices^.GetMemoryMap(size,ptr,res.memory_key,descriptorSize,descriptorVersion);
    if(status<>efi_success) then efi_freemem(ptr);
   end;
- res.memory_descriptor_count:=size div descriptorsize;
+ res.memory_descriptor_count:=replace_divide(size,descriptorsize);
  res.memory_descriptor:=efi_allocmem(res.memory_descriptor_count*sizeof(efi_memory_descriptor));
  for i:=1 to res.memory_descriptor_count do
   begin
@@ -3731,7 +3360,7 @@ begin
  efi_freemem(ptr);
  efi_loader_get_memory_map:=res;
 end;
-function efi_loader_handle_memory_map(memorymap:efi_memory_map):efi_memory_map_simple;[public,alias:'EFI_LOADER_HANDLE_MEMORY_MAP'];
+function efi_loader_handle_memory_map(memorymap:efi_memory_map):efi_memory_map_simple;
 var res:efi_memory_map_simple;
     i:natuint;
     position,partsize:natuint;
@@ -3744,7 +3373,8 @@ begin
  while(i<memorymap.memory_descriptor_count) do
   begin
    inc(i);
-   if((memorymap.memory_descriptor+i-1)^.efiType=7) then
+   if((memorymap.memory_descriptor+i-1)^.efiType=3) or ((memorymap.memory_descriptor+i-1)^.efiType=4)
+   or((memorymap.memory_descriptor+i-1)^.efiType=7) then
     begin
      if(bool=false) then 
       begin
@@ -3764,10 +3394,10 @@ begin
       end;
     end;
   end;
- if(bool) then res.memory_count:=position else res.memory_count:=position-1;
+ if(bool) then res.memory_count:=position else res.memory_count:=position-1; 
  efi_loader_handle_memory_map:=res;
 end;
-function efi_loader_find_suitable_memory_map(var smm:efi_memory_map_simple;size:natuint):efi_memory_map_result;[public,alias:'EFI_LOADER_FIND_SUITABLE_MEMORY_MAP'];
+function efi_loader_find_suitable_memory_map(var smm:efi_memory_map_simple;size:natuint):efi_memory_map_result;
 var i:natuint;
     res:efi_memory_map_result;
 begin
@@ -3794,7 +3424,7 @@ begin
   end;
  efi_loader_find_suitable_memory_map:=res;
 end;
-procedure efi_loader_exit_boot_services;[public,alias:'EFI_LOADER_EXIT_BOOT_SERVICES'];
+procedure efi_loader_exit_boot_services;
 var ptr:Pointer;
     size:natuint;
     descriptorSize:natuint;
@@ -3808,84 +3438,11 @@ begin
   begin
    ptr:=efi_allocmem(size);
    status:=GlobalSystemTable^.BootServices^.GetMemoryMap(size,ptr,res.memory_key,descriptorSize,descriptorVersion);
-   if(status<>efi_success) then efi_freemem(ptr);
+   if(status<>efi_success) then efi_freemem(ptr)
+   else status:=GlobalSystemTable^.BootServices^.ExitBootServices(ParentImageHandle,res.memory_key);
   end;
- status:=GlobalSystemTable^.BootServices^.ExitBootServices(ParentImageHandle,res.memory_key);
- while(status<>efi_success) do;
 end;
-function efi_device_list_initialize:efi_device_list;[public,alias:'EFI_DEVICE_LIST_INITIALIZE'];
-var res:efi_device_list;
-    ptr:Pefi_handle;
-    ptrnum:Natuint;
-    tempitem:Pefi_pci_io_protocol;
-    i,j:Natuint;
-    {For PCI Header code}
-    support:qword;
-    content:array[1..64] of byte;
-    barcontent:Pointer=nil;
-    status:efi_status;
-begin
- GlobalSystemTable^.BootServices^.LocateHandleBuffer(ByProtocol,@efi_pci_io_protocol_guid,nil,ptrnum,ptr);
- res.pci:=efi_allocmem(sizeof(efi_pci_configuration_space)*ptrnum);
- res.pcicount:=ptrnum;
- for i:=1 to ptrnum do
-  begin
-   GlobalSystemTable^.BootServices^.HandleProtocol((ptr+i-1)^,@efi_pci_io_protocol_guid,tempitem);
-   tempitem^.pci.efiRead(tempitem,EfiPciIoWidthUint32,0,sizeof(efi_pci_configuration_space_type0) shr 2,content);
-   for j:=1 to 3 do (res.pci+i-1)^.classcode[j]:=Pefi_pci_configuration_space_type0(@content)^.classcode[4-j];
-   (res.pci+i-1)^.Manufracturer:=Pefi_pci_configuration_space_type0(@content)^.VendorId;
-   (res.pci+i-1)^.Device:=Pefi_pci_configuration_space_type0(@content)^.DeviceId;
-   j:=1;
-   while(j<=6)do
-    begin
-     status:=tempitem^.GetBarAttributes(tempitem,j-1,support,barcontent);
-     if(status<>efi_success) or (barcontent=nil) then
-      begin
-       (res.pci+i-1)^.AddrIs64bit[j]:=false;
-       (res.pci+i-1)^.AddrStart[j]:=0; 
-       (res.pci+i-1)^.AddrEnd[j]:=0;
-       (res.pci+i-1)^.AddrOffset[j]:=0;
-       (res.pci+i-1)^.AddrClass[j]:=3;
-      end
-     else if(PByte(barcontent)^=$8A) and (PByte(barcontent+$3)^=0) then
-      begin
-       (res.pci+i-1)^.AddrIs64bit[j]:=true;
-       (res.pci+i-1)^.AddrStart[j]:=Pqword(barcontent+$E)^; 
-       (res.pci+i-1)^.AddrEnd[j]:=Pqword(barcontent+$E)^+Pqword(barcontent+$16)^;
-       (res.pci+i-1)^.AddrOffset[j]:=Pqword(barcontent+$1E)^;
-       (res.pci+i-1)^.AddrClass[j]:=Pbyte(barcontent+$3)^;
-       if(Pqword(barcontent+$6)^=64) then 
-        begin
-         inc(j);
-         (res.pci+i-1)^.AddrIs64bit[j]:=false;
-         (res.pci+i-1)^.AddrStart[j]:=0; 
-         (res.pci+i-1)^.AddrEnd[j]:=0;
-         (res.pci+i-1)^.AddrOffset[j]:=0;
-         (res.pci+i-1)^.AddrClass[j]:=3;
-        end;
-      end
-     else
-      begin
-       (res.pci+i-1)^.AddrIs64bit[j]:=false;
-       (res.pci+i-1)^.AddrStart[j]:=0; 
-       (res.pci+i-1)^.AddrEnd[j]:=0;
-       (res.pci+i-1)^.AddrOffset[j]:=0;
-       (res.pci+i-1)^.AddrClass[j]:=3;
-      end;
-     if(barcontent<>nil) then 
-      begin
-       efi_freemem(barcontent); barcontent:=nil;
-      end;
-     inc(j);
-    end;
-  end;
- efi_device_list_initialize:=res;
-end;
-procedure efi_device_list_free(var list:efi_device_list);[public,alias:'EFI_DEVICE_LIST_FREE'];
-begin
- efi_freemem(list.pci); list.pcicount:=0;
-end;
-function efi_smbios_list_initialize:efi_smbios_list;[public,alias:'EFI_SMBIOS_LIST_INITIALIZE'];
+function efi_smbios_list_initialize:efi_smbios_list;
 var ptr:Pefi_smbios_protocol;
     CurrentHandle:efi_handle;
     i:word;
@@ -3907,31 +3464,30 @@ begin
   end;
  efi_smbios_list_initialize:=res;
 end;
-procedure efi_smbios_parse_smbios_list(res:efi_smbios_list);[public,alias:'EFI_PARSE_SMBIOS_LIST'];
+procedure efi_smbios_parse_smbios_list(res:efi_smbios_list);
 begin
 end;
-procedure efi_smbios_list_free(var res:efi_smbios_list);[public,alias:'EFI_SMBIOS_LIST_FREE'];
+procedure efi_smbios_list_free(var res:efi_smbios_list);
 begin
  efi_freemem(res.item); res.count:=0;
 end;
-function efi_get_cpu_info_from_acpi_table:acpi_cpu_info;[public,alias:'EFI_GET_CPU_INFO_FROM_ACPI_TABLE'];
+function efi_get_cpu_info_from_acpi_table:Pointer;
 var i:natuint;
-    res:acpi_cpu_info;
+    res:Pointer;
 begin
- i:=1;
+ i:=1; res:=nil;
  while(i<=GlobalSystemTable^.NumberOfTableEntries)do
   begin
    if(efi_guid_compare((GlobalSystemTable^.ConfigurationTable+i-1)^.VendorGUID,acpi_20_table_guid)) then
     begin
-     res:=acpi_get_cpu_info_from_acpi_table((GlobalSystemTable^.ConfigurationTable+i-1)^.VendorTable); break;
+     res:=(GlobalSystemTable^.ConfigurationTable+i-1)^.VendorTable; break;
     end
    else if(efi_guid_compare((GlobalSystemTable^.ConfigurationTable+i-1)^.VendorGUID,acpi_table_guid)) then
     begin
-     res:=acpi_get_cpu_info_from_acpi_table((GlobalSystemTable^.ConfigurationTable+i-1)^.VendorTable); break;
+     res:=(GlobalSystemTable^.ConfigurationTable+i-1)^.VendorTable; break;
     end;
    inc(i);
   end;
- if(i>GlobalSystemTable^.NumberOfTableEntries) then res.architecture:=$FF;
  efi_get_cpu_info_from_acpi_table:=res;
 end;
 

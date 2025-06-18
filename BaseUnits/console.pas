@@ -1,145 +1,132 @@
 unit console;
 
+{$mode ObjFPC}{$H+}
+
 interface
 
 uses graphics;
 
 type console_string=packed record
-                    content:PWideChar;
-                    color:graph_color;
-                    endline:boolean;
+                    Line:boolean;
+                    Content:string;
+                    Color:graph_color;
                     end;
-     Pconsole_string=^console_string;
-     console_screen=packed record
-                    buffer:^console_string;
-                    count:natuint;
-                    charcount:natuint;
-                    maxcharcount:natuint;
-                    row:word;
-                    maxrow:word;
-                    column:word;
-                    maxcolumn:word;
+     console_screen=class
+                    private
+                    XPosition,YPosition:Natint;
+                    Content:array of console_string;
+                    Count:Natuint;
+                    CurrentColumn,CurrentRow:Natuint;
+                    MaxColumn,MaxRow:Natuint;
+                    procedure RollConsole;
+                    public
+                    constructor Create(InputMaxColumn,InputMaxRow,InputXPosition,InputYPosition:Natuint);
+                    destructor Destroy;
+                    procedure AddString(InputContent:string;Color:graph_color);
+                    procedure GetPosition(var OutputXPosition:Natint;var OutputYPosition:Natint);
+                    procedure ChangePosition(InputXPosition,InputYPosition:Natint);
+                    procedure DrawConsole(Index:Dword;FontIndex:byte);
                     end;
-     Pconsole_screen=^console_screen;
-
-function console_screen_init(maxrow,maxcolumn:natuint):console_screen;
-procedure console_screen_free(var cs:console_screen);
-procedure console_screen_add_String(var cs:console_screen;str:PWideChar;color:graph_color);
-procedure console_draw(cs:console_screen;ptr:Pointer;startx,starty:Integer);
 
 implementation
 
-function console_generate_console_string(content:PWideChar;color:graph_color;endline:boolean):console_string;
-var res:console_string;
+procedure console_screen.RollConsole;
+var i,j,RollCount:Natuint;
 begin
- res.content:=Wstrcreate(content); res.endline:=endline; res.color:=color;
- console_generate_console_string:=res;
-end;
-procedure console_free_console_string(var cstr:console_string);
-begin
- FreeMem(cstr.content); cstr.endline:=false; cstr.color:=graph_color_none;
-end;
-function console_screen_init(maxrow,maxcolumn:natuint):console_screen;
-var res:console_screen;
-begin
- res.buffer:=nil; res.count:=0;
- res.row:=0; res.maxrow:=maxrow;
- res.column:=0; res.maxcolumn:=maxcolumn;
- console_screen_init:=res;
-end;
-procedure console_screen_free(var cs:console_screen);
-begin
- FreeMem(cs.buffer); cs.count:=0; cs.charcount:=0; cs.maxcharcount:=0;
- cs.row:=0; cs.maxrow:=0; cs.column:=0; cs.maxcolumn:=0;
-end;
-procedure console_screen_roll_screen(var cs:console_screen;rollrow:word);
-var i,j,delrow:natuint;
-    interval:natuint;
-    tempcstr:console_string;
-begin
- i:=1; j:=1; delrow:=0;
- while(delrow<=rollrow)do
+ if(CurrentRow>MaxRow) then
   begin
-   if(Pconsole_string(cs.buffer+i-1)^.endline) or (i=cs.count) then
+   RollCount:=CurrentRow-MaxRow; i:=1;
+   while(i<=RollCount)do
     begin
-     inc(delrow);
-     while(j<=i)do
+     j:=1;
+     while(j<=Self.Count) and (Self.Content[j-1].Line=false) do inc(j);
+     if(j>Self.Count) then j:=Self.Count;
+     Delete(Self.Content,0,j); dec(Self.Count,j);
+     inc(i);
+    end;
+  end;
+end;
+constructor console_screen.Create(InputMaxColumn,InputMaxRow,InputXPosition,InputYPosition:Natuint);
+begin
+ SetLength(Self.Content,0); Self.Count:=0;
+ Self.XPosition:=InputXPosition; Self.YPosition:=InputYPosition;
+ Self.CurrentColumn:=1; Self.CurrentRow:=1;
+ Self.MaxColumn:=InputMaxColumn; Self.MaxRow:=InputMaxRow;
+end;
+destructor console_screen.Destroy;
+begin
+ SetLength(Self.Content,0); Self.Count:=0;
+ Self.XPosition:=0; Self.YPosition:=0;
+ Self.CurrentColumn:=0; Self.CurrentRow:=0;
+ Self.MaxColumn:=0; Self.MaxRow:=0;
+end;
+procedure console_screen.AddString(InputContent:String;Color:graph_color);
+var len,offset:Natuint;
+    tempstr:string;
+begin
+ len:=length(InputContent); offset:=1;
+ while(Self.CurrentColumn+len>Self.MaxColumn)do
+  begin
+   tempstr:=Copy(InputContent,offset,Self.MaxColumn-Self.CurrentColumn+1);
+   inc(offset,length(tempstr));
+   inc(self.Count);
+   SetLength(self.Content,Self.Count);
+   self.Content[Self.Count-1].Line:=true;
+   self.Content[Self.Count-1].Content:=tempstr;
+   self.Content[Self.Count-1].Color:=color;
+   inc(Self.CurrentRow,1);
+   dec(len,Self.MaxColumn-Self.CurrentColumn+1);
+   Self.CurrentColumn:=1;
+  end;
+ if(len>0) then
+  begin
+   tempstr:=Copy(InputContent,offset,len);
+   inc(self.Count);
+   SetLength(self.Content,Self.Count);
+   self.Content[Self.Count-1].Line:=false;
+   self.Content[Self.Count-1].Content:=tempstr;
+   self.Content[Self.Count-1].Color:=color;
+   inc(Self.CurrentColumn,len);
+  end;
+ if(Self.CurrentRow>Self.MaxRow) then Self.RollConsole;
+end;
+procedure console_screen.ChangePosition(InputXPosition,InputYPosition:Natint);
+begin
+ Self.XPosition:=InputXPosition; Self.YPosition:=InputYPosition;
+end;
+procedure console_screen.GetPosition(var OutputXPosition:Natint;var OutputYPosition:Natint);
+begin
+ OutputXPosition:=Self.XPosition; OutputYPosition:=Self.YPosition;
+end;
+procedure console_screen.DrawConsole(Index:dword;FontIndex:byte);
+var RelativeX,RelativeY,DrawX,DrawY:Natint;
+    i,j,templen:Natuint;
+begin
+ RelativeX:=graph_heap_get_x_position(Index); RelativeY:=graph_heap_get_y_position(Index);
+ DrawX:=1; DrawY:=1; i:=1;
+ while(i<=Self.Count)do
+  begin
+   templen:=length(Self.Content[i-1].Content); j:=1;
+   while(j<=templen)do
+    begin
+     graph_heap_draw_char(Index,graph_align_left,graph_align_top,
+     RelativeX+(DrawX-1)*16,
+     RelativeY+(DrawY-1)*20,FontIndex,Self.Content[i-1].Content[j],Self.Content[i-1].Color);
+     if(DrawY>Self.MaxRow) then
       begin
-       tempcstr:=Pconsole_string(cs.buffer+j-1)^;
-       console_free_console_string(tempcstr);
-       tempcstr.content:=nil;
-       inc(j);
+       exit;
+      end
+     else if(DrawX>Self.MaxColumn) then
+      begin
+       DrawX:=1; inc(DrawY);
+      end
+     else
+      begin
+       inc(DrawX);
       end;
-     if(delrow>rollrow) then break;
-     j:=i+1;
+     inc(j);
     end;
    inc(i);
-  end;
- interval:=i;
- while(i<cs.count)do
-  begin
-   Pconsole_string(cs.buffer+i-1)^:=Pconsole_string(cs.buffer+i-interval-1)^;
-   inc(i);
-  end;
- cs.count:=cs.count-interval;
- cs.row:=cs.row-delrow+1;
- ReallocMem(cs.buffer,cs.count*sizeof(console_string));
-end;
-procedure console_screen_add_console_string(var cs:console_screen;cstr:console_string);
-begin
- inc(cs.count);
- ReallocMem(cs.buffer,sizeof(console_string)*cs.count);
- Pconsole_string(cs.buffer+cs.count-1)^:=cstr;
-end;
-procedure console_screen_add_String(var cs:console_screen;str:PWideChar;color:graph_color);
-var i,j:natuint;
-    partstr:PWideChar;
-    tempcstr:console_string;
-begin
- i:=1; j:=1;
- while((str+i-1)^<>#0)do
-  begin
-   inc(cs.column);
-   if((str+i-1)^=#10) or ((str+i-1)^=#13) then
-    begin
-     partstr:=Wstrcutout(str,j,i-j);
-     tempcstr:=console_generate_console_string(partstr,color,true);
-     console_screen_add_console_string(cs,tempcstr);
-     inc(cs.row); cs.column:=0; j:=i+1;
-    end
-   else if(cs.column>=cs.maxcolumn) then
-    begin
-     partstr:=Wstrcutout(str,j,i-j+1);
-     tempcstr:=console_generate_console_string(partstr,color,false);
-     console_screen_add_console_string(cs,tempcstr);
-     inc(cs.row); cs.column:=0; j:=i+1;
-    end
-   else if((str+i)^=#0) then
-    begin
-     tempcstr:=console_generate_console_string(partstr,color,false);
-     console_screen_add_console_string(cs,tempcstr);
-    end;
-   inc(i);
-  end;
- if(cs.row>=cs.maxrow) then console_screen_roll_screen(cs,cs.row-cs.maxrow);
-end;
-procedure console_draw(cs:console_screen;ptr:Pointer;startx,starty:Integer);
-var cx,cy:Integer;
-    i:natuint;
-begin
- cx:=startx; cy:=starty;
- for i:=1 to cs.count do
-  begin
-   graph_heap_draw_graph_string(ptr,cx,cy,Pconsole_string(cs.buffer+i-1)^.content,
-   Pconsole_string(cs.buffer+i-1)^.color);
-   if(Pconsole_string(cs.buffer+i-1)^.endline) then
-    begin
-     inc(cy,32); cx:=0;
-    end
-   else
-    begin
-     inc(cx,16*Wstrlen(Pconsole_string(cs.buffer+i-1)^.content));
-    end;
   end;
 end;
 

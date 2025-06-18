@@ -2,6 +2,8 @@ unit acpi;
 
 interface
 
+{$MODE objFPC}{$H+}
+
       {ACPI Header Signature}
 const acpi_rsdp_signature:array[1..8] of char=('R','S','D',' ','P','T','R',' ');
       acpi_rsdt_signature:array[1..4] of char=('R','S','D','T');
@@ -37,6 +39,7 @@ const acpi_rsdp_signature:array[1..8] of char=('R','S','D',' ','P','T','R',' ');
       acpi_misc_signature:array[1..4] of char=('M','I','S','C');
       acpi_ccel_signature:array[1..4] of char=('C','C','E','L');
       acpi_skvl_signature:array[1..4] of char=('S','K','V','L');
+      acpi_mcfg_signature:array[1..4] of char=('M','C','F','G');
       {ACPI MADT Specified Type}
       acpi_madt_processor_local_apic:byte=0;
       acpi_madt_io_apic:byte=1;
@@ -225,6 +228,7 @@ const acpi_rsdp_signature:array[1..8] of char=('R','S','D',' ','P','T','R',' ');
       acpi_type_misc:byte=29;
       acpi_type_ccel:byte=30;
       acpi_type_skvl:byte=31;
+      acpi_type_mcfg:byte=32;
 
 type acpi_uint96=array[1..3] of dword;
      acpi_int96=packed record
@@ -1808,6 +1812,19 @@ type acpi_uint96=array[1..3] of dword;
                keystructure:array[1..1] of acpi_skvl_key_structure;
                end;
      Pacpi_skvl=^acpi_skvl;
+     {ACPI Memory Configuration Table}
+     acpi_mcfg_configuration_base_address_allocation_structure=packed record
+                                                               BaseAddress:qword;
+                                                               PCISegmentGroupNumber:word;
+                                                               StartBusNumber:byte;
+                                                               EndBusNumber:byte;
+                                                               Reserved:dword;
+                                                               end;
+     acpi_mcfg=packed record
+               Hdr:acpi_sdth;
+               ConfigStructure:array[1..1] of acpi_mcfg_configuration_base_address_allocation_structure;
+               end;
+     Pacpi_mcfg=^acpi_mcfg;
      {ACPI Item}
      acpi_item=packed record
                acpitype:byte;
@@ -1844,6 +1861,7 @@ type acpi_uint96=array[1..3] of dword;
                29:(misc:Pacpi_misc;);
                30:(ccel:Pacpi_ccel;);
                31:(skvl:Pacpi_skvl;);
+               32:(mcfg:Pacpi_mcfg;);
                end;
      Pacpi_tree=^acpi_tree;
      acpi_search_list=packed record
@@ -1898,6 +1916,10 @@ type acpi_uint96=array[1..3] of dword;
                    architecture:byte;
                    {Core Interrupt Information}
                    Processor:acpi_processor;
+                   {Core PCI Information}
+                   PCIAddress:Pointer;
+                   PCIBusStartNumber:byte;
+                   PCIBusEndNumber:byte;
                    end;
      acpi_cpu_x86_local_apic_id_register=packed record
                                          Reserved1:array[1..3] of byte;
@@ -2057,7 +2079,7 @@ type acpi_uint96=array[1..3] of dword;
                                                      Reserved1:0..3;
                                                      EOIBroadCastSuppression:0..1;
                                                      Reserved2:0..$7FFFF;
-                                                     Reserved3:array[1..12] of byte; 
+                                                     Reserved3:array[1..12] of byte;
                                                      end;
      acpi_cpu_x86_local_apic=packed record
                              Reserved1:array[1..8] of dword;
@@ -2093,19 +2115,70 @@ type acpi_uint96=array[1..3] of dword;
                              Reserved5:array[1..4] of dword;
                              end;
      Pacpi_cpu_x86_local_apic=^acpi_cpu_x86_local_apic;
+     acpi_cpu_x86_io_apic_id=bitpacked record
+                             Reserved1:0..$FFFFFF;
+                             Id:0..$F;
+                             Reserved2:0..$F;
+                             end;
+     acpi_cpu_x86_io_apic_version=packed record
+                                  APICVersion:byte;
+                                  Reserved1:byte;
+                                  MaximumRedirectionEntry:byte;
+                                  Reserved2:byte;
+                                  end;
+     acpi_cpu_x86_io_apic_relocation_table_low=bitpacked record
+                                               Vector:byte;
+                                               DeliveryMode:0..7;
+                                               DestinationMode:0..1;
+                                               DeliveryStatus:0..1;
+                                               InterruptPinPolarity:0..1;
+                                               RemoteIRR:0..1;
+                                               TriggerMode:0..1;
+                                               InterruptMask:0..1;
+                                               Reserved:0..$7FFF;
+                                               end;
+     acpi_cpu_x86_io_apic_relocation_table_high=packed record
+                                                Reserved:0..$3FFFFFFFFF;
+                                                DestinationField:0..$FF;
+                                                end;
+     acpi_cpu_x86_io_apic_structure=packed record
+                                    case Byte of
+                                    0:(id:acpi_cpu_x86_io_apic_id;);
+                                    1:(version:acpi_cpu_x86_io_apic_version;);
+                                    2:(reloclow:acpi_cpu_x86_io_apic_relocation_table_low;);
+                                    3:(relochigh:acpi_cpu_x86_io_apic_relocation_table_high;);
+                                    end;
+     Pacpi_cpu_x86_io_apic_structure=^acpi_cpu_x86_io_apic_structure;
+     acpi_cpu_x86_io_apic_register=packed record
+                                   Index:byte;
+                                   Reserved1:array[1..15] of byte;
+                                   Data:dword;
+                                   Reserved2:array[1..3] of dword;
+                                   IRQPin:dword;
+                                   Reserved3:array[1..7] of dword;
+                                   EOI:byte;
+                                   end;
+     Pacpi_cpu_x86_io_apic_register=^acpi_cpu_x86_io_apic_register;
      acpi_request=packed record
-                  requestAPICIndex:byte;
                   requestrootclass:byte;
                   requestsubclass:byte;
+                  {For x86 Local APIC Only}
                   requesttimer:dword;
                   requesttimerstatus:byte;
+                  {For x86 IO APIC}
+                  requestIOAPICIndex:byte;
+                  requestIRQIndex:byte;
+                  {For x86 APIC}
+                  requestAPICIndex:byte;
                   requestnumber:byte;
                   requestDelivery:byte;
                   requestDeliveryMode:byte;
+                  requestGenerateInterrupt:boolean;
                   end;
      acpi_processor_item=packed record
                          case Byte of
                          0:(x86localapic:Pacpi_cpu_x86_local_apic;);
+                         1:(x86ioapic:Pacpi_cpu_x86_io_apic_register;);
                          end;
 
 const acpi_persistent_memory_region_guid:acpi_guid=(data1:$66F0D379;data2:$B4F3;data3:$4074;data4:
@@ -2147,6 +2220,10 @@ const acpi_persistent_memory_region_guid:acpi_guid=(data1:$66F0D379;data2:$B4F3;
       acpi_request_x86_delivery_external=7;
       acpi_request_x86_timer_one_shot=0;
       acpi_request_x86_timer_periodic=1;
+      acpi_request_x86_io_apic:byte=$1;
+      acpi_request_x86_io_apic_id=$0;
+      acpi_request_x86_io_apic_version=$1;
+      acpi_request_x86_io_apic_start_index=$10;
 
 var os_cpuinfo:acpi_cpu_info;
 
@@ -2322,6 +2399,10 @@ begin
   begin
    res.acpitype:=acpi_type_skvl; res.skvl:=ptr;
   end
+ else if(acpi_check_signature(ptr^,acpi_mcfg_signature,4)) then
+  begin
+   res.acpitype:=acpi_type_mcfg; res.mcfg:=ptr;
+  end
  else
   begin
    res.acpitype:=$FF; res.xsdt:=nil;
@@ -2463,7 +2544,27 @@ begin
   end;
  acpi_tree_search_for_madt:=ptr;
 end;
-function acpi_tree_parse_madt_to_cpu_info(madt:Pacpi_madt):acpi_cpu_info;
+function acpi_tree_search_for_mcfg(tree:Pacpi_tree):Pointer;
+var ptr:Pointer;
+    i:dword;
+begin
+ if(tree^.item.acpitype=acpi_type_mcfg) then
+  begin
+   ptr:=tree^.item.madt;
+  end
+ else
+  begin
+   i:=1; ptr:=nil;
+   while(i<=tree^.count)do
+    begin
+     ptr:=acpi_tree_search_for_mcfg(tree^.child+i-1);
+     if(ptr<>nil) then break;
+     inc(i);
+    end;
+  end;
+ acpi_tree_search_for_mcfg:=ptr;
+end;
+function acpi_tree_parse_madt_and_mcfg_to_cpu_info(madt:Pacpi_madt;mcfg:Pacpi_mcfg):acpi_cpu_info;
 var offset,madtlength,madtstart:dword;
     i:dword;
     ptr:Pbyte;
@@ -2473,13 +2574,16 @@ var offset,madtlength,madtstart:dword;
 begin
  if(madt=nil) then
   begin
-   res.architecture:=$FF;  
+   res.architecture:=$FF;
    for i:=1 to sizeof(res.Processor) do PByte(ptr+i-1)^:=0;
    exit(res);
   end;
  madtlength:=madt^.hdr.length-sizeof(acpi_madt)+1;
  madtstart:=sizeof(acpi_madt)-1; offset:=madtstart;
  res.architecture:=acpi_get_architecture;
+ res.PCIAddress:=Pointer(mcfg^.ConfigStructure[1].BaseAddress);
+ res.PCIBusStartNumber:=mcfg^.ConfigStructure[1].StartBusNumber;
+ res.PCIBusEndNumber:=mcfg^.ConfigStructure[1].EndBusNumber;
  ptr:=@res.Processor;
  for i:=1 to sizeof(res.Processor) do PByte(ptr+i-1)^:=0;
  res.Processor.BaseInterruptAddress:=Pointer(madt^.LocalInterruptControllerAddress);
@@ -2656,22 +2760,24 @@ begin
     end
    else break;
   end;
- acpi_tree_parse_madt_to_cpu_info:=res;
+ acpi_tree_parse_madt_and_mcfg_to_cpu_info:=res;
 end;
 function acpi_get_cpu_info_from_acpi_table(ptr:Pointer):acpi_cpu_info;
 var tree:Pacpi_tree;
+    ptr1,ptr2:Pointer;
     res:acpi_cpu_info;
 begin
  tree:=nil;
  tree:=acpi_generate_tree_from_acpi_table(tree,ptr);
- ptr:=acpi_tree_search_for_madt(tree);
- res:=acpi_tree_parse_madt_to_cpu_info(ptr);
+ ptr1:=acpi_tree_search_for_madt(tree);
+ ptr2:=acpi_tree_search_for_mcfg(tree);
+ res:=acpi_tree_parse_madt_and_mcfg_to_cpu_info(ptr1,ptr2);
  acpi_tree_free(tree);
  acpi_get_cpu_info_from_acpi_table:=res;
 end;
 procedure acpi_cpu_request_interrupt(request:acpi_request);
 var item:acpi_processor_item;
-    writedata:dword;
+    readdata,writedata:dword;
 begin
  if(os_cpuinfo.architecture=acpi_i386) or (os_cpuinfo.architecture=acpi_x86_64)
  or(os_cpuinfo.architecture=acpi_ia64) then
@@ -2680,8 +2786,8 @@ begin
     begin
      if(os_cpuinfo.Processor.BaseInterruptOverrideAddress<>nil) then
      item.x86localapic:=os_cpuinfo.Processor.BaseInterruptOverrideAddress
-     else 
-     item.x86localapic:=os_cpuinfo.Processor.BaseInterruptAddress; 
+     else
+     item.x86localapic:=os_cpuinfo.Processor.BaseInterruptAddress;
      if(item.x86localapic^.SpuriousInterruptVectorRegister.EnableAPIC=1) then
       begin
        //item.x86localapic^.SpuriousInterruptVectorRegister.SpuriousVector:=$FF;
@@ -2845,6 +2951,29 @@ begin
        writedata:=(os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^ shl 24;
        Pdword(@item.x86localapic^.ICR2)^:=writedata;
       end;
+    end
+   else if(request.requestrootclass=acpi_request_x86_io_apic) then
+    begin
+     item.x86ioapic:=(os_cpuinfo.Processor.IOAPICAddress+request.requestIOAPICIndex-1)^;
+     Pbyte(@item.x86ioapic^.Index)^:=acpi_request_x86_io_apic_version;
+     readdata:=Pacpi_cpu_x86_io_apic_structure(@item.x86ioapic^.Data)^.version.MaximumRedirectionEntry;
+     if(readdata<request.requestnumber) then exit;
+     Pbyte(@item.x86ioapic^.Index)^:=acpi_request_x86_io_apic_start_index+(request.requestIRQIndex-1) shl 1;
+     Pacpi_cpu_x86_io_apic_structure(@writedata)^.reloclow.DeliveryMode:=request.requestDeliveryMode;
+     Pacpi_cpu_x86_io_apic_structure(@writedata)^.reloclow.InterruptMask:=0;
+     Pacpi_cpu_x86_io_apic_structure(@writedata)^.reloclow.Vector:=request.requestnumber-1;
+     Pdword(@item.x86ioapic^.Data)^:=writedata;
+     writedata:=0;
+     Pbyte(@item.x86ioapic^.Index)^:=acpi_request_x86_io_apic_start_index+(request.requestIRQIndex-1) shl 1+1;
+     Pacpi_cpu_x86_io_apic_structure(@writedata)^.relochigh.DestinationField:=
+     (os_cpuinfo.Processor.LocalAPICId+request.requestAPICIndex-1)^;
+     Pdword(@item.x86ioapic^.Data)^:=writedata;
+     writedata:=0;
+     if(request.requestGenerateInterrupt) then
+      begin
+       Pdword(@item.x86ioapic^.EOI)^:=request.requestnumber-1;
+       Pbyte(@item.x86ioapic^.IRQPin)^:=request.requestIRQIndex-1;
+      end;
     end;
   end
  else if(os_cpuinfo.architecture=acpi_arm) or (os_cpuinfo.architecture=acpi_arm64) then
@@ -2860,6 +2989,13 @@ begin
 
   end;
 end;
+procedure mmio_write32(ptr:Pointer;data:dword);
+begin
+ Pdword(ptr)^:=data;
+end;
+function mmio_read32(ptr:Pointer):dword;
+begin
+ mmio_read32:=Pdword(ptr)^;
+end;
 
 end.
-

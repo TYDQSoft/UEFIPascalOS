@@ -899,8 +899,8 @@ const usb_endpoint_disabled=0;
       usb_slot_state_reserved=4;
 
 function usb_initialize(ptr:Pointer):Pusb_object;
-procedure usb_send_packet(obj:Pusb_object;mainindex,subindex:word;index:byte;const data:Pointer;datasize:word);
-procedure usb_receive_packet(obj:Pusb_object;mainindex,subindex:word;index:byte;data:Pointer;datasize:word);
+procedure usb_send_packet(obj:Pusb_object;mainindex,subindex:word;index:byte;const data;datasize:word);
+procedure usb_receive_packet(obj:Pusb_object;mainindex,subindex:word;index:byte;var data;datasize:word);
 
 implementation
 
@@ -996,6 +996,11 @@ begin
  inc(obj^.CmdCount);
  (obj^.CmdAddr+obj^.CmdCount-1)^:=trb;
 end;
+procedure usb_run_doorbell(obj:Pusb_object;index:byte);
+begin
+ {Set the doorbell register to transmit information for usb}
+ obj^.DoorAddr^.DBTarget:=index;
+end;
 procedure usb_add_transfer_ring(obj:Pusb_object;mainindex,subindex:word;index:word;trb:usb_trb);
 var ptr:Pusb_context;
 begin
@@ -1004,7 +1009,7 @@ begin
  Pusb_trb(ptr^.EndPoint.TRDequeuePointer)^:=trb;
  ptr^.EndPoint.TRDequeuePointer:=index+$10;
 end;
-procedure usb_send_packet(obj:Pusb_object;mainindex,subindex:word;index:byte;const data:Pointer;datasize:word);
+procedure usb_send_packet(obj:Pusb_object;mainindex,subindex:word;index:byte;const data;datasize:word);
 var trb:usb_trb;
 begin
  {Set the Setup Stage}
@@ -1026,7 +1031,7 @@ begin
  usb_add_transfer_ring(obj,mainindex,subindex,1,trb);
  {Set the Status Stage}
  trb.DataStage.CycleBit:=1;
- trb.DataStage.DataBuffer:=Natuint(data);
+ trb.DataStage.DataBuffer:=Natuint(@data);
  trb.DataStage.EvaluateNextTRB:=1;
  trb.DataStage.Reserved1:=0;
  trb.DataStage.Reserved2:=0;
@@ -1054,9 +1059,10 @@ begin
  trb.StatusStage.Reserved3:=0;
  trb.StatusStage.Reserved4:=0;
  usb_add_transfer_ring(obj,mainindex,subindex,3,trb);
+ usb_run_doorbell(obj,subindex);
  usb_run_command(obj);
 end;
-procedure usb_receive_packet(obj:Pusb_object;mainindex,subindex:word;index:byte;data:Pointer;datasize:word);
+procedure usb_receive_packet(obj:Pusb_object;mainindex,subindex:word;index:byte;var data;datasize:word);
 var trb:usb_trb;
 begin
  {Set the Setup Stage}
@@ -1078,7 +1084,7 @@ begin
  usb_add_transfer_ring(obj,mainindex,subindex,1,trb);
  {Set the Status Stage}
  trb.DataStage.CycleBit:=1;
- trb.DataStage.DataBuffer:=Natuint(data);
+ trb.DataStage.DataBuffer:=Natuint(@data);
  trb.DataStage.EvaluateNextTRB:=1;
  trb.DataStage.Reserved1:=0;
  trb.DataStage.Reserved2:=0;
@@ -1106,6 +1112,7 @@ begin
  trb.StatusStage.Reserved3:=0;
  trb.StatusStage.Reserved4:=0;
  usb_add_transfer_ring(obj,mainindex,subindex,3,trb);
+ usb_run_doorbell(obj,subindex);
  usb_run_command(obj);
 end;
 

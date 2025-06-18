@@ -395,7 +395,6 @@ begin
 end;
 procedure kernel_gdt_initialize;
 var temprec:x86_gdt_descriptor;
-label dummy;
 begin
  gdt.Offset:=dword(@gdtentry);
  gdt.Size:=sizeof(gdtentry)-1;

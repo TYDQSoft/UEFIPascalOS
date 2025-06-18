@@ -392,11 +392,7 @@ begin
    res.io:=nil;
    res.iocount:=0;
   end;
- if(res.name=3) then
-  begin
-   res.content:=usb_initialize(res.io^.ioaddress.address_start);
-  end
- else res.content:=nil;
+ res.content:=nil;
  device_list_construct_device_object:=res;
 end;
 function device_list_search_for_index(list:device_object_list;searchindex:dword):boolean;[public,alias:'device_list_search_for_index'];
